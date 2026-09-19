@@ -12,6 +12,9 @@
 #include <wx/textctrl.h>
 #include <wx/persist/toplevel.h>
 
+#include <memory>
+#include <vector>
+
 LogWindow::LogWindow(
         _In_ wxWindow *parent, 
         _In_ const wxMenuItem *log_toggle,
@@ -88,20 +91,24 @@ void LogWindow::set_accelerators(
         _In_ const wxMenuItem *font_decr,
         _In_ const wxMenuItem *font_dflt)
 {
-        std::unique_ptr<wxAcceleratorEntry> toggle(log_toggle->GetAccel());
-        std::unique_ptr<wxAcceleratorEntry> incr(font_incr->GetAccel());
-        std::unique_ptr<wxAcceleratorEntry> decr(font_decr->GetAccel());
-        std::unique_ptr<wxAcceleratorEntry> dflt(font_dflt->GetAccel());
+        std::vector<wxAcceleratorEntry> entries;
+        entries.reserve(4);
 
-        wxAcceleratorEntry entries[] { 
-                { toggle->GetFlags(), toggle->GetKeyCode(), wxID_CLOSE }, 
-                { incr->GetFlags(), incr->GetKeyCode(), font_incr->GetId() }, 
-                { decr->GetFlags(), decr->GetKeyCode(), font_decr->GetId() }, 
-                { dflt->GetFlags(), dflt->GetKeyCode(), font_dflt->GetId() }, 
+        auto add_entry = [&entries](_In_ const wxMenuItem *item, _In_ int cmd) {
+                if (std::unique_ptr<wxAcceleratorEntry> accel{item->GetAccel()}) {
+                        entries.emplace_back(accel->GetFlags(), accel->GetKeyCode(), cmd);
+                }
         };
 
-        wxAcceleratorTable table(std::size(entries), entries);
-        GetFrame()->SetAcceleratorTable(table);
+        add_entry(log_toggle, wxID_CLOSE);
+        add_entry(font_incr, font_incr->GetId());
+        add_entry(font_decr, font_decr->GetId());
+        add_entry(font_dflt, font_dflt->GetId());
+
+        if (!entries.empty()) {
+                wxAcceleratorTable table(static_cast<int>(entries.size()), entries.data());
+                GetFrame()->SetAcceleratorTable(table);
+        }
 }
 
 void LogWindow::DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info)

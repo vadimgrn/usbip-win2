@@ -26,94 +26,97 @@ wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 class MainFrame : public Frame
 {
 public:
-	[[nodiscard]] static MainFrame* create(_In_ usbip::Handle read, _In_ int appearance);
-	~MainFrame();
+        [[nodiscard]] static MainFrame* create(_In_ usbip::Handle read, _In_ int appearance);
+        ~MainFrame();
 
-	auto start_in_tray() const noexcept { return m_start_in_tray; }
-	void iconize_to_tray();
+        auto start_in_tray() const noexcept { return m_start_in_tray; }
+        void iconize_to_tray();
 
-	void on_exit(wxCommandEvent &event) override;
-	void on_detach_all(wxCommandEvent &event) override;
+        void on_exit(wxCommandEvent &event) override;
+        void on_detach_all(wxCommandEvent &event) override;
 
         void set_status_text(_In_ const wxString &text,
                 _In_ std::chrono::seconds duration = std::chrono::seconds(10), _In_ bool verbose_log = true);
+
+        void set_view_labels(_In_ bool show);
+        void set_view_zebra(_In_ bool enable);
 
 private:
         friend class TaskBarIcon;
         friend class wxPersistentMainFrame;
 
-	MainFrame(_In_ usbip::Handle read, _In_ int appearance);
+        MainFrame(_In_ usbip::Handle read, _In_ int appearance);
 
         enum { IMG_SERVER, IMG_DEVICE, IMG_CNT };
 
-	bool m_start_in_tray{};
-	bool m_close_to_tray{};
+        bool m_start_in_tray{};
+        bool m_close_to_tray{};
 
         LogWindow *m_log{};
-	TreeListItemComparator m_tree_cmp;
-	std::unique_ptr<TaskBarIcon> m_taskbar_icon;
-	std::unique_ptr<wxMenu> m_tree_popup_menu;
+        TreeListItemComparator m_tree_cmp;
+        std::unique_ptr<TaskBarIcon> m_taskbar_icon;
+        std::unique_ptr<wxMenu> m_tree_popup_menu;
 
-	usbip::Handle m_read;
-	std::mutex m_read_close_mtx;
+        usbip::Handle m_read;
+        std::mutex m_read_close_mtx;
 
-	std::jthread m_read_thread;
+        std::jthread m_read_thread;
 
         int m_status_text_pushes{};
         wxTimer m_status_bar_timer{this};
 
-	static wxWithImages::Images get_tree_images();
+        static wxWithImages::Images get_tree_images();
 
-	void on_close(wxCloseEvent &event) override; 
+        void on_close(wxCloseEvent &event) override;
         void on_attach_stop_all(wxCommandEvent &event) override;
         void on_detach(wxCommandEvent &event) override;
         void on_reload(wxCommandEvent &event) override;
-	void on_help_about(wxCommandEvent &event) override;
-	void add_exported_devices(wxCommandEvent &event) override;
-	void on_select_all(wxCommandEvent &event) override;
-	void on_has_devices_update_ui(wxUpdateUIEvent &event) override;
-	void on_has_selected_devices_update_ui(wxUpdateUIEvent &event) override;
+        void on_help_about(wxCommandEvent &event) override;
+        void add_exported_devices(wxCommandEvent &event) override;
+        void on_select_all(wxCommandEvent &event) override;
+        void on_has_devices_update_ui(wxUpdateUIEvent &event) override;
+        void on_has_selected_devices_update_ui(wxUpdateUIEvent &event) override;
         void on_has_any_selected_devices_update_ui(wxUpdateUIEvent &event) override;
         void on_flip_auto(wxCommandEvent &event) override;
         void on_flip_receive_mode(wxCommandEvent &event) override;
-	void on_item_context_menu(wxTreeListEvent &event) override;
-	void on_view_reset(wxCommandEvent &event) override;
-	void on_help_about_lib(wxCommandEvent&) override;
-	void on_copy_rows(wxCommandEvent &event) override;
+        void on_item_context_menu(wxTreeListEvent &event) override;
+        void on_view_reset(wxCommandEvent &event) override;
+        void on_help_about_lib(wxCommandEvent&) override;
+        void on_copy_rows(wxCommandEvent &event) override;
         void on_attach(wxCommandEvent&) override { attach(false); }
         void on_attach_once(wxCommandEvent&) override;
         void on_attach_stop(wxCommandEvent &event) override;
 
         void on_save(wxCommandEvent &event) override;
-	void on_save_selected(wxCommandEvent &event) override;
-	void on_load(wxCommandEvent &event) override;
+        void on_save_selected(wxCommandEvent &event) override;
+        void on_load(wxCommandEvent &event) override;
 
-	void on_view_zebra_update_ui(wxUpdateUIEvent &event) override;
-	void on_view_zebra(wxCommandEvent &event) override;
+        void on_view_zebra_update_ui(wxUpdateUIEvent &event) override;
+        void on_view_zebra(wxCommandEvent &event) override;
 
-	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
-	void on_log_show(wxCommandEvent &event) override;
+        void on_log_show_update_ui(wxUpdateUIEvent &event) override;
+        void on_log_show(wxCommandEvent &event) override;
 
-	void on_log_library_update_ui(wxUpdateUIEvent &event) override;
-	void on_log_library(wxCommandEvent &event) override;
+        void on_log_library_update_ui(wxUpdateUIEvent &event) override;
+        void on_log_library(wxCommandEvent &event) override;
 
-	void on_log_verbose_update_ui(wxUpdateUIEvent &event) override;
-	void on_log_verbose(wxCommandEvent &event) override;
+        void on_log_verbose_update_ui(wxUpdateUIEvent &event) override;
+        void on_log_verbose(wxCommandEvent &event) override;
 
-	void on_view_column_update_ui(wxUpdateUIEvent &event) override;
-	void on_view_column(wxCommandEvent &event) override;
+        void on_view_column_update_ui(wxUpdateUIEvent &event) override;
+        void on_view_column(wxCommandEvent &event) override;
 
-	void on_start_in_tray_update_ui(wxUpdateUIEvent &event) override;
-	void on_start_in_tray(wxCommandEvent &event) override;
-	
-	void on_close_to_tray_update_ui(wxUpdateUIEvent &event) override;
-	void on_close_to_tray(wxCommandEvent &event) override;
+        void on_start_in_tray_update_ui(wxUpdateUIEvent &event) override;
+        void on_start_in_tray(wxCommandEvent &event) override;
 
-	void on_device_state(_In_ DeviceStateEvent &event);
-	void on_item_activated(wxTreeListEvent &event) override;
+        void on_close_to_tray_update_ui(wxUpdateUIEvent &event) override;
+        void on_close_to_tray(wxCommandEvent &event) override;
 
-	void on_view_labels(wxCommandEvent &event) override;
-	void on_view_labels_update_ui(wxUpdateUIEvent &event) override;
+        void on_device_state(_In_ DeviceStateEvent &event);
+        void on_item_activated(wxTreeListEvent &event) override;
+
+        void on_view_labels(wxCommandEvent &event) override;
+        void on_view_labels_update_ui(wxUpdateUIEvent &event) override;
 
         void on_edit_device_update_ui(wxUpdateUIEvent &event) override;
         void on_edit_notes(wxCommandEvent &event) override;
@@ -122,33 +125,33 @@ private:
 
         void on_frame_mouse_wheel(wxMouseEvent &event) override;
 
-	void on_view_font_increase(wxCommandEvent & event) override;
-	void on_view_font_decrease(wxCommandEvent & event) override;
-	void on_view_font_default(wxCommandEvent &event) override;
+        void on_view_font_increase(wxCommandEvent & event) override;
+        void on_view_font_decrease(wxCommandEvent & event) override;
+        void on_view_font_default(wxCommandEvent &event) override;
 
-	void on_view_appearance(wxCommandEvent &event) override;
-	void on_status_bar_timer(wxTimerEvent&);
+        void on_view_appearance(wxCommandEvent &event) override;
+        void on_status_bar_timer(wxTimerEvent&);
 
         void edit_column_dlg(
                 _In_ const wxString &title, _In_ usbip::column_pos_t col, _In_ int maxlen,
                 _In_ const std::function<wxString (const wxString&)> &validator);
 
-	void init();
-	void check_view_appearance(_In_ int appearance);
-	void init_tree_list();
-	void restore_state();
+        void init();
+        void check_view_appearance(_In_ int appearance);
+        void init_tree_list();
+        void restore_state();
 
-	void start_read_thread();
-	void read_loop(std::stop_token stoken);
-	void break_and_join_read_loop();
+        void start_read_thread();
+        void read_loop(std::stop_token stoken);
+        void break_and_join_read_loop();
 
-	wxTreeListItem find_or_add_server(_In_ const wxString &url);
+        wxTreeListItem find_or_add_server(_In_ const wxString &url);
 
-	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const wxString &url, _In_ const wxString &busid);
-	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const usbip::device_location &loc);
-	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const usbip::device_columns &dc);
+        std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const wxString &url, _In_ const wxString &busid);
+        std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const usbip::device_location &loc);
+        std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const usbip::device_columns &dc);
 
-	void remove_device(_In_ wxTreeListItem dev);
+        void remove_device(_In_ wxTreeListItem dev);
 
         DWORD detach(_In_ int port);
         void attach(_In_ bool once);
@@ -156,29 +159,29 @@ private:
         DWORD attach(_In_ const wxString &url, _In_ const wxString &busid,
                      _In_ const wxString &serial, _In_ const wxString &recv_mode, _In_ bool once);
 
-	void post_refresh();
-	void post_exit();
+        void post_refresh();
+        void post_exit();
 
-	bool is_checked(_In_ wxTreeListItem device, _In_ usbip::column_pos_t col);
-	void set_checked(_In_ wxTreeListItem device, _In_ usbip::column_pos_t col, _In_ bool checked);
+        bool is_checked(_In_ wxTreeListItem device, _In_ usbip::column_pos_t col);
+        void set_checked(_In_ wxTreeListItem device, _In_ usbip::column_pos_t col, _In_ bool checked);
 
-	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_columns &dc, _In_ unsigned int flags);
-	
-	auto connect(_In_ const wxString &hostname, _In_ const wxString &service, 
-		              _In_ const std::string &hostname_u8, _In_ const std::string &service_u8);
+        void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_columns &dc, _In_ unsigned int flags);
 
-	wxDataViewColumn* find_column(_In_ const wxString &title) const noexcept;
-	wxDataViewColumn* find_column(_In_ int item_id) const noexcept;
-	void set_menu_columns_labels();
+        auto connect(_In_ const wxString &hostname, _In_ const wxString &service,
+                     _In_ const std::string &hostname_u8, _In_ const std::string &service_u8);
 
-	int get_port(_In_ wxTreeListItem dev) const;
-	wxTreeListItem get_edit_device();
+        wxDataViewColumn* find_column(_In_ const wxString &title) const noexcept;
+        wxDataViewColumn* find_column(_In_ int item_id) const noexcept;
+        void set_menu_columns_labels();
 
-	void save(_In_ const wxTreeListItems &devices);
-	void on_tree_mouse_wheel(_In_ wxMouseEvent &event);
+        int get_port(_In_ wxTreeListItem dev) const;
+        wxTreeListItem get_edit_device();
 
-	using menu_item_descr = std::tuple<int, wxMenu*, decltype(&MainFrame::on_attach)>;
-	std::unique_ptr<wxMenu> create_menu(_In_ const menu_item_descr *items, _In_ int cnt);
+        void save(_In_ const wxTreeListItems &devices);
+        void on_tree_mouse_wheel(_In_ wxMouseEvent &event);
 
-	std::unique_ptr<wxMenu> create_tree_popup_menu();
+        using menu_item_descr = std::tuple<int, wxMenu*, decltype(&MainFrame::on_attach)>;
+        std::unique_ptr<wxMenu> create_menu(_In_ const menu_item_descr *items, _In_ int cnt);
+
+        std::unique_ptr<wxMenu> create_tree_popup_menu();
 };

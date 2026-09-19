@@ -61,11 +61,11 @@ constexpr auto mkflag(_In_ column_pos_t col) { return 1U << col; }
 
 constexpr auto mkflags(_In_ std::initializer_list<column_pos_t> columns) noexcept
 {
-	auto flags = 0U;
-	for (auto col: columns) {
-		flags |= mkflag(col);
-	}
-	return flags;
+        auto flags = 0U;
+        for (auto col: columns) {
+                flags |= mkflag(col);
+        }
+        return flags;
 }
 static_assert(mkflags({COL_PORT, COL_SPEED, COL_VENDOR}) == 0b1110);
 
@@ -89,7 +89,7 @@ wxString to_wxstring(_In_ unsigned long source_id);
  */
 constexpr auto get_cmp_key(_In_ const device_columns &dc)
 {
-	return std::tie(get_url(dc), dc[COL_BUSID]); // tuple of lvalue references
+        return std::tie(get_url(dc), dc[COL_BUSID]); // tuple of lvalue references
 }
 
 constexpr auto operator == (_In_ const device_columns &a, _In_ const device_columns &b)

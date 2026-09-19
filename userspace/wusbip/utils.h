@@ -32,7 +32,6 @@ Handle& get_vhci();
 class UsbIds;
 const UsbIds& get_ids();
 
-NullableHandle& get_event();
 
 const wchar_t* get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept;
 std::optional<USB_DEVICE_SPEED> get_speed_val(_In_ const wxString &speed) noexcept;

@@ -64,8 +64,14 @@ MainFrame& TaskBarIcon::frame() const
 
 void TaskBarIcon::on_open(wxCommandEvent&)
 {
-        wxASSERT(!frame().IsShown());
-        frame().Show();
+        auto &wnd = frame();
+        if (wnd.IsIconized()) {
+                wnd.Restore();
+        }
+        if (!wnd.IsShown()) {
+                wnd.Show();
+        }
+        wnd.Raise();
 
         wxASSERT(IsIconInstalled());
 
@@ -88,6 +94,7 @@ void TaskBarIcon::show_balloon(_In_ const wxString &text, _In_ int flags)
                 wxASSERT(ok);
         }
 
+        // ShowBalloon can return false if notifications are disabled by the user or system
+        // (e.g. Focus Assist / Do Not Disturb).
         m_cancel = ShowBalloon(wxEmptyString, text, 0, flags);
-        wxASSERT(m_cancel);
 }

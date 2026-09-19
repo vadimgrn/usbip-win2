@@ -5,6 +5,8 @@
 #include "wxutils.h"
 #include "utils.h"
 
+#include <libusbip/win_handle.h>
+
 #include <wx/msgdlg.h>
 #include <wx/menu.h>
 #include <wx/log.h>
@@ -84,11 +86,12 @@ void usbip::run_cancellable(
         wxGenericMessageDialog dlg(parent, msg, caption, style);
         dlg.SetOKLabel(_("&Cancel"));
 
-        auto &evt = get_event();
-        wxASSERT(evt); // checked in usbip::init(), utils.cpp
-
-        [[maybe_unused]] auto ok = ResetEvent(evt.get());
-        wxASSERT(ok);
+        NullableHandle evt(CreateEvent(nullptr, true, false, nullptr));
+        if (!evt) {
+                auto err = GetLastError();
+                wxLogError(_("Cannot create event\nError %lu\n%s"), err, wxSysErrorMsg(err));
+                return;
+        }
 
         auto f = [&dlg, evt = evt.get(), func = std::move(func)] (std::stop_token st)
         {
@@ -111,6 +114,10 @@ void usbip::run_cancellable(
                 if (wait(evt.get(), 1'000)) { // use MsgWaitForMultipleObjects if GUI thread is blocked for a long time
                         return;
                 }
+        }
+
+        if (wait(evt.get(), 0)) {
+                return;
         }
 
         if (auto done = !dlg.ShowModal() || wait(evt.get(), 0); !done) { // cancelled by user

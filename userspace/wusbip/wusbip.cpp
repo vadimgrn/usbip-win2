@@ -103,7 +103,12 @@ template <typename F>
 struct scope_guard
 {
         F fn;
+
+        explicit scope_guard(F f) : fn(std::move(f)) {}
         ~scope_guard() { fn(); }
+
+        scope_guard(const scope_guard&) = delete;
+        scope_guard& operator=(const scope_guard&) = delete;
 };
 
 template<typename T>
@@ -910,11 +915,18 @@ void MainFrame::on_view_zebra_update_ui(wxUpdateUIEvent &event)
         event.Check(check);
 }
 
-void MainFrame::on_view_zebra(wxCommandEvent&)
+void MainFrame::set_view_zebra(_In_ bool enable)
 {
         auto &dv = *m_treeListCtrl->GetDataView();
-        dv.ToggleWindowStyle(wxDV_ROW_LINES);
-        dv.Refresh(false);
+        if (enable != dv.HasFlag(wxDV_ROW_LINES)) {
+                dv.ToggleWindowStyle(wxDV_ROW_LINES);
+                dv.Refresh(false);
+        }
+}
+
+void MainFrame::on_view_zebra(wxCommandEvent&)
+{
+        set_view_zebra(!m_treeListCtrl->GetDataView()->HasFlag(wxDV_ROW_LINES));
 }
 
 void MainFrame::on_log_verbose_update_ui(wxUpdateUIEvent &event)
@@ -1225,9 +1237,9 @@ auto MainFrame::connect(
         Socket sock;
         DWORD err{};
 
-        auto f = [&sock, &err, host = hostname_u8.c_str(), svc = service_u8.c_str()] (std::stop_token st)
+        auto f = [&sock, &err, host = hostname_u8, svc = service_u8] (std::stop_token st)
         {
-                sock = usbip::connect(host, svc, st);
+                sock = usbip::connect(host.c_str(), svc.c_str(), st);
                 err = sock ? ERROR_SUCCESS : GetLastError();
         };
 
@@ -1387,11 +1399,18 @@ void MainFrame::on_view_labels_update_ui(wxUpdateUIEvent &event)
         event.Check(shown);
 }
 
-void MainFrame::on_view_labels(wxCommandEvent &)
+void MainFrame::set_view_labels(_In_ bool show)
 {
         auto &tb = *m_auiToolBar;
-        tb.ToggleWindowStyle(wxAUI_TB_TEXT);
-        tb.Refresh(false);
+        if (show != tb.HasFlag(wxAUI_TB_TEXT)) {
+                tb.ToggleWindowStyle(wxAUI_TB_TEXT);
+                tb.Refresh(false);
+        }
+}
+
+void MainFrame::on_view_labels(wxCommandEvent&)
+{
+        set_view_labels(!m_auiToolBar->HasFlag(wxAUI_TB_TEXT));
 }
 
 int MainFrame::get_port(_In_ wxTreeListItem dev) const
@@ -1617,7 +1636,7 @@ void MainFrame::on_view_reset(wxCommandEvent&)
                 return;
         }
 
-        wxPersistenceManager::Get().DisableSaving();	
+        wxPersistenceManager::Get().DisableSaving();
         wxConfig::Get()->DeleteGroup(L"Persistent_Options"); // FIXME: private key, defined in src\msw\regconf.cpp
 
         wchar_t** argv = wxGetApp().argv;
