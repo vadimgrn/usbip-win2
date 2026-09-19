@@ -9,8 +9,6 @@
 namespace usbip
 {
 
-struct header;
-
 struct ring_buffer_data
 {
         size_t capacity;
@@ -78,6 +76,10 @@ public:
         _IRQL_requires_max_(DISPATCH_LEVEL)
         size_t skip(_In_ size_t len);
 
+        /*
+         * A direct pointer inside the buffer is never returned;
+         * data may be wrapped or misaligned, which would cause alignment faults on ARM64.
+         */
         template <typename T>
         _IRQL_requires_same_
         _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -93,10 +95,6 @@ public:
         {
                 return size() >= sizeof(T) && read(&dest, sizeof(T)) == sizeof(T);
         }
-
-        _IRQL_requires_same_
-        _IRQL_requires_max_(DISPATCH_LEVEL)
-        bool peek_hdr(_Inout_ header &hdr) const;
 
 private:
         ring_buffer_data *m_data{};

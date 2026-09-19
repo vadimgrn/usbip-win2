@@ -714,7 +714,7 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
         if (cb > sizeof(stack_buf)) {
                 buf = unique_ptr(uninitialized, PagedPool, cb);
                 if (!buf) {
-                        Trace(TRACE_LEVEL_ERROR, "Cannot allocate %d bytes", cb);
+                        Trace(TRACE_LEVEL_ERROR, "Cannot allocate %u bytes", cb);
                         return STATUS_INSUFFICIENT_RESOURCES;
                 }
                 pbuf = buf.get<wchar_t>();
@@ -733,7 +733,7 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
         }
 
         st = RtlHashUnicodeString(&str, true, HASH_STRING_ALGORITHM_DEFAULT, &hash);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "RtlHashUnicodeString('%!USTR!') %!STATUS!", &str, st);
         }
         return st;

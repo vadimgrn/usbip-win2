@@ -7,7 +7,6 @@
 #include "ring_buffer.tmh"
 
 #include "driver.h"
-#include <usbip/proto.h>
 
 using namespace libdrv;
 
@@ -169,15 +168,4 @@ size_t usbip::ring_buffer::read(_Out_writes_bytes_to_(len, return) void *dest, _
 {
         auto n = peek(dest, len);
         return skip(n);
-}
-
-/*
- * The pointer inside the buffer is never returned,
- * it may be misaligned and will cause BSOD on ARM64.
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-bool usbip::ring_buffer::peek_hdr(_Inout_ header &hdr) const
-{
-        return peek(hdr);
 }
