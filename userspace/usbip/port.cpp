@@ -16,7 +16,7 @@ namespace
 
 using namespace usbip;
 
-void print(const imported_device &d)
+void print(_In_ const imported_device &d)
 {
         auto product = get_product(get_ids(), d.vendor, d.product);
 
@@ -65,7 +65,7 @@ bool usbip::cmd_port(const port_args &args)
                 persistent->reserve(devices->size());
         }
 
-        const auto &ports = args.ports; 
+        const auto &ports = args.ports;
         auto found = false;
 
         for (const auto &d: *devices) {

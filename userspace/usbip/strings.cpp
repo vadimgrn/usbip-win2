@@ -23,20 +23,20 @@ const char* usbip::to_string(receive_mode mode) noexcept
 
 const char* usbip::get_speed_str(USB_DEVICE_SPEED speed) noexcept
 {
-         const char *names[] { 
-                 "Low Speed(1.5Mbps)", 
-                 "Full Speed(12Mbps)", 
-                 "High Speed(480Mbps)", 
-                 "Super Speed(5000Mbps)",
-         };
+        static constexpr const char *names[] {
+                "Low Speed(1.5Mbps)",
+                "Full Speed(12Mbps)",
+                "High Speed(480Mbps)",
+                "Super Speed(5000Mbps)",
+        };
 
-         static_assert(UsbLowSpeed == 0);
-         static_assert(UsbFullSpeed == 1);
-         static_assert(UsbHighSpeed == 2);
-         static_assert(UsbSuperSpeed == 3);
+        static_assert(UsbLowSpeed == 0);
+        static_assert(UsbFullSpeed == 1);
+        static_assert(UsbHighSpeed == 2);
+        static_assert(UsbSuperSpeed == 3);
 
-         auto idx = std::to_underlying(speed);
-         return idx >= 0 && idx < std::ssize(names) ? names[idx] : "Unknown Speed";
+        auto idx = std::to_underlying(speed);
+        return idx >= 0 && idx < std::ssize(names) ? names[idx] : "Unknown Speed";
 }
 
 std::string usbip::get_product(const UsbIds &ids, uint16_t vendor, uint16_t product)
@@ -50,12 +50,12 @@ std::string usbip::get_product(const UsbIds &ids, uint16_t vendor, uint16_t prod
 
 std::string usbip::get_class(const UsbIds &ids, uint8_t class_, uint8_t subclass, uint8_t protocol)
 {
-	if (!(class_ || subclass || protocol)) {
-		return "(Defined at Interface level) (00/00/00)";
-	}
+        if (!(class_ || subclass || protocol)) {
+                return "(Defined at Interface level) (00/00/00)";
+        }
 
-	auto [c, s, p] = ids.find_class_subclass_proto(class_, subclass, protocol);
-	return std::format("{}/{}/{} ({:02x}/{:02x}/{:02x})",
+        auto [c, s, p] = ids.find_class_subclass_proto(class_, subclass, protocol);
+        return std::format("{}/{}/{} ({:02x}/{:02x}/{:02x})",
                 c.empty() ? "?" : c,
                 s.empty() ? "?" : s,
                 p.empty() ? "?" : p,

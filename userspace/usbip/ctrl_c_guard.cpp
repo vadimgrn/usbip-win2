@@ -14,13 +14,18 @@ namespace
 
 std::atomic<HANDLE> s_dev{};
 std::atomic<std::stop_source*> s_ssrc{};
+std::atomic<const usbip::ctrl_c_guard*> s_active{};
 
 } // namespace
 
 
-usbip::ctrl_c_guard::ctrl_c_guard() noexcept
+usbip::ctrl_c_guard::ctrl_c_guard() noexcept :
+        m_ssrc(std::in_place),
+        m_token(m_ssrc->get_token())
 {
-        m_ssrc.emplace();
+        [[maybe_unused]] auto prev = s_active.exchange(this);
+        assert(!prev && "Only one ctrl_c_guard instance can be active at a time");
+
         assert(!s_dev.load() && !s_ssrc.load());
         s_ssrc.store(&*m_ssrc);
 
@@ -28,8 +33,11 @@ usbip::ctrl_c_guard::ctrl_c_guard() noexcept
         assert(ok);
 }
 
-usbip::ctrl_c_guard::ctrl_c_guard(HANDLE dev) noexcept
+usbip::ctrl_c_guard::ctrl_c_guard(_In_ HANDLE dev) noexcept
 {
+        [[maybe_unused]] auto prev = s_active.exchange(this);
+        assert(!prev && "Only one ctrl_c_guard instance can be active at a time");
+
         assert(!s_dev.load() && !s_ssrc.load());
         s_dev.store(dev);
 
@@ -37,8 +45,12 @@ usbip::ctrl_c_guard::ctrl_c_guard(HANDLE dev) noexcept
         assert(ok);
 }
 
-usbip::ctrl_c_guard::ctrl_c_guard(std::stop_source &ssrc) noexcept
+usbip::ctrl_c_guard::ctrl_c_guard(_Inout_ std::stop_source &ssrc) noexcept :
+        m_token(ssrc.get_token())
 {
+        [[maybe_unused]] auto prev = s_active.exchange(this);
+        assert(!prev && "Only one ctrl_c_guard instance can be active at a time");
+
         assert(!s_dev.load() && !s_ssrc.load());
         s_ssrc.store(&ssrc);
 
@@ -53,12 +65,9 @@ usbip::ctrl_c_guard::~ctrl_c_guard() noexcept
 
         s_dev.store(HANDLE{});
         s_ssrc.store(nullptr);
-}
 
-std::stop_token usbip::ctrl_c_guard::token() const noexcept
-{
-        assert(s_ssrc.load());
-        return s_ssrc.load()->get_token();
+        [[maybe_unused]] auto prev = s_active.exchange(nullptr);
+        assert(prev == this && "ctrl_c_guard destroyed out of order");
 }
 
 BOOL WINAPI usbip::ctrl_c_guard::handler(DWORD ctrl_type) noexcept
