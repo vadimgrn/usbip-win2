@@ -15,6 +15,7 @@
 
 #include <CLI11/CLI11.hpp>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <print>
 #include <utility>
@@ -36,7 +37,7 @@ template <typename F>
 class scope_exit
 {
 public:
-        explicit scope_exit(F &&f) : m_f(std::forward<F>(f)) {}
+        explicit scope_exit(F f) : m_f(std::move(f)) {}
         ~scope_exit() { if (m_active) m_f(); }
         void release() noexcept { m_active = false; }
 
@@ -80,10 +81,9 @@ auto pack(F &&cmd)
 void errmsg(_In_ LPCSTR api, _In_ LPCWSTR str = L"", _In_ DWORD err = GetLastError())
 {
         auto mod = GetModuleHandle(L"setupapi.dll");
-        auto msg = wformat_message(mod, err);
-        auto u8_msg = wchar_to_utf8_or(msg);
+        auto u8_msg = format_message(mod, err);
 
-        if (*str) {
+        if (str && *str) {
                 std::println(stderr, "{}({}) error {:#x} {}", api, wchar_to_utf8_or(str), err, u8_msg);
         } else {
                 std::println(stderr, "{} error {:#x} {}", api, err, u8_msg);
@@ -164,18 +164,23 @@ DWORD get_device_property(
         _Out_ DEVPROPTYPE &type,
         _Inout_ std::vector<BYTE> &prop)
 {
-        for (;;) {
+        constexpr int max_attempts = 3;
+
+        for (int attempt = 0; attempt < max_attempts; ++attempt) {
                 if (DWORD actual{}; // bytes
                     SetupDiGetDeviceProperty(di, &dd, &key, &type, prop.data(), static_cast<DWORD>(prop.size()), &actual, 0)) {
                         prop.resize(actual);
                         return ERROR_SUCCESS;
-                } else if (auto err = GetLastError(); err == ERROR_INSUFFICIENT_BUFFER) {
+                } else if (auto err = GetLastError(); err == ERROR_INSUFFICIENT_BUFFER && actual > prop.size()) {
                         prop.resize(actual);
                 } else {
                         prop.clear();
                         return err;
                 }
         }
+
+        prop.clear();
+        return ERROR_INSUFFICIENT_BUFFER;
 }
 
 std::vector<std::wstring> get_device_hardware_ids(_In_ HDEVINFO di, _In_ SP_DEVINFO_DATA &dd)
@@ -266,11 +271,10 @@ auto install_devnode_and_driver(_In_ const devnode_install_args &r)
         SP_DEVINSTALL_PARAMS params{};
         params.cbSize = sizeof(params);
 
-        if (!SetupDiGetDeviceInstallParams(dev_list.get(), &dev_data, &params)) {
-                errmsg("SetupDiGetDeviceInstallParams");
-                return false;
+        bool reboot{};
+        if (SetupDiGetDeviceInstallParams(dev_list.get(), &dev_data, &params)) {
+                reboot = params.Flags & (DI_NEEDREBOOT | DI_NEEDRESTART);
         }
-        bool reboot = params.Flags & (DI_NEEDREBOOT | DI_NEEDRESTART);
 
         // the same as "pnputil /add-driver usbip2_ude.inf /install"
 
@@ -299,7 +303,7 @@ auto uninstall_device(
         }
 
         auto found = std::ranges::any_of(ids, [&r] (const auto &id) {
-                return PathMatchSpec(id.c_str(), r.hwid.c_str());
+                return PathMatchSpecEx(id.c_str(), r.hwid.c_str(), PMSF_NORMAL) == S_OK;
         });
 
         if (!found) {
@@ -307,13 +311,14 @@ auto uninstall_device(
         }
 
         ++stats.matched;
+        auto id = get_device_instance_id(di, dd);
 
         if (r.dry_run) {
-                if (auto id = get_device_instance_id(di, dd)) {
+                if (id) {
                         std::println("{}", wchar_to_utf8_or(*id));
                 }
         } else if (BOOL NeedReboot{}; !DiUninstallDevice(nullptr, di, &dd, 0, &NeedReboot)) {
-                errmsg("DiUninstallDevice");
+                errmsg("DiUninstallDevice", id ? id->c_str() : L"");
         } else {
                 ++stats.removed;
                 if (NeedReboot) {
@@ -367,35 +372,35 @@ auto remove_devnode(_In_ const devnode_remove_args &r)
 
 void add_devnode_install_cmd(_In_ CLI::App &app)
 {
-        static devnode_install_args r;
+        auto r = std::make_shared<devnode_install_args>();
         auto cmd = app.add_subcommand("install", "Install a device node and its driver");
 
-        cmd->add_option("infpath", r.infpath, "Path to the driver's .inf file")
+        cmd->add_option("infpath", r->infpath, "Path to the driver's .inf file")
                 ->check(CLI::ExistingFile)
                 ->required();
 
-        cmd->add_option("hwid", r.hwid, "Hardware Id of the device")->required();
+        cmd->add_option("hwid", r->hwid, "Hardware Id of the device")->required();
 
-        auto f = [&r = r] 
-        { 
-                r.infpath = std::filesystem::absolute(r.infpath).wstring();
-                return install_devnode_and_driver(r); 
+        auto f = [r]
+        {
+                r->infpath = std::filesystem::absolute(r->infpath).wstring();
+                return install_devnode_and_driver(*r);
         };
         cmd->callback(pack(std::move(f)));
 }
 
 void add_devnode_remove_cmd(_In_ CLI::App &app)
 {
-        static devnode_remove_args r;
+        auto r = std::make_shared<devnode_remove_args>();
         auto cmd = app.add_subcommand("remove", "Uninstall a device and remove its device nodes");
 
-        cmd->add_option("hwid", r.hwid, "Hardware Id of the device")->required();
-        cmd->add_option("enumerator", r.enumerator, "An identifier of a Plug and Play enumerator");
+        cmd->add_option("hwid", r->hwid, "Hardware Id of the device")->required();
+        cmd->add_option("enumerator", r->enumerator, "An identifier of a Plug and Play enumerator");
 
-        cmd->add_flag("-n,--dry-run", r.dry_run, 
+        cmd->add_flag("-n,--dry-run", r->dry_run,
                       "Print InstanceId of devices that will be removed instead of removing them");
 
-        auto f = [&r = r] { return remove_devnode(r); };
+        auto f = [r] { return remove_devnode(*r); };
         cmd->callback(pack(std::move(f)));
 }
 
@@ -407,7 +412,6 @@ int wmain(_In_ int argc, _Inout_ wchar_t* argv[])
         try {
                 CLI::App app("usbip2 drivers installation utility");
                 
-                app.option_defaults()->always_capture_default();
                 app.set_version_flag("-V,--version", get_version());
 
                 add_devnode_install_cmd(app);
