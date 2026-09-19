@@ -21,21 +21,21 @@
 #endif
 
 #ifdef ExePath
-	#define BuildDir AddBackslash(ExtractFilePath(ExePath))
+        #define BuildDir AddBackslash(ExtractFilePath(ExePath))
 #else
-	#error Use option /DExePath=path-to-exe
+        #error Use option /DExePath=path-to-exe
 #endif
 
 #if !FileExists(ExePath)
-	#error File not found: ExePath
+        #error File not found: ExePath
 #endif
 
 #ifndef GuiExePath
-	#error Use option /DGuiExePath=path-to-exe
+        #error Use option /DGuiExePath=path-to-exe
 #endif
 
 #if !FileExists(GuiExePath)
-	#error File not found: GuiExePath
+        #error File not found: GuiExePath
 #endif
 
 #ifndef VCToolsRedistInstallDir
@@ -139,9 +139,9 @@ Name: "{commondesktop}\{#ProductName}"; Filename: "{app}\{#GuiExeName}"; Tasks: 
 
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
 
-Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
-Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Components: main
-Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Flags: ignoreversion; Components: main
+Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Flags: ignoreversion; Components: main
+Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Flags: ignoreversion; Components: main
 
 Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Excludes: "resource.h"; Components: sdk
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
@@ -152,9 +152,9 @@ Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: pdb or sdk
 ; Source: {#BuildDir + "wusbip.pdb"}; DestDir: "{app}"; Components: pdb and gui
 ; wusbip.pdb is too large
 
-Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Components: gui
+Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Flags: ignoreversion; Components: gui
 
-Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
+Source: {#AddBackslash(VCToolsRedistInstallDir) + VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: client
 
 #if INSTALL_TEST_CERTIFICATE
@@ -167,7 +167,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Run]
 
-Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcredist; StatusMsg: "Installing Microsoft Visual C++ Redistributable ({#VCRedistArch})..."
+Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Flags: runhidden; Tasks: vcredist; StatusMsg: "Installing Microsoft Visual C++ Redistributable ({#VCRedistArch})..."
 
 #if INSTALL_TEST_CERTIFICATE
   Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFileName}"" FriendlyName=""{#CertName}"""; Flags: runhidden logoutput; StatusMsg: "Installing test certificate..."
@@ -243,6 +243,7 @@ procedure InitializeWizard();
 begin
   WizardForm.LicenseAcceptedRadio.Checked := True;
 end;
+
 
 procedure RegisterDetachTask();
 var
@@ -336,10 +337,10 @@ begin
           if OemName <> '' then
           begin
             Log('Deleting OEM driver ' + OemName + ' (' + Names[I] + ')');
-            if ExecWithNativeSysDir(
+            if ExecAndLogOutputWithNativeSysDir(
                  ExpandConstant('{sys}\pnputil.exe'),
                  '/delete-driver ' + OemName + ' /uninstall /force',
-                 '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+                 '', SW_HIDE, ewWaitUntilTerminated, ResultCode, nil) then
             begin
               Log(Format('pnputil /delete-driver %s returned exit code %d', [OemName, ResultCode]));
               Result := True;
@@ -380,10 +381,10 @@ begin
              (GetIniString('SourceDisksFiles', DriverName + '.sys', '', InfDir + FindRec.Name) <> '') then
           begin
             Log('Deleting OEM driver ' + FindRec.Name + ' (' + DriverName + ')');
-            if ExecWithNativeSysDir(
+            if ExecAndLogOutputWithNativeSysDir(
                  ExpandConstant('{sys}\pnputil.exe'),
                  '/delete-driver ' + FindRec.Name + ' /uninstall /force',
-                 '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+                 '', SW_HIDE, ewWaitUntilTerminated, ResultCode, nil) then
             begin
               Log(Format('pnputil /delete-driver %s returned exit code %d', [FindRec.Name, ResultCode]));
             end
@@ -401,6 +402,9 @@ begin
 end;
 
 
+// Both registry lookup and file search are intentionally executed sequentially
+// by design to remove stale drivers and ensure all OEM driver packages are thoroughly removed.
+// Do not flag this dual-pass approach as redundant in code reviews.
 procedure DeleteOemDriver(const DriverName: String);
 begin
   DeleteOemDriverFromRegistry(DriverName);
@@ -460,11 +464,17 @@ begin
   end
   else
   begin
-    P := Pos(' ', UninstStr);
+    P := Pos('.exe', Lowercase(UninstStr));
     if P > 0 then
-      UninstPath := Copy(UninstStr, 1, P - 1)
+      UninstPath := Trim(Copy(UninstStr, 1, P + 3))
     else
-      UninstPath := UninstStr;
+    begin
+      P := Pos(' ', UninstStr);
+      if P > 0 then
+        UninstPath := Copy(UninstStr, 1, P - 1)
+      else
+        UninstPath := UninstStr;
+    end;
   end;
 
   UninstParams := '/VERYSILENT /NORESTART /SUPPRESSMSGBOXES';

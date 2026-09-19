@@ -118,6 +118,10 @@
       <Project>{36cee68d-d6cf-4413-978c-794488f44555}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+    <ProjectReference Include="..\wusbip\wusbip.vcxproj">
+      <Project>{dcee5171-b4d9-d234-64b0-4a94110b21fe}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
