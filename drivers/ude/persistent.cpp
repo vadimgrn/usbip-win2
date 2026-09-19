@@ -699,7 +699,13 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
         hash = 0;
 
         static_assert(sizeof(L",,") == 3*sizeof(wchar_t)); // must have space for null terminator
-        USHORT cb = r.node_name.Length + r.service_name.Length + r.busid.Length + sizeof(L",,"); // see format string
+
+        auto cb64 = sizeof(L",,") + r.node_name.Length + r.service_name.Length + r.busid.Length; // see format string
+        if (cb64 > UNICODE_STRING_MAX_BYTES) {
+                Trace(TRACE_LEVEL_ERROR, "Location string is too long (%Iu bytes)", cb64);
+                return STATUS_INVALID_PARAMETER;
+        }
+        USHORT cb = static_cast<USHORT>(cb64);
 
         wchar_t stack_buf[96];
         unique_ptr buf;
@@ -708,7 +714,7 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
         if (cb > sizeof(stack_buf)) {
                 buf = unique_ptr(uninitialized, PagedPool, cb);
                 if (!buf) {
-                        Trace(TRACE_LEVEL_ERROR, "Cannot allocate %d bytes", cb);
+                        Trace(TRACE_LEVEL_ERROR, "Cannot allocate %u bytes", cb);
                         return STATUS_INSUFFICIENT_RESOURCES;
                 }
                 pbuf = buf.get<wchar_t>();
@@ -720,13 +726,13 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
         };
 
         auto st = RtlUnicodeStringPrintf(&str, L"%wZ,%wZ,%wZ", &r.node_name, &r.service_name, &r.busid);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "RtlUnicodeStringPrintf %!STATUS!", st);
                 return st;
         }
 
         st = RtlHashUnicodeString(&str, true, HASH_STRING_ALGORITHM_DEFAULT, &hash);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "RtlHashUnicodeString('%!USTR!') %!STATUS!", &str, st);
         }
         return st;
