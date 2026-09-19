@@ -106,7 +106,7 @@ void debug(std::format_string<Args...> fmt, Args&&... args)
         }
 }
 
-inline void debug_msg(std::string msg)
+inline void debug_msg(std::string_view msg)
 {
         debug(msg);
 }

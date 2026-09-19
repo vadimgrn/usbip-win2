@@ -17,7 +17,7 @@ namespace
 
 using namespace usbip;
 
-auto attach_persistent_devices(HANDLE dev)
+bool attach_persistent_devices(_In_ HANDLE dev)
 {
         auto v = vhci::get_persistent(dev);
         if (!v) {
@@ -39,7 +39,7 @@ auto attach_persistent_devices(HANDLE dev)
         return ok;
 }
 
-auto stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *loc)
+bool stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *loc)
 {
         auto cnt = vhci::stop_attach_attempts(dev, loc);
         auto ok = cnt >= 0;
