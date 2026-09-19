@@ -116,14 +116,12 @@ void wxPersistentMainFrame::do_restore()
                 frame.m_log->set_font_size(pt);
         }
 
-        if (bool ok{}; RestoreValue(m_toolbar_labels, &ok) && ok != frame.m_auiToolBar->HasFlag(wxAUI_TB_TEXT)) {
-                wxCommandEvent evt;
-                frame.on_view_labels(evt);
+        if (bool ok{}; RestoreValue(m_toolbar_labels, &ok)) {
+                frame.set_view_labels(ok);
         }
 
-        if (bool ok{}; RestoreValue(m_tree_row_lines, &ok) && ok) {
-                wxCommandEvent evt;
-                frame.on_view_zebra(evt);
+        if (bool ok{}; RestoreValue(m_tree_row_lines, &ok)) {
+                frame.set_view_zebra(ok);
         }
 
         if (int pt{}; RestoreValue(m_tree_font_size, &pt)) {

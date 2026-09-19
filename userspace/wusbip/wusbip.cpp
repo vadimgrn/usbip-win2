@@ -26,6 +26,7 @@
 #include <wx/headerctrl.h>
 #include <wx/clipbrd.h>
 #include <wx/persist/dataview.h>
+#include <wx/wupdlock.h>
 
 #include <format>
 #include <set>
@@ -103,7 +104,12 @@ template <typename F>
 struct scope_guard
 {
         F fn;
+
+        explicit scope_guard(F f) : fn(std::move(f)) {}
         ~scope_guard() { fn(); }
+
+        scope_guard(const scope_guard&) = delete;
+        scope_guard& operator=(const scope_guard&) = delete;
 };
 
 template<typename T>
@@ -124,7 +130,7 @@ void log(_In_ const device_state &st)
                               static_cast<int>(d.speed), d.vendor, d.product, d.serial,
                               to_string(d.recv_mode).utf8_string(), st.source_id);
 
-        wxLogVerbose(wxString::FromUTF8(s));
+        wxLogVerbose(L"%s", wxString::FromUTF8(s));
 }
 
 void log(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wxString &prefix)
@@ -149,7 +155,7 @@ void log(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wx
                         tree.GetItemText(dev, COL_NOTES),
                         tree.GetItemText(dev, COL_SOURCE_ID));
 
-        wxLogVerbose(s);
+        wxLogVerbose(L"%s", s);
 }
 
 auto load_license()
@@ -643,7 +649,7 @@ void MainFrame::read_loop(std::stop_token stoken)
         std::stop_callback stop_cb(stoken, [this] {
                 std::lock_guard<std::mutex> lock(m_read_close_mtx);
                 if (m_read) {
-                        CancelIoEx(m_read.get(), nullptr);
+                        vhci::cancel_io(m_read.get());
                 }
         });
 
@@ -673,13 +679,16 @@ void MainFrame::read_loop(std::stop_token stoken)
 void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
 {
         auto &tree = *m_treeListCtrl;
+        wxWindowUpdateLocker locker(&tree);
 
         auto &st = event.get();
         log(st);
 
         if (m_taskbar_icon && m_taskbar_icon->IsIconInstalled()) {
-                auto s = wxString::FromAscii(vhci::get_state_str(st.state)) + L' ' + make_device_url(st.device.location);
-                m_taskbar_icon->show_balloon(s);
+                if (std::chrono::steady_clock::now() - m_start_time > std::chrono::seconds(2)) {
+                        auto s = wxString::FromAscii(vhci::get_state_str(st.state)) + L' ' + make_device_url(st.device.location);
+                        m_taskbar_icon->show_balloon(s);
+                }
         }
 
         auto [dev, added] = find_or_add_device(st.device.location);
@@ -758,7 +767,7 @@ void MainFrame::on_copy_rows(wxCommandEvent&)
                 rows += to_string(tree, dev) + L'\n';
         }
 
-        wxLogVerbose(rows);
+        wxLogVerbose(L"%s", rows);
 
         if (wxClipboardLocker lck; !lck) {
                 wxLogError(_("Could not lock the clipboard"));
@@ -910,11 +919,18 @@ void MainFrame::on_view_zebra_update_ui(wxUpdateUIEvent &event)
         event.Check(check);
 }
 
-void MainFrame::on_view_zebra(wxCommandEvent&)
+void MainFrame::set_view_zebra(_In_ bool enable)
 {
         auto &dv = *m_treeListCtrl->GetDataView();
-        dv.ToggleWindowStyle(wxDV_ROW_LINES);
-        dv.Refresh(false);
+        if (enable != dv.HasFlag(wxDV_ROW_LINES)) {
+                dv.ToggleWindowStyle(wxDV_ROW_LINES);
+                dv.Refresh(false);
+        }
+}
+
+void MainFrame::on_view_zebra(wxCommandEvent&)
+{
+        set_view_zebra(!m_treeListCtrl->GetDataView()->HasFlag(wxDV_ROW_LINES));
 }
 
 void MainFrame::on_log_verbose_update_ui(wxUpdateUIEvent &event)
@@ -1075,19 +1091,13 @@ void MainFrame::on_attach_stop_all(wxCommandEvent&)
 DWORD MainFrame::detach(_In_ int port)
 {
         wxLogVerbose(_("Detach port %d"), port);
-        auto err = ERROR_SUCCESS;
+        wxBusyCursor wait;
 
-        auto f = [&err, port] (std::stop_token)
-        {
-                if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), port)) {
-                        err = GetLastError();
-                }
-        };
+        if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), port)) {
+                return GetLastError();
+        }
 
-        auto msg = wxString::Format(_("Port %d"), port);
-        run_cancellable(this, msg, _("Detaching"), std::move(f), cancel_vhci_io);
-
-        return err;
+        return ERROR_SUCCESS;
 }
 
 void MainFrame::on_detach(wxCommandEvent&)
@@ -1225,9 +1235,9 @@ auto MainFrame::connect(
         Socket sock;
         DWORD err{};
 
-        auto f = [&sock, &err, host = hostname_u8.c_str(), svc = service_u8.c_str()] (std::stop_token st)
+        auto f = [&sock, &err, host = hostname_u8, svc = service_u8] (std::stop_token st)
         {
-                sock = usbip::connect(host, svc, st);
+                sock = usbip::connect(host.c_str(), svc.c_str(), st);
                 err = sock ? ERROR_SUCCESS : GetLastError();
         };
 
@@ -1387,11 +1397,18 @@ void MainFrame::on_view_labels_update_ui(wxUpdateUIEvent &event)
         event.Check(shown);
 }
 
-void MainFrame::on_view_labels(wxCommandEvent &)
+void MainFrame::set_view_labels(_In_ bool show)
 {
         auto &tb = *m_auiToolBar;
-        tb.ToggleWindowStyle(wxAUI_TB_TEXT);
-        tb.Refresh(false);
+        if (show != tb.HasFlag(wxAUI_TB_TEXT)) {
+                tb.ToggleWindowStyle(wxAUI_TB_TEXT);
+                tb.Refresh(false);
+        }
+}
+
+void MainFrame::on_view_labels(wxCommandEvent&)
+{
+        set_view_labels(!m_auiToolBar->HasFlag(wxAUI_TB_TEXT));
 }
 
 int MainFrame::get_port(_In_ wxTreeListItem dev) const
@@ -1617,7 +1634,7 @@ void MainFrame::on_view_reset(wxCommandEvent&)
                 return;
         }
 
-        wxPersistenceManager::Get().DisableSaving();	
+        wxPersistenceManager::Get().DisableSaving();
         wxConfig::Get()->DeleteGroup(L"Persistent_Options"); // FIXME: private key, defined in src\msw\regconf.cpp
 
         wchar_t** argv = wxGetApp().argv;
@@ -1677,7 +1694,7 @@ void MainFrame::set_status_text(
         _In_ const wxString &text, _In_ std::chrono::seconds duration, _In_ bool verbose_log)
 {
         if (verbose_log) {
-                wxLogVerbose(text);
+                wxLogVerbose(L"%s", text);
         }
 
         if (auto ms = duration_cast<std::chrono::milliseconds>(duration).count(); m_status_bar_timer.StartOnce(ms)) {

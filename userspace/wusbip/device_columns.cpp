@@ -97,8 +97,8 @@ auto usbip::make_persistent_device(
 
 auto usbip::make_persistent_device(_In_ const device_columns &dc) -> persistent_device
 {
-	auto &url = get_url(dc);
-	return make_persistent_device(url, dc[COL_BUSID], dc[COL_SERIAL], dc[COL_RECEIVE_MODE]);
+        auto &url = get_url(dc);
+        return make_persistent_device(url, dc[COL_BUSID], dc[COL_SERIAL], dc[COL_RECEIVE_MODE]);
 }
 
 auto usbip::make_device_columns(_In_ const imported_device &dev) ->

@@ -294,7 +294,6 @@
     <None Include="resources\usb_dark.svg" />
     <None Include="resources\view_columns.svg" />
     <None Include="resources\view_columns_dark.svg" />
-    <None Include="wxpatch.bat" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="app.cpp" />

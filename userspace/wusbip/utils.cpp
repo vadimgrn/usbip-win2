@@ -22,7 +22,7 @@ static_assert(UsbFullSpeed == 1);
 static_assert(UsbHighSpeed == 2);
 static_assert(UsbSuperSpeed == 3);
 
-const wchar_t *g_usb_speed_str[] { L"Low", L"Full", L"High", L"Super" }; // indexed by enum USB_DEVICE_SPEED
+constexpr const wchar_t *g_usb_speed_str[] { L"Low", L"Full", L"High", L"Super" }; // indexed by enum USB_DEVICE_SPEED
 
 auto &msgtable_dll = L"resources"; // resource-only DLL that contains RT_MESSAGETABLE
 
@@ -72,12 +72,6 @@ auto usbip::get_ids() -> const UsbIds&
         return ids;
 }
 
-auto usbip::get_event() -> NullableHandle& 
-{
-        static NullableHandle evt(CreateEvent(nullptr, true, false, nullptr));
-        return evt;
-}
-
 bool usbip::init(_Inout_ wxString &err)
 {
         wxASSERT(err.empty());
@@ -92,12 +86,6 @@ bool usbip::init(_Inout_ wxString &err)
         if (!ws2) {
                 auto ec = GetLastError();
                 err = wxString::Format(_("WSAStartup error %lu\n%s"), ec, wxSysErrorMsg(ec));
-                return false;
-        }
-
-        if (!get_event()) {
-                auto ec = GetLastError();
-                err = wxString::Format(_("Cannot create event\nError %lu\n%s"), ec, wxSysErrorMsg(ec));
                 return false;
         }
 
