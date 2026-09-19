@@ -631,6 +631,26 @@ PAGED void getaddrinfo(
         TraceDbg("%!STATUS!", st);
 }
 
+/*
+ * Security Note:
+ * Because the VHCI device object grants World (Everyone) Read/Write access (see initialize() in vhci.cpp),
+ * an unprivileged caller can issue PLUGIN_HARDWARE / PLUGIN_HARDWARE_ONCE with arbitrary host and service
+ * (port) parameters. Because socket operations are performed by the driver in kernel mode under the
+ * SYSTEM security context, this effectively acts as an outbound TCP connection primitive / SSRF mechanism,
+ * potentially bypassing user-level outbound firewall rules or enabling network reconnaissance.
+ *
+ * How this can be restricted:
+ * 1. Caller privilege check: Call SeSinglePrivilegeCheck(RtlConvertLongToLuid(SE_LOAD_DRIVER_PRIVILEGE),
+ *    WdfRequestGetRequestorMode(request)) or inspect the caller's token for Administrator membership
+ *    before scheduling the connection work item.
+ * 2. Caller impersonation: Use WdfRequestImpersonate() before performing wsk::getaddrinfo and
+ *    wsk::connect so that outbound network traffic is attributed to the caller's security token and
+ *    evaluated against per-user Windows Filtering Platform (WFP) / firewall rules instead of SYSTEM.
+ * 3. Destination filtering: Validate the target host and port (e.g., restrict to standard USB/IP
+ *    port 3240, or disallow loopback [127.0.0.1, ::1], link-local, or private RFC 1918 addresses).
+ * 4. Device ACL: Restrict the device object SDDL to SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_R so only
+ *    administrators can open the device for write/IOCTL dispatch.
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto plugin_hardware(
@@ -834,6 +854,20 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
 }
 
 /*
+ * Security Note:
+ * Because the VHCI device object grants World (Everyone) Read/Write access (see initialize() in vhci.cpp),
+ * unprivileged callers can invoke this IOCTL to overwrite the persistent device list in HKLM
+ * (DriverRegKeyPersistentState) with arbitrary REG_MULTI_SZ data. Although HKLM normally requires
+ * administrative privileges for write access, the driver performs this write in kernel mode as SYSTEM.
+ * The stored device entries are subsequently parsed and connected by plugin_persistent_devices() on
+ * driver initialization.
+ *
+ * How this can be restricted:
+ * - Verify that the caller holds administrative privileges before modifying the registry, e.g. via
+ *   SeSinglePrivilegeCheck(RtlConvertLongToLuid(SE_LOAD_DRIVER_PRIVILEGE), WdfRequestGetRequestorMode(request))
+ *   or by impersonating the caller (WdfRequestImpersonate) and checking for the local Administrators group.
+ * - Restrict the device object ACL to require administrative access for write IOCTLs.
+ *
  * @see get_persistent_devices
  */
 _IRQL_requires_same_
