@@ -1,4 +1,17 @@
-<Project>
+<Project TreatAsLocalProperty="UserspacePlatformToolset">
+ <PropertyGroup>
+  <!-- Map VisualStudioVersion to corresponding default MSVC toolset if not already defined -->
+  <_DefaultMsvcToolset Condition="'$(VisualStudioVersion)' == '18.0'">v145</_DefaultMsvcToolset>
+  <_DefaultMsvcToolset Condition="'$(VisualStudioVersion)' == '17.0'">v143</_DefaultMsvcToolset>
+  <_DefaultMsvcToolset Condition="'$(VisualStudioVersion)' == '16.0'">v142</_DefaultMsvcToolset>
+  <_DefaultMsvcToolset Condition="'$(_DefaultMsvcToolset)' == ''">v145</_DefaultMsvcToolset>
+
+  <!-- Default userspace toolset: msvc (latest) or ClangCL.
+       Can be overridden on the command line via /p:UserspacePlatformToolset=... or /p:PlatformToolset=... -->
+  <UserspacePlatformToolset Condition="'$(UserspacePlatformToolset)' == '' and '$(PlatformToolset)' != '' and '$(PlatformToolset)' != 'WindowsKernelModeDriver10.0'">$(PlatformToolset)</UserspacePlatformToolset>
+  <UserspacePlatformToolset Condition="'$(UserspacePlatformToolset)' == ''">msvc</UserspacePlatformToolset>
+  <UserspacePlatformToolset Condition="'$(UserspacePlatformToolset)' == 'latest' or '$(UserspacePlatformToolset)' == 'msvc'">$(_DefaultMsvcToolset)</UserspacePlatformToolset>
+ </PropertyGroup>
  <Import Project="$(MSBuildThisFileDirectory)vcpkg\scripts\buildsystems\msbuild\vcpkg.props" />
  <ItemDefinitionGroup>
   <ClCompile>

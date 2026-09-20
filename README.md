@@ -50,15 +50,33 @@
   - Select "Individual components" tab, find and check
     - Git for Windows
     - Windows Driver Kit
+    - C++ Clang Compiler for Windows (optional, if using LLVM/ClangCL toolset)
   - Install selected items
 - Clone project using git or download an archive from github and extract source code
 - Run `bootstrap.bat`
-- Open `usbip_win2.sln`
+- Open `usbip_win2.slnx`
 - Set certificate driver signing for `package` project
   - Right-click on the `Project > Properties > Driver Signing > Test Certificate`
   - Enter `usbip.pfx` (password: usbip)
 - Build the solution
 - All output files are created under {x64,ARM64}/{Debug,Release} folders.
+
+### Platform Toolset Selection
+- Drivers strictly use `WindowsKernelModeDriver10.0` (LLVM is not supported for drivers).
+- Userspace projects use MSVC by default (resolving dynamically to the latest MSVC toolset, e.g. `v145` for Visual Studio 2026).
+- To select the userspace toolset:
+  - In `Directory.Build.props`: change `<UserspacePlatformToolset>` from `msvc` to `ClangCL`:
+    ```xml
+    <UserspacePlatformToolset Condition="'$(UserspacePlatformToolset)' == ''">ClangCL</UserspacePlatformToolset>
+    ```
+  - Via command line: pass `/p:UserspacePlatformToolset=...` to `msbuild`:
+    ```cmd
+    # Build with default MSVC
+    msbuild usbip_win2.slnx /p:Configuration=Release /p:Platform=x64
+
+    # Build with LLVM (ClangCL)
+    msbuild usbip_win2.slnx /p:Configuration=Release /p:Platform=x64 /p:UserspacePlatformToolset=ClangCL
+    ```
 
 ## Setup USB/IP server on Ubuntu Linux
 - Install required packages

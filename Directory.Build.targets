@@ -1,3 +1,13 @@
 <Project>
  <Import Project="$(MSBuildThisFileDirectory)vcpkg\scripts\buildsystems\msbuild\vcpkg.targets" />
+
+  <!-- Ensure driver projects never use LLVM/ClangCL or any non-WDK toolset -->
+  <Target Name="ValidateDriverPlatformToolset"
+          BeforeTargets="PrepareForBuild;Build"
+          Condition="'$(DriverType)' != ''">
+    <Error Condition="'$(PlatformToolset)' == 'ClangCL' or '$(PlatformToolset)' == 'llvm'"
+           Text="Driver project '$(MSBuildProjectName)' cannot use LLVM/ClangCL. Drivers must use WindowsKernelModeDriver10.0." />
+    <Error Condition="'$(PlatformToolset)' != 'WindowsKernelModeDriver10.0'"
+           Text="Driver project '$(MSBuildProjectName)' must use WindowsKernelModeDriver10.0 toolset. Current toolset is '$(PlatformToolset)'." />
+  </Target>
 </Project>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" TreatAsLocalProperty="PlatformToolset">
   <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.28000.2705\build\native\Microsoft.Windows.SDK.cpp.x64.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.28000.2705\build\native\Microsoft.Windows.SDK.cpp.x64.props') and '$(Platform)' == 'x64'" />
   <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.28000.2705\build\native\Microsoft.Windows.SDK.cpp.arm64.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.28000.2705\build\native\Microsoft.Windows.SDK.cpp.arm64.props') and '$(Platform)' == 'ARM64'" />
   <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.10.0.28000.2705\build\native\Microsoft.Windows.SDK.cpp.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.10.0.28000.2705\build\native\Microsoft.Windows.SDK.cpp.props')" />
