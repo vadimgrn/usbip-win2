@@ -33,6 +33,11 @@ PAGED NTSTATUS fill_location(_Inout_ vhci::imported_device_location &r, _In_ con
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS validate_persistent_devices(
+        _In_reads_bytes_(length) const void *buf, _In_ size_t length, _In_ ULONG max_devices);
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS hash_location(_Inout_ ULONG &hash, _In_ const device_attributes &r);
 
 _IRQL_requires_same_

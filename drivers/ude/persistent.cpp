@@ -185,7 +185,7 @@ PAGED auto parse_flags(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &str)
 
         ULONG val{};
         auto st = RtlUnicodeStringToInteger(&str, 10, &val);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 return st;
         }
 
@@ -225,20 +225,20 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
         auto &u8_serial = r.properties.serial;
 
         auto st = unicode_to_utf8(u8_serial, sizeof(u8_serial), serial);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &serial, st);
                 return st;
         }
 
         st = validate_serial_number(u8_serial);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "bad serial '%!USTR!'", &serial);
                 return st;
         }
 
         if (!empty(tail)) {
                 st = parse_flags(r.properties.wsk_events, tail);
-                if (NT_ERROR(st)) {
+                if (!NT_SUCCESS(st)) {
                         return st;
                 }
         }
@@ -587,7 +587,7 @@ PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
                 device_attributes attr{};
                 auto st = parse_device_str(attr, device_str);
 
-                if (NT_ERROR(st)) {
+                if (!NT_SUCCESS(st)) {
                         Trace(TRACE_LEVEL_ERROR, "parse_device_str(%!USTR!) %!STATUS!", &device_str, st);
                 } else {
                         start_attach_attempts(vhci, ctx, attr);
@@ -614,10 +614,112 @@ PAGED NTSTATUS usbip::fill_location(
 
         for (auto &[dst, dst_sz, src]: v) {
                 auto st = unicode_to_utf8(dst, dst_sz, src);
-                if (NT_ERROR(st)) {
+                if (!NT_SUCCESS(st)) {
                         Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &src, st);
                         return st;
                 }
+        }
+
+        return STATUS_SUCCESS;
+}
+
+/*
+ * Validate persistent devices multi-string buffer before writing to the registry.
+ * - Enforces wide-character alignment and a maximum buffer size.
+ * - Validates proper null / double-null termination of the REG_MULTI_SZ structure.
+ * - Parses every entry via parse_device_str() and fill_location() to verify syntax,
+ *   serial number format, attach flags, and location hash.
+ * - Ensures total device count does not exceed max_devices (controller port count).
+ *
+ * @see set_persistent
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS usbip::validate_persistent_devices(
+        _In_reads_bytes_(length) const void *buf, _In_ size_t length, _In_ ULONG max_devices)
+{
+        PAGED_CODE();
+
+        if (length && !buf) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        if (length % sizeof(wchar_t)) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        if (constexpr size_t max_persistent_size = 64*1024; // arbitrary
+            length > max_persistent_size) {
+                Trace(TRACE_LEVEL_ERROR, "length %Iu exceeds max %Iu", length, max_persistent_size);
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        if (!length) {
+                return STATUS_SUCCESS;
+        }
+
+        auto p = static_cast<const wchar_t*>(buf);
+        auto end = p + length/sizeof(wchar_t);
+
+        if (end[-1] != L'\0') {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        ULONG count = 0;
+
+        while (p < end && *p != L'\0') {
+                auto str_start = p;
+                while (p < end && *p != L'\0') {
+                        ++p;
+                }
+
+                if (p >= end) {
+                        return STATUS_INVALID_PARAMETER;
+                }
+
+                auto cch = p - str_start;
+                if (!cch || cch*sizeof(wchar_t) > UNICODE_STRING_MAX_BYTES) {
+                        return STATUS_INVALID_PARAMETER;
+                }
+
+                UNICODE_STRING device_str {
+                        .Length = static_cast<USHORT>(cch*sizeof(wchar_t)),
+                        .MaximumLength = static_cast<USHORT>(cch*sizeof(wchar_t)),
+                        .Buffer = const_cast<wchar_t*>(str_start)
+                };
+
+                device_attributes attr{};
+                auto st = parse_device_str(attr, device_str);
+                if (!NT_SUCCESS(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "invalid device '%!USTR!' %!STATUS!", &device_str, st);
+                        return st;
+                }
+
+                vhci::imported_device_location loc{};
+                st = fill_location(loc, attr);
+                if (!NT_SUCCESS(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "fill_location '%!USTR!' %!STATUS!", &device_str, st);
+                        return st;
+                }
+
+                ++count;
+                if (count > max_devices) {
+                        Trace(TRACE_LEVEL_ERROR, "count %u exceeds max %u", count, max_devices);
+                        return STATUS_INVALID_PARAMETER;
+                }
+
+                ++p; // skip the null terminator
+        }
+
+        if (p == end && count > 0) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        while (p < end) {
+                if (*p != L'\0') {
+                        return STATUS_INVALID_PARAMETER;
+                }
+                ++p;
         }
 
         return STATUS_SUCCESS;

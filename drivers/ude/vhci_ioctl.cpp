@@ -857,12 +857,19 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
  * Security Note:
  * Because the VHCI device object grants World (Everyone) Read/Write access (see initialize() in vhci.cpp),
  * unprivileged callers can invoke this IOCTL to overwrite the persistent device list in HKLM
- * (DriverRegKeyPersistentState) with arbitrary REG_MULTI_SZ data. Although HKLM normally requires
- * administrative privileges for write access, the driver performs this write in kernel mode as SYSTEM.
- * The stored device entries are subsequently parsed and connected by plugin_persistent_devices() on
- * driver initialization.
+ * (DriverRegKeyPersistentState). Although HKLM normally requires administrative privileges for write access,
+ * the driver performs this write in kernel mode as SYSTEM. The stored device entries are subsequently
+ * parsed and connected by plugin_persistent_devices() on driver initialization.
  *
- * How this can be restricted:
+ * To mitigate registry corruption and DoS attacks by unprivileged callers, set_persistent() validates:
+ * 1. Buffer length and alignment (wide character aligned, capped at 64 KB).
+ * 2. Proper null and double-null termination of the REG_MULTI_SZ structure.
+ * 3. Bounded device count (cannot exceed ctx.devices_cnt).
+ * 4. Full semantic parsing of each entry via parse_device_str() and fill_location() (syntax, valid
+ *    alphanumeric serial, attach flags, location hash).
+ * Any malformed or unauthorized structure is rejected before modifying the registry.
+ *
+ * How caller privilege can be further restricted:
  * - Verify that the caller holds administrative privileges before modifying the registry, e.g. via
  *   SeSinglePrivilegeCheck(RtlConvertLongToLuid(SE_LOAD_DRIVER_PRIVILEGE), WdfRequestGetRequestorMode(request))
  *   or by impersonating the caller (WdfRequestImpersonate) and checking for the local Administrators group.
@@ -879,13 +886,22 @@ PAGED auto set_persistent(_In_ WDFREQUEST request)
         void *buf{};
         size_t length{};
         auto st = WdfRequestRetrieveInputBuffer(request, 0, &buf, &length);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
+                return st;
+        }
+
+        auto vhci = get_vhci(request);
+        auto &ctx = *get_vhci_ctx(vhci);
+
+        st = validate_persistent_devices(buf, length, ctx.devices_cnt);
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "validate_persistent_devices %!STATUS!, length %Iu", st, length);
                 return st;
         }
 
         registry key;
         st = open(key, DriverRegKeyPersistentState, KEY_SET_VALUE);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 return st;
         }
 
@@ -893,7 +909,7 @@ PAGED auto set_persistent(_In_ WDFREQUEST request)
         RtlUnicodeStringInit(&val_name, persistent_devices_value_name);
 
         st = WdfRegistryAssignValue(key.get(), &val_name, REG_MULTI_SZ, ULONG(length), buf);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRegistryAssignValue(%!USTR!) %!STATUS!, length %Iu", &val_name, st, length);
         }
         return st;
@@ -912,13 +928,13 @@ PAGED auto get_persistent(_In_ WDFREQUEST request)
         void *buf{};
         size_t length{};
         auto st = WdfRequestRetrieveOutputBuffer(request, 0, &buf, &length);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 return st;
         }
 
         registry key;
         st = open(key, DriverRegKeyPersistentState);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 return st;
         }
 
