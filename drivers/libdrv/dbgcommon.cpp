@@ -485,7 +485,7 @@ const char* libdrv::dbg_usbip_hdr(
         auto st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, %s[%u]}, ",
                                        hdr->seqnum, hdr->devid, direction_str(*hdr), hdr->ep);
 
-	if (NT_ERROR(st)) {
+	if (!NT_SUCCESS(st)) {
 		return "dbg_usbip_hdr error";
 	}
 

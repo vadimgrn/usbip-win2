@@ -96,7 +96,7 @@ void complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 	auto &req = *get_request_ctx(request);
 
 	if (!has_urb(irp)) {
-		if (NT_ERROR(status)) {
+		if (!NT_SUCCESS(status)) {
 			TraceUrb("seqnum %u, %!STATUS!, Information %#Ix", req.seqnum, status, info);
 		}
 		WdfRequestComplete(request, status);
@@ -110,7 +110,7 @@ void complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 		urb_st = USBD_STATUS_CANCELED; // FIXME: is this really required?
 	}
 
-	if (NT_ERROR(status) || urb_st) {
+	if (!NT_SUCCESS(status) || urb_st) {
 		TraceUrb("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix", 
 			  req.seqnum, get_usbd_status(urb_st), status, info);
 	}
@@ -298,7 +298,7 @@ NTSTATUS usbip::device::on_send_complete(
 
                 req.send_completion_pending = false;
 
-                if (NT_ERROR(send_status)) {
+                if (!NT_SUCCESS(send_status)) {
                         remove_from_sent_list_locked(req);
                         // a response or cancellation that already owns the request has status precedence
                         if (!(req.terminal || req.response_in_progress)) {
@@ -362,7 +362,7 @@ WDFREQUEST usbip::device::find_sent_request(_Inout_ device_ctx &dev, _In_ seqnum
                         if (status == STATUS_CANCELLED) {
                                 request = WDF_NO_HANDLE;
                         } else {
-                                NT_ASSERT(NT_SUCCESS(status));
+                                NT_ASSERT(status == STATUS_SUCCESS);
                         }
                 }
 

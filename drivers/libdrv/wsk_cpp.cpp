@@ -36,7 +36,8 @@ PAGED ULONG NTAPI ProviderNpiInit(
         auto prov = static_cast<WSK_PROVIDER_NPI*>(Parameter);
         enum { TIMEOUT = 5*60*1000 }; // milliseconds, @see WSK_INFINITE_WAIT
 
-        auto ok = prov && NT_SUCCESS(WskCaptureProviderNPI(&g_Registration, TIMEOUT, prov));
+        static_assert(NT_SUCCESS(STATUS_TIMEOUT)); // why NT_SUCCESS is not used
+        auto ok = prov && WskCaptureProviderNPI(&g_Registration, TIMEOUT, prov) == STATUS_SUCCESS;
         if (ok) {
                 InterlockedBitTestAndSet(&g_init_flags, F_CAPTURE);
         }
@@ -379,7 +380,8 @@ PAGED NTSTATUS wsk::control_client(
 
         irp.wait_for_completion(st);
 
-        if (NT_SUCCESS(st) && OutputSizeReturned) {
+        static_assert(!NT_SUCCESS(STATUS_BUFFER_OVERFLOW));
+        if ((NT_SUCCESS(st) || st == STATUS_BUFFER_OVERFLOW) && OutputSizeReturned) {
                 *OutputSizeReturned = irp->IoStatus.Information;
         }
 
@@ -419,7 +421,7 @@ PAGED NTSTATUS wsk::control(
 
         if (use_irp) {
                 irp.wait_for_completion(st);
-                if (NT_SUCCESS(st) && OutputSizeReturnedIrp) {
+                if ((NT_SUCCESS(st) || st == STATUS_BUFFER_OVERFLOW) && OutputSizeReturnedIrp) {
                         *OutputSizeReturnedIrp = irp->IoStatus.Information;
                 }
         }

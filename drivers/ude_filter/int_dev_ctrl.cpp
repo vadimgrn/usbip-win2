@@ -339,7 +339,7 @@ void post_process_irp(_In_ filter_ext &fltr, _Inout_ remove_lock_guard &lck, _In
         } else if (auto urb = urb_from_irp(irp); !urb) {
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, submit URB has no URB pointer", ptr04x(fltr.self));
 
-        } else if (NT_ERROR(status) || USBD_ERROR(URB_STATUS(urb))) {
+        } else if (!NT_SUCCESS(status) || USBD_ERROR(URB_STATUS(urb))) {
                 auto &hdr = urb->UrbHeader;
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, %s, USBD_STATUS_%s, %!STATUS!", ptr04x(fltr.self), 
                         urb_function_str(hdr.Function), get_usbd_status(hdr.Status), status);

@@ -179,7 +179,7 @@ PAGED auto query_interface(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const Q
 
 	auto st = ForwardIrpSynchronously(fltr, irp);
 
-	if (auto name = get_guid_name(*qi.InterfaceType); NT_ERROR(st)) {
+	if (auto name = get_guid_name(*qi.InterfaceType); !NT_SUCCESS(st)) {
 		if (name) {
 			Trace(TRACE_LEVEL_ERROR, "dev %04x, %s, Size %d, Version %d, %!STATUS!", 
 				ptr04x(fltr.self), name, qi.Size, qi.Version, st);

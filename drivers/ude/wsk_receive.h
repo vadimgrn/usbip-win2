@@ -40,7 +40,7 @@ constexpr auto check(ULONG TransferBufferLength, int actual_length)
 constexpr auto assign(_Inout_ ULONG &TransferBufferLength, int actual_length)
 {
         auto st = check(TransferBufferLength, actual_length);
-        TransferBufferLength = NT_ERROR(st) ? 0 : actual_length;
+        TransferBufferLength = !NT_SUCCESS(st) ? 0 : actual_length;
         return st;
 }
 

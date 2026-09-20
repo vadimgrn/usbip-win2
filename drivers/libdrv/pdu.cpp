@@ -195,12 +195,12 @@ bool libdrv::get_payload_size(_Out_ size_t &result, _In_ const header &hdr)
         }
 
         size_t isoc_len{};
-        if (NT_ERROR(RtlSizeTMult(layout.number_of_packets, sizeof(iso_packet_descriptor), &isoc_len))) {
+        if (!NT_SUCCESS(RtlSizeTMult(layout.number_of_packets, sizeof(iso_packet_descriptor), &isoc_len))) {
                 return false;
         }
 
         size_t payload{};
-        if (NT_ERROR(RtlSizeTAdd(layout.payload, isoc_len, &payload))) {
+        if (!NT_SUCCESS(RtlSizeTAdd(layout.payload, isoc_len, &payload))) {
                 return false;
         }
 
@@ -219,7 +219,7 @@ bool libdrv::get_total_size(_Out_ size_t &result, _In_ const header &hdr)
         }
 
         size_t total{};
-        if (NT_ERROR(RtlSizeTAdd(sizeof(hdr), payload, &total))) {
+        if (!NT_SUCCESS(RtlSizeTAdd(sizeof(hdr), payload, &total))) {
                 result = 0;
                 return false;
         }

@@ -79,7 +79,7 @@ PAGED NTSTATUS usbip::query_interface(_Inout_ [[maybe_unused]] filter_ext &fltr,
 		if (!r.QueryBusTimeEx) {
 			TraceDbg("QueryBusTimeEx is NULL, substituted");
 			r.QueryBusTimeEx = QueryBusTimeEx;
-		} else if (auto st = r.QueryBusTimeEx(r.BusContext, &dummy); NT_ERROR(st)) {
+		} else if (auto st = r.QueryBusTimeEx(r.BusContext, &dummy); !NT_SUCCESS(st)) {
 			TraceDbg("QueryBusTimeEx -> %!STATUS!, substituted", st);
 			r.QueryBusTimeEx = QueryBusTimeEx;
 		}
@@ -90,7 +90,7 @@ PAGED NTSTATUS usbip::query_interface(_Inout_ [[maybe_unused]] filter_ext &fltr,
 		if (!r.QueryBusTime) {
 			TraceDbg("QueryBusTime is NULL, substituted");
 			r.QueryBusTime = QueryBusTime;
-		} else if (auto st = r.QueryBusTime(r.BusContext, &dummy); NT_ERROR(st)) {
+		} else if (auto st = r.QueryBusTime(r.BusContext, &dummy); !NT_SUCCESS(st)) {
 			TraceDbg("QueryBusTime -> %!STATUS!, substituted", st);
 			r.QueryBusTime = QueryBusTime;
 		}

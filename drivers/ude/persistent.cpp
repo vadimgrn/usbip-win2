@@ -141,7 +141,7 @@ PAGED auto get_persistent_devices(_In_ WDFKEY key)
         RtlUnicodeStringInit(&value_name, persistent_devices_value_name);
 
         st = WdfRegistryQueryMultiString(key, &value_name, &str_attr, col.get<WDFCOLLECTION>());
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_VERBOSE, "WdfRegistryQueryMultiString('%!USTR!') %!STATUS!", &value_name, st);
                 col.reset();
         }
@@ -294,7 +294,7 @@ void on_plugin_hardware(
         auto retry_cnt = req.retry_cnt++; // from zero
 
         auto st = WdfRequestGetStatus(request);
-        auto failed = NT_ERROR(st);
+        auto failed = !NT_SUCCESS(st);
         auto retry = failed && retry_cnt < vhci.reattach_max_attempts &&
                      can_reattach(req.vhci, req.location_hash, st);
 
@@ -419,7 +419,7 @@ PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ c
         req.wsk_events = props.wsk_events;
 
         auto st = RtlStringCbCopyNA(req.serial, sizeof(req.serial), props.serial, sizeof(props.serial));
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", props.serial, st);
                 return false;
         }
@@ -674,7 +674,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 bool usbip::can_reattach(_In_ WDFDEVICE vhci, _In_ ULONG location_hash, _In_ NTSTATUS status)
 {
-        NT_ASSERT(NT_ERROR(status));
+        NT_ASSERT(!NT_SUCCESS(status));
 
         switch (as_usbip_status(status)) {
         case USBIP_ERROR_ABI:

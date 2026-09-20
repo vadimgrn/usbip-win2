@@ -712,7 +712,7 @@ void NTAPI usbip::device::internal_control(
                 get_urb(request).UrbHeader.Status = USBD_STATUS_DEVICE_GONE;
                 device::enqueue_for_completion(request, STATUS_SUCCESS);
         } else if (st = usb_submit_urb(dev, endpoint, endp, request); st != STATUS_PENDING) {
-                if (NT_ERROR(st)) {
+                if (!NT_SUCCESS(st)) {
                         TraceDbg("%!STATUS!", st);
                 }
                 device::enqueue_for_completion(request, st);

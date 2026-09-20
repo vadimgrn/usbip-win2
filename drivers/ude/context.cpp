@@ -144,7 +144,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
         props.wsk_events = r.wsk_events;
 
         st = RtlStringCbCopyNA(props.serial, sizeof(props.serial), r.serial, sizeof(r.serial));
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", r.serial, st);
                 return st;
         }
@@ -184,7 +184,7 @@ PAGED NTSTATUS usbip::init_device_attributes(
                 st = hash_location(attr.location_hash, attr);
         }
 
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 free(attr);
         }
 

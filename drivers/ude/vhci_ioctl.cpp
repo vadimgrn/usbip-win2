@@ -552,7 +552,7 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
                 //
         } else if (auto hash = ext.location_hash(); NT_SUCCESS(st)) {
                 stop_attach_attempts(vhci, hash);
-        } else if (NT_ERROR(st) && can_reattach(ctx.vhci, hash, st)) {
+        } else if (!NT_SUCCESS(st) && can_reattach(ctx.vhci, hash, st)) {
                 stop_attach_attempts(vhci, hash);
                 start_attach_attempts(ctx.vhci, vhci, ext.attr, true);
         }
@@ -929,7 +929,8 @@ PAGED auto get_persistent(_In_ WDFREQUEST request)
         auto type = REG_NONE;
         st = WdfRegistryQueryValue(key.get(), &val_name, ULONG(length), buf, &actual, &type);
 
-        if (NT_ERROR(st)) {
+        static_assert(!NT_SUCCESS(STATUS_BUFFER_OVERFLOW));
+        if (st != STATUS_SUCCESS && st != STATUS_BUFFER_OVERFLOW) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryValue(%!USTR!) %!STATUS!, length %Iu", &val_name, st, length);
         } else if (type != REG_MULTI_SZ) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryValue(%!USTR!): type(%ul) != REG_MULTI_SZ(%ul)", &val_name, type, REG_MULTI_SZ);

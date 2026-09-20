@@ -124,9 +124,9 @@ PAGED auto prepare_wsk_mdl(_Inout_ MDL* &mdl, _Inout_ wsk_context &ctx)
 	bool fail{};
 
 	if (ctx.is_isoc) { // always has payload
-		fail = NT_ERROR(check(TransferBufferLength, ret.actual_length)); // do not change buffer length
+		fail = !NT_SUCCESS(check(TransferBufferLength, ret.actual_length)); // do not change buffer length
 	} else { // actual_length MUST be assigned, must not have payload for OUT
-		fail = NT_ERROR(assign(TransferBufferLength, ret.actual_length)) || dir_out;
+		fail = !NT_SUCCESS(assign(TransferBufferLength, ret.actual_length)) || dir_out;
 		UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
 	}
 
@@ -182,7 +182,7 @@ PAGED auto receive(_Inout_ wsk_context &ctx, _Inout_ WSK_BUF &buf)
 
 	TraceWSK("req %04x, %!STATUS!, %Iu byte(s)", ptr04x(ctx.request), st, actual);
 
-	return  NT_ERROR(st) ? st :
+	return  !NT_SUCCESS(st) ? st :
 		actual == buf.Length ? STATUS_SUCCESS :
 		actual ? STATUS_RECEIVE_PARTIAL : 
 		STATUS_CONNECTION_DISCONNECTED; // EOF
@@ -239,7 +239,7 @@ PAGED auto recv_usbip_header(_Inout_ wsk_context &ctx)
 	WSK_BUF buf{ .Mdl = ctx.mdl_hdr.get(), .Length = sizeof(ctx.hdr) };
 
         auto st = receive(ctx, buf);
-	if (NT_ERROR(st)) {
+	if (!NT_SUCCESS(st)) {
 		return st;
 	}
 
@@ -254,7 +254,7 @@ PAGED void recv_loop(_Inout_ device_ctx &dev, _Inout_ wsk_context &ctx)
 
 	for (NTSTATUS status{}; NT_SUCCESS(status); ) {
 
-                if (get_flag(dev.unplugged) || NT_ERROR(recv_usbip_header(ctx))) [[unlikely]] {
+                if (get_flag(dev.unplugged) || !NT_SUCCESS(recv_usbip_header(ctx))) [[unlikely]] {
                         break;
                 }
 
@@ -274,7 +274,7 @@ PAGED void recv_loop(_Inout_ device_ctx &dev, _Inout_ wsk_context &ctx)
                 }
 
 		if (auto &req = ctx.request) {
-			auto st = NT_ERROR(status) ? status : ret_submit(ctx);
+			auto st = !NT_SUCCESS(status) ? status : ret_submit(ctx);
 			complete_and_set_null(req, st);
 		}
 	}
