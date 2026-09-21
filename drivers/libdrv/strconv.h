@@ -62,4 +62,20 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED int strchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch);
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool equal_strings(
+        _In_reads_bytes_(max_a) const char *a, _In_ size_t max_a,
+        _In_reads_bytes_(max_b) const char *b, _In_ size_t max_b);
+
+template<size_t N1, size_t N2>
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline bool equal_strings(
+        _In_reads_bytes_(N1) const char (&a)[N1],
+        _In_reads_bytes_(N2) const char (&b)[N2])
+{
+        return equal_strings(a, sizeof(a), b, sizeof(b));
+}
+
 } // namespace libdrv

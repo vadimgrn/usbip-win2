@@ -165,10 +165,10 @@ PAGED NTSTATUS recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_
         char busid[sizeof(reply.udev.busid)];
         st = unicode_to_utf8(busid, sizeof(busid), *ext.busid());
 
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", ext.busid(), st);
                 return st;
-        } else if (strncmp(reply.udev.busid, busid, sizeof(busid))) {
+        } else if (!equal_strings(reply.udev.busid, busid)) {
                 Trace(TRACE_LEVEL_ERROR, "Received busid '%s' != '%s'", reply.udev.busid, busid);
                 return USBIP_ERROR_PROTOCOL;
         }
@@ -1120,14 +1120,14 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
                 vhci::replay_plugged_devices(device, fobj);
         }
 
-        if (auto evt = (WDFMEMORY)WdfCollectionGetFirstItem(fobj.events)) {
+        if (auto evt = static_cast<WDFMEMORY>(WdfCollectionGetFirstItem(fobj.events))) {
                 vhci::complete_read(request, evt);
-                WdfCollectionRemove(fobj.events, evt); // decrements reference count
+                WdfCollectionRemoveItem(fobj.events, 0); // decrements reference count
                 return;
         }
 
         auto st = WdfRequestForwardToIoQueue(request, vhci.reads);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", st);
                 if (st == STATUS_WDF_BUSY) { // the queue is not accepting new requests, purged
                         st = STATUS_END_OF_FILE; // ReadFile will return TRUE and set lpNumberOfBytesRead to zero

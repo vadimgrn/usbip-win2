@@ -175,3 +175,19 @@ PAGED void libdrv::split(
         tail.MaximumLength = tail.Length;
         tail.Buffer = s + pos + 1;
 }
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool libdrv::equal_strings(
+        _In_reads_bytes_(max_a) const char *a, _In_ size_t max_a,
+        _In_reads_bytes_(max_b) const char *b, _In_ size_t max_b)
+{
+        size_t len_a;
+        size_t len_b;
+
+        return  NT_SUCCESS(RtlStringCbLengthA(a, max_a, &len_a)) &&
+                NT_SUCCESS(RtlStringCbLengthA(b, max_b, &len_b)) &&
+                len_a == len_b &&
+                RtlCompareMemory(a, b, len_a) == len_a;
+}
+

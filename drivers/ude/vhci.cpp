@@ -12,6 +12,7 @@
 #include "persistent.h"
 
 #include <libdrv/wdm_cpp.h>
+#include <libdrv/strconv.h>
 #include <libdrv/utils.h>
 
 #include <ntstrsafe.h>
@@ -822,6 +823,72 @@ PAGED auto make_device_state(
         return result;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto is_same_device(
+        _In_ const vhci::imported_device_location &a, _In_ const vhci::imported_device_location &b)
+{
+        PAGED_CODE();
+
+        return equal_strings(a.busid, b.busid) &&
+               equal_strings(a.service, b.service) &&
+               equal_strings(a.host, b.host);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED const auto& get_device_state(_In_ WDFMEMORY mem)
+{
+        PAGED_CODE();
+        NT_ASSERT(mem);
+
+        size_t size;
+        auto state = static_cast<const vhci::device_state*>(WdfMemoryGetBuffer(mem, &size));
+
+        NT_ASSERT(size == sizeof(*state));
+        return *state;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void sweep_redundant_events(_Inout_ fileobject_ctx &fobj, _In_ WDFMEMORY new_evt, _In_ ULONG count)
+{
+        PAGED_CODE();
+        NT_ASSERT(count);
+
+        auto fileobj = get_handle(&fobj);
+        auto events = fobj.events;
+        auto &new_st = get_device_state(new_evt);
+
+        for (auto i = count; i--; ) {
+                auto mem_i = static_cast<WDFMEMORY>(WdfCollectionGetItem(events, i));
+                auto &st_i = get_device_state(mem_i);
+
+                auto is_redundant = is_same_device(st_i, new_st);
+
+                if (!is_redundant) {
+                        for (auto cnt = WdfCollectionGetCount(events), j = i + 1; j < cnt; ++j) {
+                                auto mem_j = static_cast<WDFMEMORY>(WdfCollectionGetItem(events, j));
+                                if (is_same_device(st_i, get_device_state(mem_j))) {
+                                        is_redundant = true;
+                                        break;
+                                }
+                        }
+                }
+
+                if (is_redundant) {
+                        WdfCollectionRemoveItem(events, i);
+                        TraceDbg("fobj %04x, drop %04x[%lu]", ptr04x(fileobj), ptr04x(mem_i), i);
+                }
+        }
+}
+
+constexpr ULONG get_max_events(_In_ int devices_cnt)
+{
+        enum { MIN_EVENTS = 64 };
+        return max(MIN_EVENTS, 4*devices_cnt);
+}
+
 /*
  * vhci_ctx::events_lock must be acquired.
  */
@@ -841,13 +908,17 @@ PAGED void process_event(
                 vhci::complete_read(request, evt);
                 break;
         case STATUS_NO_MORE_ENTRIES:
+                if (auto cnt = WdfCollectionGetCount(fobj.events); cnt >= max_events) {
+                        sweep_redundant_events(fobj, evt, cnt);
+                }
+
                 st = WdfCollectionAdd(fobj.events, evt); // append and increment reference count
 
-                if (NT_ERROR(st)) {
+                if (!NT_SUCCESS(st)) {
                         Trace(TRACE_LEVEL_ERROR, "WdfCollectionAdd %!STATUS!", st);
                 } else if (auto cnt = WdfCollectionGetCount(fobj.events); cnt > max_events) {
                         auto head = WdfCollectionGetFirstItem(fobj.events);
-                        WdfCollectionRemove(fobj.events, head); // decrements reference count
+                        WdfCollectionRemoveItem(fobj.events, 0); // is a head, decrements reference count
 
                         TraceDbg("fobj %04x, drop %04x[0], add %04x[%lu]",
                                   ptr04x(fileobj), ptr04x(head), ptr04x(evt), --cnt - 1);
@@ -867,13 +938,15 @@ PAGED void process_event(_In_ vhci_ctx &vhci, _In_ WDFMEMORY evt)
 {
         PAGED_CODE();
 
+        auto max_events = get_max_events(vhci.devices_cnt);
         int cnt = 0;
+
         wdf::waitlock lck(vhci.events_lock);
 
         for (auto head = &vhci.fileobjects, entry = head->Flink; entry != head; entry = entry->Flink) {
                 auto &fobj = *CONTAINING_RECORD(entry, fileobject_ctx, entry);
                 if (fobj.process_events) {
-                        process_event(vhci.reads, fobj, evt, 4*vhci.devices_cnt);
+                        process_event(vhci.reads, fobj, evt, max_events);
                         ++cnt;
                 }
         }
@@ -1029,9 +1102,7 @@ PAGED void usbip::vhci::complete_read(_In_ WDFREQUEST request, _In_ WDFMEMORY ev
         auto st = WdfRequestRetrieveOutputBuffer(request, dst_sz, reinterpret_cast<PVOID*>(&dst), nullptr);
         
         if (NT_SUCCESS(st)) {
-                size_t size{};
-                *dst = *reinterpret_cast<device_state*>(WdfMemoryGetBuffer(evt, &size));
-                NT_ASSERT(size == dst_sz);
+                *dst = get_device_state(evt);
         } else {
                 Trace(TRACE_LEVEL_ERROR, "WdfRequestRetrieveOutputBuffer %!STATUS!", st);
                 dst_sz = 0;
@@ -1076,15 +1147,11 @@ PAGED void usbip::vhci::device_state_changed(
         _In_ WDFDEVICE vhci, _In_ const device_attributes &attr, _In_ int port, _In_ state state)
 {
         PAGED_CODE();
-
         auto &ctx = *get_vhci_ctx(vhci);
-        int subscribers;
-        {
-                wdf::waitlock lck(ctx.events_lock);
-                subscribers = ctx.events_subscribers;
-                if (!subscribers) {
-                        return; // don't create device state unnecessarily
-                }
+
+        auto subscribers = ctx.events_subscribers; // lock-free check, reading 32-bit aligned int is atomic
+        if (!subscribers) {
+                return;
         }
 
         TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!vhci_state!, subscribers %d",
