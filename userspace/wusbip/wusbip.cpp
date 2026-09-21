@@ -700,7 +700,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
                 wxLogVerbose(_("Added %s/%s"), url, busid);
         }
 
-        if (st.state == state::disconnected && is_empty(tree, dev)) { // connection has failed/closed
+        if (st.state == state::disconnected && is_empty(tree, dev) && !is_checked(dev, COL_PERSISTENT)) { // connection has failed/closed
                 wxLogVerbose(_("Transient device removed"));
                 remove_device(dev);
                 return;

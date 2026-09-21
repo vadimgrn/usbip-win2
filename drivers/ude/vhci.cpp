@@ -797,12 +797,14 @@ PAGED auto make_device_state(
 
         WDFMEMORY mem{};
         vhci::device_state *r{};
+        wdf::object_delete result;
 
         auto st = WdfMemoryCreate(&attr, PagedPool, 0, sizeof(*r), &mem, reinterpret_cast<PVOID*>(&r));
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", st);
-                return mem;
+                return result;
         }
+        result.reset(mem);
 
         RtlZeroMemory(r, sizeof(*r));
         r->size = sizeof(*r);
@@ -810,13 +812,14 @@ PAGED auto make_device_state(
         r->source_id = make_source_id(&dev); // CONTAINING_RECORD(&dev, device_ctx_ext, attr)
 
         st = fill(*r, dev, port);
-        if (NT_ERROR(st)) {
-                WdfObjectDelete(mem);
-                mem = WDF_NO_HANDLE;
+
+        if (NT_SUCCESS(st)) {
+                TraceDbg("%04x", ptr04x(mem));
+        } else {
+                result.reset();
         }
 
-        TraceDbg("%04x", ptr04x(mem));
-        return mem;
+        return result;
 }
 
 /*
@@ -1041,6 +1044,30 @@ PAGED void usbip::vhci::complete_read(_In_ WDFREQUEST request, _In_ WDFMEMORY ev
 }
 
 /*
+ * vhci_ctx::events_lock must be acquired.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void usbip::vhci::replay_plugged_devices(_In_ WDFDEVICE vhci, _Inout_ fileobject_ctx &fobj)
+{
+        PAGED_CODE();
+
+        auto &ctx = *get_vhci_ctx(vhci);
+
+        for (int port = 1; port <= ctx.devices_cnt; ++port) {
+                if (auto dev = get_device(vhci, port)) {
+                        auto dc = get_device_ctx(dev.get());
+                        if (auto evt = make_device_state(vhci, dc->attributes(), dc->port, state::plugged)) {
+                                auto st = WdfCollectionAdd(fobj.events, evt.get<WDFMEMORY>());
+                                if (!NT_SUCCESS(st)) {
+                                        Trace(TRACE_LEVEL_ERROR, "WdfCollectionAdd %!STATUS!", st);
+                                }
+                        }
+                }
+        }
+}
+
+/*
  * Each WDFMEMORY object is shared between FILEOBJECT-s, thus parent is set to WDFDEVICE.
  */
 _IRQL_requires_same_
@@ -1064,8 +1091,7 @@ PAGED void usbip::vhci::device_state_changed(
                   &attr.node_name, &attr.service_name, &attr.busid, port, int(state), subscribers);
 
         if (auto evt = make_device_state(vhci, attr, port, state)) {
-                process_event(ctx, evt);
-                WdfObjectDelete(evt); // will be deleted after its reference count becomes zero
+                process_event(ctx, evt.get<WDFMEMORY>());
         } else {
                 Trace(TRACE_LEVEL_ERROR, "Failed to create state '%!vhci_state!'", int(state));
         }

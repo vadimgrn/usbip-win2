@@ -1117,6 +1117,7 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
         if (auto &val = fobj.process_events; !val) {
                 ++vhci.events_subscribers;
                 val = true;
+                vhci::replay_plugged_devices(device, fobj);
         }
 
         if (auto evt = (WDFMEMORY)WdfCollectionGetFirstItem(fobj.events)) {
