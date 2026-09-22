@@ -80,6 +80,8 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
         }
 
         assert(!dst.port);
+        assert(!dst.location_hash);
+
         return ERROR_SUCCESS;
 }
 

@@ -726,7 +726,9 @@ PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
                 auto vhci = get_vhci(request);
                 auto ctx = get_vhci_ctx(vhci);
 
+                r->location_hash = location_hash;
                 r->count = stop_attach_attempts(*ctx, location_hash);
+
                 WdfRequestSetInformation(request, sizeof(*r));
         }
 

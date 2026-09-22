@@ -602,6 +602,9 @@ PAGED NTSTATUS usbip::fill_location(
 {
         PAGED_CODE();
 
+        NT_ASSERT(attr.location_hash);
+        r.location_hash = attr.location_hash;
+
         struct {
                 char *dst;
                 USHORT dst_sz;

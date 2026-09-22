@@ -68,12 +68,14 @@ struct base
 struct imported_device_location
 {
         int port; // OUT, >= 1 or zero if an error
+        ULONG location_hash; // OUT, hash(host,service,busid)
 
         char busid[BUS_ID_SIZE];
         char service[32]; // NI_MAXSERV
         char host[1025];  // NI_MAXHOST in ws2def.h
 };
 static_assert(!offsetof(imported_device_location, port)); // must be the first member
+static_assert(offsetof(imported_device_location, location_hash) == sizeof(imported_device_location::port));
 
 struct imported_device_properties
 {

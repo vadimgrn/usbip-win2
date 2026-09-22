@@ -12,7 +12,6 @@
 #include "persistent.h"
 
 #include <libdrv/wdm_cpp.h>
-#include <libdrv/strconv.h>
 #include <libdrv/utils.h>
 
 #include <ntstrsafe.h>
@@ -825,18 +824,6 @@ PAGED auto make_device_state(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto is_same_device(
-        _In_ const vhci::imported_device_location &a, _In_ const vhci::imported_device_location &b)
-{
-        PAGED_CODE();
-
-        return equal_strings(a.busid, b.busid) &&
-               equal_strings(a.service, b.service) &&
-               equal_strings(a.host, b.host);
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGED const auto& get_device_state(_In_ WDFMEMORY mem)
 {
         PAGED_CODE();
@@ -858,18 +845,21 @@ PAGED void sweep_redundant_events(_Inout_ fileobject_ctx &fobj, _In_ WDFMEMORY n
 
         auto fileobj = get_handle(&fobj);
         auto events = fobj.events;
+
         auto &new_st = get_device_state(new_evt);
+        NT_ASSERT(new_st.location_hash);
 
         for (auto i = count; i--; ) {
                 auto mem_i = static_cast<WDFMEMORY>(WdfCollectionGetItem(events, i));
                 auto &st_i = get_device_state(mem_i);
 
-                auto is_redundant = is_same_device(st_i, new_st);
+                NT_ASSERT(st_i.location_hash);
+                auto is_redundant = st_i.location_hash == new_st.location_hash;
 
                 if (!is_redundant) {
                         for (auto cnt = WdfCollectionGetCount(events), j = i + 1; j < cnt; ++j) {
                                 auto mem_j = static_cast<WDFMEMORY>(WdfCollectionGetItem(events, j));
-                                if (is_same_device(st_i, get_device_state(mem_j))) {
+                                if (st_i.location_hash == get_device_state(mem_j).location_hash) {
                                         is_redundant = true;
                                         break;
                                 }
