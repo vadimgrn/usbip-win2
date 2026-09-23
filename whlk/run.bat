@@ -21,5 +21,4 @@ msbuild /t:dvl /p:Configuration="Release" /p:Platform="x64" /p:SarifTelemetryPat
 powershell -ExecutionPolicy Bypass -Command "$sarif = Get-Content -Raw '%PROJ_NAME%.sarif' | ConvertFrom-Json; $sarif.runs | ForEach-Object { $_.results } | ForEach-Object { $loc = $_.locations | Select-Object -First 1; [PSCustomObject]@{ RuleId = $_.ruleId; File = if ($loc.physicalLocation.artifactLocation.uri) { $loc.physicalLocation.artifactLocation.uri } else { 'N/A' }; Line = if ($loc.physicalLocation.region.startLine) { $loc.physicalLocation.region.startLine } else { 'N/A' } } } | Format-Table -AutoSize"
 powershell -Command "Get-Content -Raw '%PROJ_NAME%.sarif' | ConvertFrom-Json | ConvertTo-Json -Depth 100 | Set-Content '%PROJ_NAME%.sarif'"
 
-"C:\Program Files (x86)\Windows Kits\10\Tools\bin\x64\dvl.exe" /manualCreate %PROJ_NAME% x64 /sarifPath "%UDE_HOME%"
 cd /d "%CURDIR%"
