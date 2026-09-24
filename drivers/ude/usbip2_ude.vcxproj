@@ -247,6 +247,9 @@
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
       <AdditionalOptions>/Zc:__cplusplus %(ClCompile.AdditionalOptions)</AdditionalOptions>
       <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Optimization>MaxSpeed</Optimization>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <DriverSign>
       <FileDigestAlgorithm>certHash</FileDigestAlgorithm>
@@ -254,6 +257,7 @@
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);ntstrsafe.lib;wdmsec.lib;netio.lib</AdditionalDependencies>
       <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
