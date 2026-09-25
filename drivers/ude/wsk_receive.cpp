@@ -46,6 +46,8 @@ void log(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
 		  d.bConfigurationValue, d.iConfiguration, d.bmAttributes, d.MaxPower);
 }
 
+enum : UCHAR { HS_MIN_INTVL = 1, HS_MAX_INTVL = 16 }; // USB_ENDPOINT_DESCRIPTOR.bInterval
+
 /*
  * For LS/FS interrupt endpoint only.
  * @param bInterval milliseconds
@@ -53,64 +55,57 @@ void log(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
+constexpr UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
 {
-        enum { MIN_INTVL = 1, MAX_INTVL = 16 }; // result
+        if (!bInterval) [[unlikely]] {
+                return HS_MIN_INTVL;
+        }
 
-        NT_ASSERT(bInterval);
         auto microframes = 8*bInterval;
-	
-        for (UCHAR i = MIN_INTVL; i <= MAX_INTVL; ++i) {
+
+        for (UCHAR i = HS_MIN_INTVL; i <= HS_MAX_INTVL; ++i) {
                 if ((1 << (i - 1)) >= microframes) {
                         return i;
                 }
         }
-	
-        return MAX_INTVL;
+
+        return HS_MAX_INTVL;
 }
 
 /*
- * UDE/USBHUB3 internally treats all devices as High-Speed.
- * Full-Speed bulk endpoints have wMaxPacketSize <= 64, but HS requires 512.
- * USBHUB3 rejects the configuration descriptor if bulk endpoints don't match HS rules,
- * causing repeated enumeration failures ("Invalid Configuration Descriptor").
+ * UDECX virtual USB 2.0 root ports unconditionally report PORT_HIGH_SPEED (0x0400)
+ * in EvtRootHubGetPortStatus (udecx.sys) for any connected device. Consequently,
+ * USBHUB3.sys (HUBDSM_SettingSpeedFlagFor20Devices / HUBUCX_CreateDeviceInUCX) marks
+ * every device on a USB 2.0 port as High-Speed (Speed = 2).
  *
- * USB_SPEED_FULL audio devices do not work if ISOCH IN/OUT USB_ENDPOINT_DESCRIPTOR.bInterval = 1. 
- * ucx01000!UrbHandler_USBPORTStyle_Legacy_IsochTransfer completes IRP with USBD_STATUS_INVALID_PARAMETER,
- * this error can be observed in the filter driver, this driver will not get ISOCH transfers at all.
- * it always treats bInterval as 0.125ms intervals, and it doesn't care if everything else in the device
- * descriptor or speed is correct.
+ * During device enumeration, USBHUB3.sys (HUBDESC_InternalValidateEndpointDescriptor)
+ * validates the Configuration Descriptor against strict High-Speed USB constraints:
  *
- * Isochronous transfers can only be used by full-speed and high-speed devices.
- * For devices and host controllers that can operate at full speed, the period is measured in units of 1 millisecond frames.
- * 
- * For devices and host controllers that can operate at high speed, the period is measured in units of microframes.
- * There are eight microframes in each 1 millisecond frame.
- * The period is related to the value in bInterval by the formula 2**(bInterval - 1), the result is number of microframes.
+ * 1. Bulk Endpoints (USB 2.0 Spec 5.8.3):
+ *    High-Speed bulk endpoints MUST have wMaxPacketSize == 512. If a Full-Speed device
+ *    reports wMaxPacketSize <= 64, USBHUB3 fails validation with error 0x3C
+ *    (DescriptorValidationErrorBulkEndpointPacketSizeInvalidAtHighSpeed), returning
+ *    STATUS_USB_INVALID_CONFIGURATION_DESCRIPTOR and causing enumeration failure
+ *    (Code 43, USB\CONFIGURATION_DESCRIPTOR_VALIDATION_FAILURE). See Issue #151.
+ *    Setting wMaxPacketSize = 512 satisfies USBHUB3 validation; transfer buffer lengths
+ *    are unaffected because actual transfers use URB.TransferBufferLength.
  *
- * 5.5.3 Control Transfer Packet Size Constraints
- * The allowable maximum control transfer data payload sizes for full-speed devices is 8, 16, 32, or 64 bytes;
- * for high-speed devices, it is 64 bytes and for low-speed devices, it is 8 bytes.
- * 
- * 5.6.4 Isochronous Transfer Bus Access Constraints
- * An isochronous endpoint must specify its required bus access period. Full-/high-speed endpoints must specify
- * a desired period as (2**bInterval-1)*F, where bInterval is in the range 1-16 and F is 125µs for high-speed
- * and 1ms for full-speed.
- * 
- * 5.7.4 Interrupt Transfer Packet Size Constraints
- * A full-speed endpoint can specify a desired period from 1 ms to 255 ms. Low-speed endpoints are limited
- * to specifying only 10 ms to 255 ms. High-speed endpoints can specify a desired period (2**bInterval-1)*125µs,
- * where bInterval is in the range 1-16.
+ * 2. Interrupt Endpoints (USB 2.0 Spec 5.7.4):
+ *    High-Speed interrupt endpoints must specify bInterval in the range 1-16 (representing
+ *    2**(bInterval - 1) microframes of 125µs). Full-Speed devices specify bInterval in
+ *    milliseconds (1-255 ms). If bInterval > 16, USBHUB3 fails validation with error 0x6D
+ *    (DescriptorValidationErrorInterruptEndpointInvalidBInterval). Converting milliseconds
+ *    to microframe exponents (1-16) preserves proper polling periods and passes validation.
  *
- * 5.8.3 Bulk Transfer Packet Size Constraints
- * An endpoint for bulk transfers specifies the maximum data payload size that the endpoint can accept from
- * or transmit to the bus. The USB defines the allowable maximum bulk data payload sizes to be only 8, 16,
- * 32, or 64 bytes for full-speed endpoints and 512 bytes for high-speed endpoints. A low-speed device must
- * not have bulk endpoints
+ * 3. Isochronous Endpoints (USB 2.0 Spec 5.6.4 / ucx01000):
+ *    High-Speed isochronous endpoints specify bInterval in microframes (1-16). Full-Speed
+ *    devices specify bInterval in 1ms frames (2**(bInterval - 1) frames). Under High-Speed
+ *    root hub emulation, ucx01000 treats bInterval as microframes. Adding 3 converts 1ms
+ *    frames (8 microframes = 2^3) to microframes, maintaining the intended bus access period.
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void patch_config(_In_opt_ USB_CONFIGURATION_DESCRIPTOR *cd)
+void patch_ls_fs_config(_In_opt_ USB_CONFIGURATION_DESCRIPTOR *cd)
 {
         for (USB_ENDPOINT_DESCRIPTOR *cur{};
              (cur = find_next<USB_ENDPOINT_DESCRIPTOR>(cd, cur)); ) {
@@ -124,26 +119,22 @@ void patch_config(_In_opt_ USB_CONFIGURATION_DESCRIPTOR *cd)
                         e.wMaxPacketSize = 512; // fixed value for HS
                         break;
                 case UsbdPipeTypeIsochronous: // 2**(bInterval - 1) frames
-                        enum : UCHAR { MIN_INTVL = 1, MAX_INTVL = 16 };
-                        if (!(e.bInterval >= MIN_INTVL && e.bInterval <= MAX_INTVL)) [[unlikely]] {
+                        if (!(e.bInterval >= HS_MIN_INTVL && e.bInterval <= HS_MAX_INTVL)) [[unlikely]] {
                                 Trace(TRACE_LEVEL_WARNING, "Isochronous interval %d out of spec bounds", e.bInterval);
-                                e.bInterval = min(max(e.bInterval, MIN_INTVL), MAX_INTVL);
+                                e.bInterval = min(max(e.bInterval, HS_MIN_INTVL), HS_MAX_INTVL);
                         }
-                        e.bInterval = min(static_cast<UCHAR>(e.bInterval + 3), MAX_INTVL); // 2**(bInterval-1) microframes
+                        e.bInterval = min(static_cast<UCHAR>(e.bInterval + 3), HS_MAX_INTVL); // 2**(bInterval-1) microframes
                         break;
                 case UsbdPipeTypeInterrupt: // 1-255 ms
                         e.bInterval = to_high_speed_interval(e.bInterval); // 2**(bInterval-1) microframes
-                        break;
-                case UsbdPipeTypeControl:
-                        Trace(TRACE_LEVEL_WARNING, "control endpoint found in configuration descriptor");
                         break;
                 }
 
                 if (auto eq = e.wMaxPacketSize == old_pkt && e.bInterval == old_intvl; !eq) {
                         TraceDbg("bLength %d, %!usb_descriptor_type!, bEndpointAddress %#x, "
-                                "bmAttributes %#x, wMaxPacketSize %d (was %d), bInterval %d (was %d)", 
-                                e.bLength, e.bDescriptorType, e.bEndpointAddress, e.bmAttributes, 
-                                e.wMaxPacketSize, old_pkt, e.bInterval, old_intvl);
+                                 "bmAttributes %#x, wMaxPacketSize %d (was %d), bInterval %d (was %d)", 
+                                  e.bLength, e.bDescriptorType, e.bEndpointAddress, e.bmAttributes, 
+                                  e.wMaxPacketSize, old_pkt, e.bInterval, old_intvl);
                 }
         }
 }
@@ -366,7 +357,7 @@ void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_T
                         NT_ASSERT(is_valid(d));
                         log(d);
                         if (dev.speed() < USB_SPEED_HIGH) {
-                                patch_config(&d);
+                                patch_ls_fs_config(&d);
                         }
 		}
 		break;
