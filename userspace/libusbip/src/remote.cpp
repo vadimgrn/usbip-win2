@@ -186,7 +186,7 @@ auto recv_op_common(_In_ SOCKET s, _In_ uint16_t expected_code)
 {
 	assert(s != INVALID_SOCKET);
 
-	op_common r{};
+	op_common r;
 	if (recv(s, &r, sizeof(r))) {
 		byteswap(r);
 	} else {
@@ -225,18 +225,15 @@ constexpr auto as_usb_device(_In_ const usbip_usb_device &d)
 		.bConfigurationValue = d.bConfigurationValue,
 
 		.bNumConfigurations = d.bNumConfigurations,
-		.bNumInterfaces = d.bNumInterfaces,
 	};
 }
 
 constexpr auto as_usb_interface(_In_ const usbip_usb_interface &r)
 {
-        static_assert(sizeof(r) == sizeof(usb_interface));
         return usb_interface {
                 .bInterfaceClass = r.bInterfaceClass,
                 .bInterfaceSubClass = r.bInterfaceSubClass,
                 .bInterfaceProtocol = r.bInterfaceProtocol,
-                .padding = r.padding,
         };
 }
 
@@ -505,68 +502,58 @@ auto usbip::connect(
 	return std::move(*res);
 }
 
-bool usbip::enum_exportable_devices(
-	_In_ SOCKET s, 
-	_In_ const usb_device_f &on_dev, 
-	_In_ const usb_interface_f &on_intf,
-	_In_opt_ const usb_device_cnt_f &on_dev_cnt)
+std::optional<std::vector<usb_device>> usbip::get_exportable_devices(_In_ SOCKET s)
 {
 	assert(s != INVALID_SOCKET);
 	
 	if (!send_op_common(s, OP_REQ_DEVLIST)) {
-		return false;
+		return std::nullopt;
 	}
 
 	if (auto err = recv_op_common(s, OP_REP_DEVLIST)) {
 		SetLastError(err);
-		return false;
+		return std::nullopt;
 	}
 
-	op_devlist_reply reply{};
+	op_devlist_reply reply;
 	
 	if (recv(s, &reply, sizeof(reply))) {
 		byteswap(reply);
 	} else {
-		return false;
+		return std::nullopt;
 	}
 
 	if (reply.ndev > INT_MAX) {
 		libusbip::output("the number of exportable devices {} is too large", reply.ndev);
 		SetLastError(ERROR_INVALID_DATA);
-		return false;
+		return std::nullopt;
 	}
 
-        libusbip::output("{} exportable device(s)", reply.ndev);
+	libusbip::output("{} exportable device(s)", reply.ndev);
 
-	if (on_dev_cnt) {
-		on_dev_cnt(reply.ndev);
-	}
-
-	usb_device lib_dev;
+	std::vector<usb_device> devices;
+	devices.reserve(reply.ndev);
 
 	for (UINT32 i = 0; i < reply.ndev; ++i) {
 
-		op_devlist_reply_extra extra{};
-
-		if (recv(s, &extra, sizeof(extra))) {
-			byteswap(extra);
-			lib_dev = as_usb_device(extra.udev);
-			on_dev(i, lib_dev);
-		} else {
-			return false;
+		op_devlist_reply_extra extra;
+		if (!recv(s, &extra, sizeof(extra))) {
+			return std::nullopt;
 		}
+		byteswap(extra);
 
-		for (int j = 0; j < lib_dev.bNumInterfaces; ++j) {
+		auto &dev = devices.emplace_back(as_usb_device(extra.udev));
+		dev.interfaces.reserve(extra.udev.bNumInterfaces);
 
-			if (usbip_usb_interface intf{}; recv(s, &intf, sizeof(intf))) {
+		for (int j = 0; j < extra.udev.bNumInterfaces; ++j) {
+			if (usbip_usb_interface intf; recv(s, &intf, sizeof(intf))) {
 				byteswap(intf);
-				auto uintf = as_usb_interface(intf);
-				on_intf(i, lib_dev, j, uintf);
+				dev.interfaces.emplace_back(as_usb_interface(intf));
 			} else {
-				return false;
+				return std::nullopt;
 			}
 		}
 	}
 
-	return true;
+	return devices;
 }

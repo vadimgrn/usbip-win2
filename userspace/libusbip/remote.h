@@ -9,16 +9,24 @@
 #include "win_socket.h"
 
 #include <usbspec.h>
+
 #include <string>
-#include <functional>
+#include <vector>
+#include <optional>
 
 #if __cplusplus >= 202002L
-  #include <optional>
   #include <stop_token>
 #endif
 
 namespace usbip
 {
+
+struct usb_interface 
+{
+        UINT8 bInterfaceClass{};
+        UINT8 bInterfaceSubClass{};
+        UINT8 bInterfaceProtocol{};
+};
 
 struct usb_device 
 {
@@ -38,17 +46,9 @@ struct usb_device
         UINT8 bDeviceProtocol{};
 
         UINT8 bConfigurationValue{};
-
         UINT8 bNumConfigurations{};
-        UINT8 bNumInterfaces{};
-};
 
-struct usb_interface 
-{
-        UINT8 bInterfaceClass{};
-        UINT8 bInterfaceSubClass{};
-        UINT8 bInterfaceProtocol{};
-        UINT8 padding{}; /* alignment */
+        std::vector<usb_interface> interfaces;
 };
 
 /**
@@ -108,35 +108,9 @@ inline Socket connect(
 #endif // __cplusplus
 
 /**
- * @param idx zero-based index of usb device
- * @param dev usb device
- */
-using usb_device_f = std::function<void(_In_ int idx, _In_ const usb_device &dev)>;
-
-/**
- * @param dev_idx zero-based index of usb device
- * @param dev usb device
- * @param idx zero-based index of usb interface that belong to this usb device
- * @param intf usb interface
- */
-using usb_interface_f = std::function<void(_In_ int dev_idx, _In_ const usb_device &dev, int idx, const usb_interface &intf)>;
-
-/**
- * @param count number of usb devices
- */
-using usb_device_cnt_f = std::function<void(_In_ int count)>;
-
-/**
  * @param s socket handle
- * @param on_dev will be called for every usb device
- * @param on_intf will be called for every usb interface of usb device
- * @param on_dev_cnt will be called once before other callbacks
- * @return call GetLastError() if false is returned
+ * @return devices if the result contains a value, otherwise call GetLastError()
  */
-USBIP_API bool enum_exportable_devices(
-        _In_ SOCKET s, 
-        _In_ const usb_device_f &on_dev, 
-        _In_ const usb_interface_f &on_intf,
-        _In_opt_ const usb_device_cnt_f &on_dev_cnt = nullptr);
+USBIP_API std::optional<std::vector<usb_device>> get_exportable_devices(_In_ SOCKET s);
 
 } // namespace usbip

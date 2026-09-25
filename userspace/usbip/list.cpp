@@ -17,46 +17,47 @@ namespace
 
 using namespace usbip;
 
-void on_device_count(int count)
+void print_exportable_devices(const std::vector<usb_device> &devices)
 {
-        if (count) {
-                std::println("Exportable USB devices\n"
-                             "======================");
+        if (devices.empty()) {
+                return;
         }
-}
 
-void on_device(int, _In_ const usb_device &d)
-{
+        std::println("Exportable USB devices\n"
+                     "======================");
+
         auto &ids = get_ids();
-        auto prod = get_product(ids, d.idVendor, d.idProduct);
-        auto csp = get_class(ids, d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol);
 
-        auto lines = std::format(
-                        "{:^11}: {}\n"
-                        "{:11}: {}\n"
-                        "{:11}: {}\n",
-                        d.busid, prod,
-                        "", d.path,
-                        "", csp);
+        for (const auto &d: devices) {
+                auto prod = get_product(ids, d.idVendor, d.idProduct);
+                auto csp = get_class(ids, d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol);
 
-        if (!d.bNumInterfaces) {
-                lines += '\n';
+                auto lines = std::format(
+                                "{:^11}: {}\n"
+                                "{:11}: {}\n"
+                                "{:11}: {}\n",
+                                d.busid, prod,
+                                "", d.path,
+                                "", csp);
+
+                if (d.interfaces.empty()) {
+                        lines += '\n';
+                }
+
+                std::print("{}", lines);
+
+                for (size_t idx = 0; idx < d.interfaces.size(); ++idx) {
+                        const auto &r = d.interfaces[idx];
+                        auto intf_csp = get_class(ids, r.bInterfaceClass, r.bInterfaceSubClass, r.bInterfaceProtocol);
+
+                        auto s = std::format("{:11}: {:2} - {}\n", "", idx, intf_csp);
+                        if (idx + 1 == d.interfaces.size()) {
+                                s += '\n';
+                        }
+
+                        std::print("{}", s);
+                }
         }
-
-        std::print("{}", lines);
-}
-
-void on_interface(int, _In_ const usb_device &d, int idx, _In_ const usb_interface &r)
-{
-        auto &ids = get_ids();
-        auto csp = get_class(ids, r.bInterfaceClass, r.bInterfaceSubClass, r.bInterfaceProtocol);
-
-        auto s = std::format("{:11}: {:2} - {}\n", "", idx, csp);
-        if (idx + 1 == d.bNumInterfaces) { // last
-                s += '\n';
-        }
-
-        std::print("{}", s);
 }
 
 bool list_persistent_devices()
@@ -98,10 +99,13 @@ bool usbip::cmd_list(const list_args &args)
 
         log::debug("connected to {}:{}", args.remote, global_args.tcp_port);
 
-        if (!enum_exportable_devices(sock.get(), on_device, on_interface, on_device_count)) {
+        auto devices = get_exportable_devices(sock.get());
+
+        if (!devices) {
                 log::error(get_last_error_msg());
-                return false;
+        } else {
+                print_exportable_devices(*devices);
         }
 
-        return true;
+        return devices.has_value();
 }

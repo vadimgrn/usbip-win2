@@ -54,10 +54,7 @@ int main()
         auto s3 = connect("", "1234", ssrc.get_token());
 #endif
         if (s1) {
-                enum_exportable_devices(s1.get(),
-                        [] (int, const usb_device&) {},
-                        [] (int, const usb_device&, int, const usb_interface&) {},
-                        [] (int) {});
+                [[maybe_unused]] auto devices = get_exportable_devices(s1.get());
         }
 
         // vhci.h
