@@ -118,7 +118,7 @@ auto make_imported_device(_In_ const vhci::imported_device &d)
                 .port = d.port,
                 // imported_device_properties
                 .devid = d.devid,
-                .speed = win_speed(d.speed),
+                .speed = win_speed(d.speed).value_or(UsbLowSpeed),
                 .vendor = d.vendor,
                 .product = d.product,
                 .serial{ d.serial, strnlen(d.serial, std::size(d.serial)) },

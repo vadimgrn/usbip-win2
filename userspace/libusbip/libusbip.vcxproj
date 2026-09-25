@@ -166,7 +166,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\device_speed.cpp" />
     <ClCompile Include="src\dllmain.cpp" />
     <ClCompile Include="src\file_ver.cpp" />
     <ClCompile Include="src\format_message.cpp" />

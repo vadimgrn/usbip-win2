@@ -204,7 +204,7 @@ auto recv_op_common(_In_ SOCKET s, _In_ uint16_t expected_code)
 	return op_status_error(static_cast<op_status_t>(r.status));
 }
 
-constexpr auto as_usb_device(_In_ const usbip_usb_device &d)
+constexpr auto as_usb_device(_In_ const usbip_usb_device &d, _In_ USB_DEVICE_SPEED speed)
 {
 	return usb_device {
 		.path = d.path,
@@ -212,7 +212,7 @@ constexpr auto as_usb_device(_In_ const usbip_usb_device &d)
 
 		.busnum = d.busnum,
 		.devnum = d.devnum,
-		.speed = win_speed(static_cast<usb_device_speed>(d.speed)),
+		.speed = speed,
 
 		.idVendor = d.idVendor,
 		.idProduct = d.idProduct,
@@ -483,6 +483,39 @@ auto do_connect(
 	return std::unexpected(last_err);
 }
 
+auto recv_usb_device(_In_ SOCKET s, _Inout_ usb_device &dev)
+{
+        op_devlist_reply_extra extra;
+        if (!recv(s, &extra, sizeof(extra))) {
+                return false;
+        }
+        byteswap(extra);
+
+        auto &udev = extra.udev;
+
+        auto speed = win_speed(static_cast<usb_device_speed>(udev.speed));
+        if (!speed) {
+                libusbip::output("invalid device speed: {}", udev.speed);
+                SetLastError(ERROR_INVALID_DATA);
+                return false;
+        }
+
+        dev = as_usb_device(udev, *speed);
+        dev.interfaces.resize(udev.bNumInterfaces);
+
+        for (auto &i: dev.interfaces) {
+
+                if (usbip_usb_interface intf; recv(s, &intf, sizeof(intf))) {
+                        byteswap(intf);
+                        i = as_usb_interface(intf);
+                } else {
+                        return false;
+                }
+        }
+
+        return true;
+}
+
 } // namespace
 
 
@@ -515,13 +548,11 @@ std::optional<std::vector<usb_device>> usbip::get_exportable_devices(_In_ SOCKET
 		return std::nullopt;
 	}
 
-	op_devlist_reply reply;
-	
-	if (recv(s, &reply, sizeof(reply))) {
-		byteswap(reply);
-	} else {
-		return std::nullopt;
-	}
+        op_devlist_reply reply;
+        if (!recv(s, &reply, sizeof(reply))) {
+                return std::nullopt;
+        }
+        byteswap(reply);
 
 	if (reply.ndev > INT_MAX) {
 		libusbip::output("the number of exportable devices {} is too large", reply.ndev);
@@ -529,29 +560,12 @@ std::optional<std::vector<usb_device>> usbip::get_exportable_devices(_In_ SOCKET
 		return std::nullopt;
 	}
 
-	libusbip::output("{} exportable device(s)", reply.ndev);
+        libusbip::output("{} exportable device(s)", reply.ndev);
+        std::vector<usb_device> devices(reply.ndev);
 
-	std::vector<usb_device> devices;
-	devices.reserve(reply.ndev);
-
-	for (UINT32 i = 0; i < reply.ndev; ++i) {
-
-		op_devlist_reply_extra extra;
-		if (!recv(s, &extra, sizeof(extra))) {
+	for (auto &dev: devices) {
+                if (!recv_usb_device(s, dev)) {
 			return std::nullopt;
-		}
-		byteswap(extra);
-
-		auto &dev = devices.emplace_back(as_usb_device(extra.udev));
-		dev.interfaces.reserve(extra.udev.bNumInterfaces);
-
-		for (int j = 0; j < extra.udev.bNumInterfaces; ++j) {
-			if (usbip_usb_interface intf; recv(s, &intf, sizeof(intf))) {
-				byteswap(intf);
-				dev.interfaces.emplace_back(as_usb_interface(intf));
-			} else {
-				return std::nullopt;
-			}
 		}
 	}
 
