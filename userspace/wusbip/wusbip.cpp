@@ -1280,10 +1280,17 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         auto persistent = get_persistent();
         auto saved = as_set(get_saved());
 
-        auto dev = [this, host = std::move(u8_host), port = std::move(u8_port), &persistent, &saved] (auto, auto &device)
-        {
+        auto devices = get_exportable_devices(sock.get());
+        if (!devices) {
+                auto err = GetLastError();
+                wxLogError(_("get_exportable_devices error %lu\n%s"), err, get_last_error_msg(err));
+                return;
+        }
+
+        for (const auto &device: *devices) {
+
                 device_state state {
-                        .device = make_imported_device(host, port, device),
+                        .device = make_imported_device(u8_host, u8_port, device),
                 };
                 auto [dc, flags] = make_device_columns(state);
 
@@ -1304,14 +1311,9 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                 }
 
                 update_device(item, dc, flags);
-        };
+        }
 
-        auto intf = [] <typename... Args> (Args&&...) {};
-
-        if (!enum_exportable_devices(sock.get(), dev, intf)) {
-                auto err = GetLastError();
-                wxLogError(_("enum_exportable_devices error %lu\n%s"), err, get_last_error_msg(err));
-        } else if (cb.FindString(host) != wxNOT_FOUND) {
+        if (cb.FindString(host) != wxNOT_FOUND) {
                 // already exists
         } else if (cb.Append(host); cb.GetCount() > 32) {
                 cb.Delete(0);
