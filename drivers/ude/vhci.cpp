@@ -890,7 +890,7 @@ PAGED void process_event(
 {
         PAGED_CODE();
 
-        if (fobj.session_id != owner_session_id) { // Terminal Server session isolation
+        if (owner_session_id != invalid_session_id && fobj.session_id != owner_session_id) { // Terminal Server session isolation
                 return; // a subscriber only sees state changes of devices its own session attached
         }
 
@@ -1067,7 +1067,8 @@ PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool plugou
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = get_device(vhci, port)) {
                         auto d = dev.get<UDECXUSBDEVICE>();
-                        if (session_id == invalid_session_id || get_device_ctx(d)->session_id == session_id) { // Terminal Server session isolation
+                        auto dc = get_device_ctx(d);
+                        if (session_id == invalid_session_id || (dc->is_session_isolated() && dc->session_id == session_id)) { // Terminal Server session isolation
                                 device::detach(d, plugout_and_delete);
                         }
                 }
@@ -1126,7 +1127,7 @@ PAGED void usbip::vhci::replay_plugged_devices(_In_ WDFDEVICE vhci, _Inout_ file
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = get_device(vhci, port)) {
                         auto dc = get_device_ctx(dev.get());
-                        if (dc->session_id != fobj.session_id) { // Terminal Server session isolation
+                        if (dc->is_session_isolated() && dc->session_id != fobj.session_id) { // Terminal Server session isolation
                                 continue;
                         }
                         if (auto evt = make_device_state(vhci, dc->attributes(), dc->port, state::plugged)) {

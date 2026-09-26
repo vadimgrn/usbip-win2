@@ -33,6 +33,7 @@ namespace usbip
  *     but at a high frequency, such as HID keyboard/mouse, etc.
  */
 enum class receive_mode { zero_copy, low_latency };
+enum class isolation : unsigned char { none = 0, session = 1, user = 2 };
 
 struct device_location
 {
@@ -52,6 +53,7 @@ struct persistent_device
         std::string serial; ///< optional device serial number if you want to set/override it
         receive_mode recv_mode = receive_mode::zero_copy; ///< how to optimize data reception over the network
         bool once{}; ///< do not start automatic attach attempts if cannot connect; for attach_args only
+        isolation iso_mode = isolation::none; ///< device isolation mode (none, session, user)
 };
 
 struct imported_device
@@ -67,6 +69,7 @@ struct imported_device
 
         std::string serial; ///< only filled if you set it in attach_args
         receive_mode recv_mode = receive_mode::zero_copy; ///< @see attach_args.recv_mode
+        isolation iso_mode = isolation::none; ///< @see attach_args.iso_mode
 };
 
 enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };

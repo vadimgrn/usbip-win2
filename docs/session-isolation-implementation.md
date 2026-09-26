@@ -12,30 +12,71 @@ Verifier — see `docs/session-isolation-test-results.md` for the full matrix an
 
 ## Model
 
-Every attached device (`UDECXUSBDEVICE` / `device_ctx`) is tagged with an owning session id
-(`IoGetRequestorSessionId` of the attach request). Each user-facing operation reads the **current
-requestor's** session (not a value cached at handle-open, so a handle leaked from session A to B is
-still rejected when B uses it) and compares it to the target device's owner. Mismatch → the device is
-invisible / the operation is denied.
+Attachments are **shared by default** (`isolation::none`), maintaining full backward compatibility with single-user and legacy workflows where any session or service can interact with an attached device.
 
-`invalid_session_id` (`MAXULONG`) is an owner that never matches any real session, so an un-stamped or
-kernel-originated device denies everyone by default.
+Terminal Server session isolation is activated **on demand** via the `--isolate=session` CLI flag or SDK `args.iso_mode = usbip::isolation::session`.
 
-## Changes (drivers/ude)
+The model uses an extensible enumeration designed to accommodate future user/SID-based isolation:
 
-| Area | File | Change |
+```cpp
+enum class isolation : unsigned char {
+        none    = 0,
+        session = 1,
+        user    = 2, // reserved for future user/SID isolation
+};
+```
+
+Isolation mode is encoded in bits 2–3 of the attach flags on the wire and stored in the persistent registry configuration (`REG_MULTI_SZ`).
+
+When a device is attached:
+- **Shared (`isolation::none`, default)**:
+  - `device_ctx.iso_mode` is set to `isolation::none`.
+  - `device_ctx.session_id` is set to `invalid_session_id` (`MAXULONG`).
+  - `device_ctx::is_session_isolated()` returns `false`.
+  - The device is visible to all sessions via `GET_IMPORTED_DEVICES`, detachable by any session via single-port `PLUGOUT_HARDWARE`, and its state events are broadcast machine-wide to all subscribers.
+- **Session-isolated (`isolation::session`)**:
+  - `device_ctx.iso_mode` is set to `isolation::session`.
+  - `device_ctx.session_id` is stamped with the requestor's Terminal Server session id (`IoGetRequestorSessionId`).
+  - `device_ctx::is_session_isolated()` returns `true`.
+  - User-facing operations check the **current requestor's** session (not a cached handle-open session):
+    - Mismatch → `GET_IMPORTED_DEVICES` hides the device, single-port `PLUGOUT_HARDWARE` returns `STATUS_ACCESS_DENIED`, and state events / replays are filtered out.
+    - Local administrators (`is_admin_request`) bypass session restrictions to inspect and detach any port.
+
+### What Windows Sessions Actually Are (Scope of Session Isolation)
+
+In Windows, **"Terminal Services"** (or **Terminal Server**) is the underlying operating system architecture name for what is marketed as **Remote Desktop (RDP)** and **Remote Desktop Services (RDS)**. 
+
+The Windows kernel organizes **all** user execution environments into integer-based `SessionId` containers, queried via `IoGetRequestorSessionId`:
+
+| Session Context | Description | Session ID | Handled by `--isolate=session` |
+|---|---|---|---|
+| **RDP Sessions (RDS / Terminal Server)** | Multi-user Remote Desktop on Windows Server (RDSH), Azure Virtual Desktop (AVD), and multi-session Windows. | `Session 2`, `Session 3`, etc. | **Yes** — Each remote user has their own distinct session ID. |
+| **Standard RDP (Windows 10/11)** | Standard remote desktop connection to a Windows 10/11 Pro/Enterprise workstation. | `Session 1` (or next allocated) | **Yes** — The remote user has their own session. |
+| **Fast User Switching (FUS)** | Multiple local users logged into the *same physical machine* concurrently (e.g. User A switches to User B). | User A = `Session 1`<br>User B = `Session 2` | **Yes** — Even locally on the same physical box, User A cannot see or detach User B's isolated devices. |
+| **Session 0** | Non-interactive system services, background daemons, and driver helper processes. | `Session 0` | **Yes** — Isolated from all interactive user sessions. |
+| **Citrix / VMware Horizon / VDI** | Third-party virtual desktop and app streaming solutions running on Windows. | `Session N` | **Yes** — Built directly on top of the Windows Terminal Services session manager. |
+
+Because `IoGetRequestorSessionId` extracts the session ID directly from the IRP requestor, session isolation works uniformly across all RDP sessions, local Fast User Switching, and multi-session RDS environments.
+
+#### Ephemeral Sessions vs. Future User/SID Isolation
+Session IDs are **ephemeral** and bound to a specific logon session lifetime. If a user disconnects and reconnects (potentially receiving a new `SessionId`), or logs in simultaneously across both console and RDP, session isolation treats them as separate environments. The extensible `enum class isolation` includes `isolation::user` so that future enhancements can optionally bind device attachments to the caller's Windows Security Identifier (SID) from their security token.
+
+## Changes Across the Stack
+
+| Component | File | Change |
 |---|---|---|
-| Owner field | `context.h`, `consts.h` | `device_ctx.session_id` (owner) and `fileobject_ctx.session_id` (subscriber); central `invalid_session_id` constant |
-| Session of caller | `vhci_ioctl.cpp` | `get_requestor_session_id()` and `is_admin_request()` helpers (token security and session inspection via kernel exports) |
-| Capture owner at attach | `vhci_ioctl.cpp` (`plugin_hardware`, `connected`), `device.cpp` (`device::create` inits to `invalid_session_id`) | stamps `device_ctx.session_id`; `find_attach_session` only called if requestor is `invalid_session_id` to prevent cross-session attach hijacking |
-| **Detach control** | `vhci_ioctl.cpp` (`plugout_hardware`), `vhci.cpp` (`detach_all_devices`) | single-port detach returns `STATUS_ACCESS_DENIED` across sessions unless caller is administrator; mass-detach (`port <= 0`) is scoped to caller's own session, while Session 0 admin can detach all |
-| **List** | `vhci_ioctl.cpp` (`get_imported_devices`) | skips devices not owned by caller unless caller is administrator (admins can inspect all ports) |
-| **Event stream** | `vhci.cpp` (`process_event`, `device_state_changed`, `replay_plugged_devices`), `vhci.h` | state changes and replays are delivered only to subscribers in the owning session; `device_read` rejects cross-session reads (`STATUS_ACCESS_DENIED`) |
-| **Owner across auto-reattach** | `persistent.cpp/.h` (`attach_ctx.session_id`, `start_attach_attempts`, `find_attach_session`), `vhci_ioctl.cpp`, `device.cpp` | owner preserved across `target_self` loopback and recovered by `location_hash` |
-| **Scoped cancellation** | `persistent.cpp/.h` (`stop_attach_attempts`, `reattach_req_remove`), `vhci_ioctl.cpp` | `STOP_ATTACH_ATTEMPTS` is scoped to caller's session (admins can cancel globally), preventing cross-session DoS |
-| **Persistent state write** | `vhci_ioctl.cpp` (`set_persistent`) | `SET_PERSISTENT` requires administrator privilege (`is_admin_request`), preventing unprivileged HKLM modification |
+| Wire & Protocol | `include/usbip/vhci.h` | `enum class isolation` in `namespace usbip::vhci`; attach flags pack isolation into bits 2–3 (`pack_attach_flags`/`unpack_attach_flags`); added `isolation iso_mode` to `imported_device_properties` and `plugin_hardware` |
+| Public SDK | `userspace/libusbip/vhci.h`, `persistent.h` | `enum class isolation` in `namespace usbip`; added `iso_mode` to `imported_device`, `persistent_device`, and `device_attach_args` |
+| SDK Implementation | `userspace/libusbip/src/vhci.cpp`, `persistent.cpp` | Propagates `iso_mode` during attach and packs/unpacks `iso_mode` in `REG_MULTI_SZ` persistence strings |
+| CLI Interface | `userspace/usbip/usbip.cpp`, `attach.cpp` | Added `-i,--isolate [none\|session]` option (defaults to `none`); passes selection to attach command |
+| CLI Display & Formatting | `userspace/usbip/port.cpp`, `strings.cpp`, `strings.h` | Outputs `-> isolation: <mode>` in `usbip port`; formats isolation mode for console and persistent serialization |
+| Compile Test | `userspace/libusbip_check/main.cpp` | Validates C++17 compatibility with `isolation` enum in `device_attach_args` |
+| Driver Context | `drivers/ude/context.h`, `context.cpp` | `device_ctx.iso_mode`; `iso_mode()` and `is_session_isolated()` helpers; `create_device_ctx_ext` initializes `iso_mode` and stamps session only if isolated |
+| Driver Persistence | `drivers/ude/persistent.cpp`, `persistent.h` | Unpacks `iso_mode` from persistent records; propagates across auto-reattach loopback |
+| Driver Detach & Event Filtering | `drivers/ude/vhci.cpp` | `detach_all_devices`, `process_event`, and `replay_plugged_devices` skip session checks for unisolated devices (`!dc->is_session_isolated()`) |
+| Driver IOCTL Dispatch | `drivers/ude/vhci_ioctl.cpp` | `plugin_hardware` captures session only if `iso_mode == isolation::session`; `get_imported_devices` and `plugout_hardware` gate access only if `is_session_isolated()` |
 
-Net: Option A boundary enforced with administrator override, scoped cancellation, and protected registry writes.
+Net: Option A boundary enforced on demand with administrator override, scoped cancellation, and protected registry writes.
 
 ## What this closes (the Phase 4 functional matrix)
 

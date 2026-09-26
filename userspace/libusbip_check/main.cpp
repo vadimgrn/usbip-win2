@@ -74,6 +74,7 @@ int main()
         args.serial = "test";
         args.recv_mode = receive_mode::zero_copy;
         args.once = true;
+        args.iso_mode = isolation::session;
 
         [[maybe_unused]] auto attached_port = vhci::attach(dev.get(), args);
         [[maybe_unused]] auto stopped_cnt = vhci::stop_attach_attempts(dev.get(), &args.location);

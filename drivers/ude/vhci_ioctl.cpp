@@ -752,7 +752,9 @@ PAGED auto plugin_hardware(
 
         ctx.vhci = vhci;
         ctx.request = request;
-        ctx.session_id = get_requestor_session_id(request);
+        ctx.session_id = (r.iso_mode == vhci::isolation::session)
+                ? get_requestor_session_id(request)
+                : invalid_session_id;
         ctx.one_attempt = once;
 
         st = create_device_ctx_ext(ctx.ctx_ext, vhci, r);
@@ -765,7 +767,7 @@ PAGED auto plugin_hardware(
 
         // A driver-initiated (re)attach reaches this handler through target_self, which erased the
         // original requestor's session. Recover the owning session from the pending attach request.
-        if (ctx.session_id == invalid_session_id) {
+        if (r.iso_mode == vhci::isolation::session && ctx.session_id == invalid_session_id) {
                 if (auto s = find_attach_session(*get_vhci_ctx(vhci), ext.location_hash()); s != invalid_session_id) {
                         ctx.session_id = s;
                 }
@@ -890,7 +892,7 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request, _In_ bool reattach)
         } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
                 st = STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::get_device(vhci, r->port)) {
-                if (!is_admin && get_device_ctx(dev.get())->session_id != session_id) { // owned by another session
+                if (auto dc = get_device_ctx(dev.get()); dc->is_session_isolated() && !is_admin && dc->session_id != session_id) { // owned by another session with session isolation
                         st = STATUS_ACCESS_DENIED;
                 } else {
                         device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), reattach);
@@ -937,8 +939,8 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = vhci::get_device(vhci, port); !dev) {
                         //
-                } else if (auto dc = get_device_ctx(dev.get()); !is_admin && dc->session_id != session_id) {
-                        // owned by another session, hide it from this non-admin caller
+                } else if (auto dc = get_device_ctx(dev.get()); dc->is_session_isolated() && !is_admin && dc->session_id != session_id) {
+                        // owned by another session with session isolation enabled, hide it from this non-admin caller
                 } else if (cnt == max_cnt) {
                         return STATUS_BUFFER_TOO_SMALL;
                 } else if (auto err = fill(r->devices[cnt++], *dc); !NT_SUCCESS(err)) {

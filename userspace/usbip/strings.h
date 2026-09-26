@@ -19,6 +19,7 @@ std::string get_class(const UsbIds &ids, uint8_t class_, uint8_t subclass, uint8
 
 const char *get_speed_str(USB_DEVICE_SPEED speed) noexcept;
 const char *to_string(receive_mode mode) noexcept;
+const char *to_string(isolation iso) noexcept;
 
 } // namespace usbip
 
@@ -27,8 +28,8 @@ struct std::formatter<usbip::persistent_device> : std::formatter<std::string_vie
 {
         auto format(const usbip::persistent_device &d, auto &ctx) const
         {
-                return std::format_to(ctx.out(), "{}:{}/{}, serial:{}, mode:{}, once:{}",
+                return std::format_to(ctx.out(), "{}:{}/{}, serial:{}, mode:{}, once:{}, isolation:{}",
                         d.location.hostname, d.location.service, d.location.busid,
-                        d.serial, usbip::to_string(d.recv_mode), d.once);
+                        d.serial, usbip::to_string(d.recv_mode), d.once, usbip::to_string(d.iso_mode));
         }
 };

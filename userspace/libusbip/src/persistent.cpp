@@ -43,7 +43,7 @@ std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<pe
                         return std::unexpected(ERROR_INVALID_PARAMETER);
                 }
 
-                auto flags = pack_attach_flags(d.once, wsk_events);
+                auto flags = pack_attach_flags(d.once, wsk_events, static_cast<usbip::vhci::isolation>(d.iso_mode));
 
                 if (auto s = std::format("{},{},{},{},{}", dl.hostname, dl.service, dl.busid, d.serial, flags);
                     auto ws = utf8_to_wchar(s)) {
@@ -105,9 +105,11 @@ auto parse_persistent_device(_In_ const std::string &str)
 
                 if (ec == std::errc{} && end == s.data() + s.size()) {
                         bool wsk_events;
-                        unpack_attach_flags(dev.once, wsk_events, flags);
+                        usbip::vhci::isolation iso{};
+                        unpack_attach_flags(dev.once, wsk_events, iso, flags);
 
                         dev.recv_mode = wsk_events ? receive_mode::low_latency : receive_mode::zero_copy;
+                        dev.iso_mode = static_cast<isolation>(iso);
                 } else {
                         result.reset();
                 }

@@ -36,19 +36,41 @@ constexpr SSIZE_T is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen);
 
 constexpr auto is_ascii(unsigned char ch) { return ch < 0x80; }
 
-constexpr auto pack_attach_flags(bool once, bool wsk_events)
+} // namespace usbip
+
+
+namespace usbip::vhci
 {
-        return (static_cast<ULONG>(once) << 1) |
+
+enum class isolation : unsigned char { none = 0, session = 1, user = 2 };
+
+} // namespace usbip::vhci
+
+
+namespace usbip
+{
+
+constexpr auto pack_attach_flags(bool once, bool wsk_events, vhci::isolation iso = vhci::isolation::none)
+{
+        return (static_cast<ULONG>(iso) << 2) |
+                (static_cast<ULONG>(once) << 1) |
                 static_cast<ULONG>(wsk_events);
 }
 
 /*
  * Unknown flags are ignored.
  */
-constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, ULONG flags)
+constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, _Inout_ vhci::isolation &iso, ULONG flags)
 {
         once = flags & 2;
         wsk_events = flags & 1;
+        iso = static_cast<vhci::isolation>((flags >> 2) & 0x3);
+}
+
+constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, ULONG flags)
+{
+        vhci::isolation iso;
+        unpack_attach_flags(once, wsk_events, iso, flags);
 }
 
 } // namespace usbip
@@ -92,6 +114,7 @@ struct imported_device_properties
         UCHAR iserial; // USB_DEVICE_DESCRIPTOR.iSerialNumber
 
         bool wsk_events;
+        isolation iso_mode;
 };
 
 struct imported_device : imported_device_location, imported_device_properties {};
@@ -145,6 +168,7 @@ struct plugin_hardware : base, imported_device_location
 {
         char serial[SERIAL_BUFSZ];
         bool wsk_events;
+        isolation iso_mode;
 };
 
 struct stop_attach_attempts : base, imported_device_location

@@ -176,7 +176,7 @@ PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto parse_flags(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &str)
+PAGED auto parse_flags(_Inout_ bool &wsk_events, _Inout_ vhci::isolation &iso, _In_ const UNICODE_STRING &str)
 {
         PAGED_CODE();
 
@@ -197,7 +197,7 @@ PAGED auto parse_flags(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &str)
         }
 
         bool once; // ignore, does not make sense for persistent
-        unpack_attach_flags(once, wsk_events, val);
+        unpack_attach_flags(once, wsk_events, iso, val);
 
         return STATUS_SUCCESS;
 }
@@ -244,7 +244,7 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
         }
 
         if (!empty(tail)) {
-                st = parse_flags(r.properties.wsk_events, tail);
+                st = parse_flags(r.properties.wsk_events, r.properties.iso_mode, tail);
                 if (!NT_SUCCESS(st)) {
                         return st;
                 }
@@ -424,6 +424,7 @@ PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ c
 
         auto &props = attr.properties;
         req.wsk_events = props.wsk_events;
+        req.iso_mode = props.iso_mode;
 
         auto st = RtlStringCbCopyNA(req.serial, sizeof(req.serial), props.serial, sizeof(props.serial));
         if (!NT_SUCCESS(st)) {

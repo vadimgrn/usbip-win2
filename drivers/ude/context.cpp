@@ -142,6 +142,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
 
         auto &props = ext.properties();
         props.wsk_events = r.wsk_events;
+        props.iso_mode = r.iso_mode;
 
         st = RtlStringCbCopyNA(props.serial, sizeof(props.serial), r.serial, sizeof(r.serial));
         if (!NT_SUCCESS(st)) {

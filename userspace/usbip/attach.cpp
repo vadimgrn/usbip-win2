@@ -89,6 +89,7 @@ bool usbip::cmd_attach(const attach_args &args)
                 .serial = args.serial,
                 .recv_mode = args.recv_mode,
                 .once = args.once,
+                .iso_mode = args.iso_mode,
         };
 
         auto port = vhci::attach(dev.get(), cmd_args);

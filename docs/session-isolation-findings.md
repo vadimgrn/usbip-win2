@@ -289,3 +289,16 @@ The raw Option A implementation treated all sessions equally, meaning even local
 ### 4. Simplified Persistent State Security
 Rather than introducing complex per-SID parsing and subkeys in registry `REG_MULTI_SZ` storage (which complicates boot-time reattach before any user logs in), `SET_PERSISTENT` was gated to administrators via `is_admin_request()`. Standard users receive `STATUS_ACCESS_DENIED`, fully neutralizing unprivileged machine-wide registry modification.
 
+### 5. On-Demand Session Isolation vs. Shared Default
+By default, attachments remain shared (`isolation::none`) to preserve full backward compatibility with single-user and legacy workflows where any session or service can interact with the attached device. Session isolation is activated on demand via `--isolate=session` (modeled as `enum class isolation { none = 0, session = 1, user = 2 }` to pave the way for future user/SID-based isolation).
+
+### 6. Scope of Windows Sessions (RDP, Fast User Switching, and Multi-User Architecture)
+In Windows architecture, "Terminal Services" (Terminal Server) is the OS subsystem underlying Remote Desktop (RDP) and Remote Desktop Services (RDS). All user environments are partitioned by the kernel into integer `SessionId` namespaces:
+- **RDP / RDS sessions** on Windows Server and Azure Virtual Desktop each receive distinct interactive `SessionId`s (`Session 2`, `Session 3`, etc.).
+- **Standard single-user RDP** connections to Windows 10/11 Pro/Enterprise are allocated dedicated session IDs.
+- **Fast User Switching (FUS)** on local workstations assigns distinct session IDs to concurrently logged-on local users on the same physical hardware.
+- **Session 0** isolates system services and background daemons from all interactive user sessions.
+- **Third-party VDI** solutions (Citrix Virtual Apps/Desktops, VMware Horizon) build directly on the Windows Terminal Services session infrastructure.
+
+Because the driver inspects the caller's session via the core kernel API `IoGetRequestorSessionId`, session isolation operates natively and identically across all of these environments.
+
