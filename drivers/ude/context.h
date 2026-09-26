@@ -161,6 +161,7 @@ struct device_ctx
         };
 
         int port; // vhci_ctx.devices[port - 1]
+        ULONG session_id; // Terminal Server session that attached this device, @see get_requestor_session_id
         seqnum_t seqnum; // @see next_seqnum
 
         SLIST_HEADER pending_sends;
@@ -247,6 +248,13 @@ inline auto get_vhci(_In_ WDFREQUEST Request)
         return WdfIoQueueGetDevice(queue);
 }
 
+/*
+ * Terminal Server session isolation.
+ * invalid_session_id never equals a real session id, so an ownership check against it always denies.
+ * @see get_requestor_session_id
+ */
+inline constexpr ULONG invalid_session_id = MAXULONG;
+
 
 /*
  * Context space for WDFFILEOBJECT.
@@ -257,6 +265,7 @@ struct fileobject_ctx
         LIST_ENTRY entry; // head is vhci_ctx::fileobjects
         WDFCOLLECTION events; // WDFMEMORY(device_state_ex) that are waiting for IRP_MJ_READ
         bool process_events; // if IRP_MJ_READ was issued, see vhci_ctx::events_subscribers
+        ULONG session_id; // Terminal Server session of the subscriber, set on the first IRP_MJ_READ
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(fileobject_ctx, get_fileobject_ctx)
 

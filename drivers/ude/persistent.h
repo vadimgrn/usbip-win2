@@ -51,11 +51,20 @@ PAGED void plugin_persistent_devices(_In_ WDFDEVICE vhci);
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void start_attach_attempts(
-        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &vctx, _In_ const device_attributes &attr, _In_ bool delayed = false);
+        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &vctx, _In_ const device_attributes &attr,
+        _In_ ULONG session_id, _In_ bool delayed = false);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 int stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash);
+
+/*
+ * Recover the owning Terminal Server session of a pending (re)attach by its location_hash.
+ * Returns invalid_session_id if there is no matching attach in progress.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+ULONG find_attach_session(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

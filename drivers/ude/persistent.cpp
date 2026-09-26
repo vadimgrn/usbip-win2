@@ -27,6 +27,7 @@ using namespace libdrv;
 struct attach_ctx
 {
         ULONG location_hash; // hash(host,port,busid)
+        ULONG session_id; // Terminal Server session that owns the device being (re)attached
 
         WDFDEVICE vhci;
         WDFTIMER timer;
@@ -443,7 +444,8 @@ PAGED void cleanup_attach_request(_In_ WDFOBJECT obj)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ const device_attributes &dev)
+PAGED auto create_attach_request(
+        _In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ const device_attributes &dev, _In_ ULONG session_id)
 {
         PAGED_CODE();
 
@@ -457,11 +459,12 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ c
                 return req;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "%04x, %!USTR!:%!USTR!/%!USTR!, hash %lx",
-                ptr04x(req.get()), &dev.node_name, &dev.service_name, &dev.busid, dev.location_hash);
+        Trace(TRACE_LEVEL_INFORMATION, "%04x, %!USTR!:%!USTR!/%!USTR!, hash %lx, session %lu",
+                ptr04x(req.get()), &dev.node_name, &dev.service_name, &dev.busid, dev.location_hash, session_id);
 
         auto &r = *get_attach_ctx(req.get());
         r.vhci = vhci;
+        r.session_id = session_id; // preserve the owning session across (re)attach
 
         vhci::ioctl::plugin_hardware *buf{};
 
@@ -515,7 +518,7 @@ PAGED decltype(WdfDriverOpenParametersRegistryKey) *get_function(_In_ DRIVER_REG
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::start_attach_attempts(
-        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ const device_attributes &attr, _In_ bool delayed)
+        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ const device_attributes &attr, _In_ ULONG session_id, _In_ bool delayed)
 {
         PAGED_CODE();
 
@@ -523,7 +526,7 @@ PAGED void usbip::start_attach_attempts(
                 TraceDbg("vhci is being removing");
         } else if (auto cnt = reattach_req_count(ctx); cnt >= 4*static_cast<ULONG>(ctx.devices_cnt)) {
                 Trace(TRACE_LEVEL_WARNING, "too many active attach requests, %lu", cnt);
-        } else if (auto req = create_attach_request(vhci, ctx, attr); !req) {
+        } else if (auto req = create_attach_request(vhci, ctx, attr, session_id); !req) {
                 //
         } else if (auto &r = *get_attach_ctx(req.get()); !delayed) {
                 send_plugin_hardware(ctx.target_self, r.inbuf, r.outbuf, req);
@@ -567,6 +570,32 @@ int usbip::stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash
         return cnt;
 }
 
+/*
+ * A device (re)attach travels to the driver through an IOCTL to target_self, which erases the
+ * original requestor's session. The owning session is preserved in the pending attach request's
+ * context, so the inbound attach handler can recover it by location_hash.
+ * @see start_attach_attempts, plugin_hardware
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+ULONG usbip::find_attach_session(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
+{
+        if (!location_hash) {
+                return invalid_session_id;
+        }
+
+        auto col = vhci.reattach_req;
+        wdf::spinlock lck(vhci.reattach_req_lock);
+
+        for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
+                if (auto r = get_attach_ctx(WdfCollectionGetItem(col, i)); r->location_hash == location_hash) {
+                        return r->session_id;
+                }
+        }
+
+        return invalid_session_id;
+}
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
@@ -590,7 +619,8 @@ PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
                 if (!NT_SUCCESS(st)) {
                         Trace(TRACE_LEVEL_ERROR, "parse_device_str(%!USTR!) %!STATUS!", &device_str, st);
                 } else {
-                        start_attach_attempts(vhci, ctx, attr);
+                        // boot-time persistent devices belong to no live session; per-SID persistent state is a follow-up
+                        start_attach_attempts(vhci, ctx, attr, invalid_session_id);
                 }
         }
 }

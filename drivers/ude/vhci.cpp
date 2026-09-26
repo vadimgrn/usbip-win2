@@ -885,9 +885,14 @@ constexpr ULONG get_max_events(_In_ int devices_cnt)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void process_event(
-        _In_ WDFQUEUE queue, _Inout_ fileobject_ctx &fobj, _In_ WDFMEMORY evt, _In_ ULONG max_events)
+        _In_ WDFQUEUE queue, _Inout_ fileobject_ctx &fobj, _In_ WDFMEMORY evt, _In_ ULONG max_events,
+        _In_ ULONG owner_session_id)
 {
         PAGED_CODE();
+
+        if (fobj.session_id != owner_session_id) { // Terminal Server session isolation
+                return; // a subscriber only sees state changes of devices its own session attached
+        }
 
         auto fileobj = get_handle(&fobj);
         WDFREQUEST request{};
@@ -924,7 +929,7 @@ PAGED void process_event(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void process_event(_In_ vhci_ctx &vhci, _In_ WDFMEMORY evt)
+PAGED void process_event(_In_ vhci_ctx &vhci, _In_ WDFMEMORY evt, _In_ ULONG owner_session_id)
 {
         PAGED_CODE();
 
@@ -936,7 +941,7 @@ PAGED void process_event(_In_ vhci_ctx &vhci, _In_ WDFMEMORY evt)
         for (auto head = &vhci.fileobjects, entry = head->Flink; entry != head; entry = entry->Flink) {
                 auto &fobj = *CONTAINING_RECORD(entry, fileobject_ctx, entry);
                 if (fobj.process_events) {
-                        process_event(vhci.reads, fobj, evt, max_events);
+                        process_event(vhci.reads, fobj, evt, max_events, owner_session_id);
                         ++cnt;
                 }
         }
@@ -1052,16 +1057,19 @@ wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool plugout_and_delete)
+PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool plugout_and_delete, _In_ ULONG session_id)
 {
         PAGED_CODE();
 
-        TraceDbg("%04x", ptr04x(vhci));
+        TraceDbg("%04x, session %lu", ptr04x(vhci), session_id);
         auto &ctx = *get_vhci_ctx(vhci);
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = get_device(vhci, port)) {
-                        device::detach(dev.get<UDECXUSBDEVICE>(), plugout_and_delete);
+                        auto d = dev.get<UDECXUSBDEVICE>();
+                        if (get_device_ctx(d)->session_id == session_id) { // Terminal Server session isolation
+                                device::detach(d, plugout_and_delete);
+                        }
                 }
         }
 }
@@ -1118,6 +1126,9 @@ PAGED void usbip::vhci::replay_plugged_devices(_In_ WDFDEVICE vhci, _Inout_ file
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = get_device(vhci, port)) {
                         auto dc = get_device_ctx(dev.get());
+                        if (dc->session_id != fobj.session_id) { // Terminal Server session isolation
+                                continue;
+                        }
                         if (auto evt = make_device_state(vhci, dc->attributes(), dc->port, state::plugged)) {
                                 auto st = WdfCollectionAdd(fobj.events, evt.get<WDFMEMORY>());
                                 if (!NT_SUCCESS(st)) {
@@ -1134,7 +1145,7 @@ PAGED void usbip::vhci::replay_plugged_devices(_In_ WDFDEVICE vhci, _Inout_ file
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::vhci::device_state_changed(
-        _In_ WDFDEVICE vhci, _In_ const device_attributes &attr, _In_ int port, _In_ state state)
+        _In_ WDFDEVICE vhci, _In_ const device_attributes &attr, _In_ int port, _In_ state state, _In_ ULONG session_id)
 {
         PAGED_CODE();
         auto &ctx = *get_vhci_ctx(vhci);
@@ -1144,11 +1155,11 @@ PAGED void usbip::vhci::device_state_changed(
                 return;
         }
 
-        TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!vhci_state!, subscribers %d",
-                  &attr.node_name, &attr.service_name, &attr.busid, port, int(state), subscribers);
+        TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!vhci_state!, session %lu, subscribers %d",
+                  &attr.node_name, &attr.service_name, &attr.busid, port, int(state), session_id, subscribers);
 
         if (auto evt = make_device_state(vhci, attr, port, state)) {
-                process_event(ctx, evt.get<WDFMEMORY>());
+                process_event(ctx, evt.get<WDFMEMORY>(), session_id);
         } else {
                 Trace(TRACE_LEVEL_ERROR, "Failed to create state '%!vhci_state!'", int(state));
         }

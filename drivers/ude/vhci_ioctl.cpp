@@ -24,6 +24,12 @@
 #include <ntstrsafe.h>
 #include <usbuser.h>
 
+/*
+ * IoGetRequestorSessionId is declared in ntifs.h, which a KMDF driver should not include alongside
+ * wdm.h. The routine is exported by the kernel, so its prototype is declared locally instead.
+ */
+extern "C" NTKERNELAPI NTSTATUS IoGetRequestorSessionId(_In_ PIRP Irp, _Out_ PULONG pSessionId);
+
 namespace
 {
 
@@ -33,6 +39,19 @@ using namespace wdf;
 
 static_assert(sizeof(vhci::imported_device_location::service) == NI_MAXSERV);
 static_assert(sizeof(vhci::imported_device_location::host) == NI_MAXHOST);
+
+/*
+ * The Terminal Server session that issued the request, or invalid_session_id if it cannot be
+ * determined (e.g. a kernel-mode request), which denies ownership by design.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(APC_LEVEL)
+ULONG get_requestor_session_id(_In_ WDFREQUEST request)
+{
+        ULONG id;
+        auto irp = WdfRequestWdmGetIrp(request);
+        return NT_SUCCESS(IoGetRequestorSessionId(irp, &id)) ? id : invalid_session_id;
+}
 
 struct irp_args
 {
@@ -51,6 +70,7 @@ struct workitem_ctx
 
         ADDRINFOEXW *addrinfo; // list head
         irp_args args;
+        ULONG session_id; // Terminal Server session that requested the attach
         bool one_attempt;
 
         workitem_ctx& operator=(const workitem_ctx&) = delete;
@@ -68,6 +88,7 @@ workitem_ctx& workitem_ctx::operator=(workitem_ctx &&src)
         if (this != &src) {
                 vhci = src.vhci;
                 args = src.args;
+                session_id = src.session_id;
                 one_attempt = src.one_attempt;
 
                 NT_ASSERT(!request);
@@ -331,7 +352,7 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
         vhci::ioctl::plugin_hardware *r{};
         NT_VERIFY(NT_SUCCESS(WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)));
 
-        device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::connected);
+        device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::connected, ctx.session_id);
 
         auto st = import_remote_device(ext);
         if (NT_ERROR(st)) {
@@ -344,6 +365,9 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
                 return st;
         }
         ctx.ctx_ext = WDF_NO_HANDLE; // now dev owns it
+
+        auto &dev_ctx = *get_device_ctx(dev);
+        dev_ctx.session_id = ctx.session_id; // Terminal Server session that owns this device
 
         bool plugout_and_delete{};
         st = plugin(dev, r->port, plugout_and_delete);
@@ -554,7 +578,7 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
                 stop_attach_attempts(vhci, hash);
         } else if (!NT_SUCCESS(st) && can_reattach(ctx.vhci, hash, st)) {
                 stop_attach_attempts(vhci, hash);
-                start_attach_attempts(ctx.vhci, vhci, ext.attr, true);
+                start_attach_attempts(ctx.vhci, vhci, ext.attr, ctx.session_id, true);
         }
 }
 
@@ -581,7 +605,7 @@ PAGED void workitem_cleanup(_In_ WDFOBJECT object)
                 auto &ext = get_device_ctx_ext(mem); // or ctx.ext()
 
                 close_socket(ext.sock);
-                device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::disconnected);
+                device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::disconnected, ctx.session_id);
 
                 WdfObjectDelete(mem);
                 mem = WDF_NO_HANDLE;
@@ -673,6 +697,7 @@ PAGED auto plugin_hardware(
 
         ctx.vhci = vhci;
         ctx.request = request;
+        ctx.session_id = get_requestor_session_id(request);
         ctx.one_attempt = once;
 
         st = create_device_ctx_ext(ctx.ctx_ext, vhci, r);
@@ -682,7 +707,14 @@ PAGED auto plugin_hardware(
         }
 
         auto &ext = ctx.ext();
-        device_state_changed(vhci, ext.attr, 0, vhci::state::connecting);
+
+        // A driver-initiated (re)attach reaches this handler through target_self, which erased the
+        // original requestor's session. Recover the owning session from the pending attach request.
+        if (auto s = find_attach_session(*get_vhci_ctx(vhci), ext.location_hash()); s != invalid_session_id) {
+                ctx.session_id = s;
+        }
+
+        device_state_changed(vhci, ext.attr, 0, vhci::state::connecting, ctx.session_id);
 
         getaddrinfo(request, wi, ctx, ext); // completion handler will be called anyway
         return STATUS_PENDING;
@@ -785,16 +817,21 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request, _In_ bool reattach)
                 return USBIP_ERROR_ABI;
         }
 
-        TraceDbg("port %d, reattach %!bool!", r->port, reattach);
+        auto session_id = get_requestor_session_id(request); // Terminal Server session isolation
+        TraceDbg("port %d, reattach %!bool!, session %lu", r->port, reattach, session_id);
         st = STATUS_SUCCESS;
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
                 auto plugout_and_delete = r->port != vhci::ioctl::PORT_ALL_CLOSEONLY;
-                vhci::detach_all_devices(vhci, plugout_and_delete);
+                vhci::detach_all_devices(vhci, plugout_and_delete, session_id); // only the caller's own devices
         } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
                 st = STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::get_device(vhci, r->port)) {
-                device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), reattach);
+                if (get_device_ctx(dev.get())->session_id != session_id) { // owned by another session
+                        st = STATUS_ACCESS_DENIED;
+                } else {
+                        device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), reattach);
+                }
         } else {
                 st = STATUS_DEVICE_NOT_CONNECTED;
         }
@@ -829,20 +866,19 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
 
         auto vhci = get_vhci(request);
         auto &ctx = *get_vhci_ctx(vhci);
-        
+
+        auto session_id = get_requestor_session_id(request); // Terminal Server session isolation
         ULONG cnt = 0;
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = vhci::get_device(vhci, port); !dev) {
                         //
+                } else if (auto dc = get_device_ctx(dev.get()); dc->session_id != session_id) {
+                        // owned by another session, hide it from this caller
                 } else if (cnt == max_cnt) {
                         return STATUS_BUFFER_TOO_SMALL;
-                } else {
-                        auto dc = get_device_ctx(dev.get());
-                        st = fill(r->devices[cnt++], *dc);
-                        if (NT_ERROR(st)) {
-                                return st;
-                        }
+                } else if (auto err = fill(r->devices[cnt++], *dc); !NT_SUCCESS(err)) {
+                        return err;
                 }
         }
 
@@ -1113,13 +1149,18 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
 
         auto device = WdfIoQueueGetDevice(queue);
         auto &vhci = *get_vhci_ctx(device);
-        
+        auto caller = get_requestor_session_id(request); // Terminal Server session isolation
+
         waitlock lck(vhci.events_lock);
 
         if (auto &val = fobj.process_events; !val) {
+                fobj.session_id = caller; // bind the subscription to the caller's session
                 ++vhci.events_subscribers;
                 val = true;
                 vhci::replay_plugged_devices(device, fobj);
+        } else if (fobj.session_id != caller) {
+                WdfRequestCompleteWithInformation(request, STATUS_ACCESS_DENIED, 0);
+                return; // a handle opened by one session must not be read from another
         }
 
         if (auto evt = static_cast<WDFMEMORY>(WdfCollectionGetFirstItem(fobj.events))) {
