@@ -73,6 +73,7 @@ Session IDs are **ephemeral** and bound to a specific logon session lifetime. If
 | Compile Test | `userspace/libusbip_check/main.cpp` | Validates C++17 compatibility with `isolation` enum in `device_attach_args` |
 | Driver Context | `drivers/ude/context.h`, `context.cpp` | `device_ctx.iso_mode`; `iso_mode()` and `is_session_isolated()` helpers; `create_device_ctx_ext` initializes `iso_mode` and stamps session only if isolated |
 | Driver Persistence | `drivers/ude/persistent.cpp`, `persistent.h` | Unpacks `iso_mode` from persistent records; propagates across auto-reattach loopback |
+| Driver Session & Security | `drivers/ude/session.h`, `session.cpp` | `get_requestor_session_id` and `is_admin_request` helpers; kernel token inspection and session lookup |
 | Driver Detach & Event Filtering | `drivers/ude/vhci.cpp` | `detach_all_devices`, `process_event`, and `replay_plugged_devices` skip session checks for unisolated devices (`!dc->is_session_isolated()`) |
 | Driver IOCTL Dispatch | `drivers/ude/vhci_ioctl.cpp` | `plugin_hardware` captures session only if `iso_mode == isolation::session`; `get_imported_devices` and `plugout_hardware` gate access only if `is_session_isolated()` |
 

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="usbip">
@@ -36,6 +36,7 @@
       <Filter>usbip</Filter>
     </ClInclude>
     <ClInclude Include="persistent.h" />
+    <ClInclude Include="session.h" />
     <ClInclude Include="filter_request.h" />
     <ClInclude Include="endpoint_list.h" />
     <ClInclude Include="wsk_receive_events.h" />
@@ -46,6 +47,7 @@
     <ClCompile Include="vhci.cpp" />
     <ClCompile Include="driver.cpp" />
     <ClCompile Include="vhci_ioctl.cpp" />
+    <ClCompile Include="session.cpp" />
     <ClCompile Include="device.cpp" />
     <ClCompile Include="network.cpp" />
     <ClCompile Include="urbtransfer.cpp" />

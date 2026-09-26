@@ -167,7 +167,7 @@ struct device_ctx
         };
 
         int port; // vhci_ctx.devices[port - 1]
-        ULONG session_id; // Terminal Server session that attached this device, @see get_requestor_session_id
+        ULONG session_id; // Terminal Server session that attached this device, @see session::get_requestor_session_id
         seqnum_t seqnum; // @see next_seqnum
 
         SLIST_HEADER pending_sends;

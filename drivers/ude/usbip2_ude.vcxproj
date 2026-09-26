@@ -39,6 +39,7 @@
     <ClCompile Include="vhci.cpp" />
     <ClCompile Include="driver.cpp" />
     <ClCompile Include="vhci_ioctl.cpp" />
+    <ClCompile Include="session.cpp" />
     <ClCompile Include="wsk_context.cpp" />
     <ClCompile Include="wsk_receive.cpp" />
     <ClCompile Include="wsk_receive_events.cpp" />
@@ -60,6 +61,7 @@
     <ClInclude Include="network.h" />
     <ClInclude Include="proto.h" />
     <ClInclude Include="persistent.h" />
+    <ClInclude Include="session.h" />
     <ClInclude Include="urbtransfer.h" />
     <ClInclude Include="device.h" />
     <ClInclude Include="vhci.h" />

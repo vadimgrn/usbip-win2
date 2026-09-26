@@ -12,6 +12,7 @@
 #include "network.h"
 #include "ioctl.h"
 #include "persistent.h"
+#include "session.h"
 #include "wsk_receive_irp.h"
 #include "wsk_receive_events.h"
 
@@ -24,89 +25,17 @@
 #include <ntstrsafe.h>
 #include <usbuser.h>
 
-/*
- * IoGetRequestorSessionId, IoGetRequestorProcess, PsReferencePrimaryToken,
- * PsDereferencePrimaryToken, PsReferenceImpersonationToken, PsDereferenceImpersonationToken,
- * and SeTokenIsAdmin are exported by the kernel (ntoskrnl.exe).
- * Declarations are provided locally to avoid pulling ntifs.h into a KMDF translation unit.
- */
-extern "C" {
-NTKERNELAPI NTSTATUS IoGetRequestorSessionId(_In_ PIRP Irp, _Out_ PULONG pSessionId);
-NTKERNELAPI PEPROCESS IoGetRequestorProcess(_In_ PIRP Irp);
-NTKERNELAPI PACCESS_TOKEN PsReferencePrimaryToken(_Inout_ PEPROCESS Process);
-NTKERNELAPI VOID PsDereferencePrimaryToken(_In_ PACCESS_TOKEN PrimaryToken);
-NTKERNELAPI PACCESS_TOKEN PsReferenceImpersonationToken(
-        _Inout_ PETHREAD Thread,
-        _Out_ PBOOLEAN CopyOnOpen,
-        _Out_ PBOOLEAN EffectiveOnly,
-        _Out_ PSECURITY_IMPERSONATION_LEVEL ImpersonationLevel);
-NTKERNELAPI VOID PsDereferenceImpersonationToken(_In_ PACCESS_TOKEN ImpersonationToken);
-NTKERNELAPI BOOLEAN SeTokenIsAdmin(_In_ PACCESS_TOKEN Token);
-}
-
 namespace
 {
 
 using namespace usbip;
 using namespace libdrv;
 using namespace wdf;
+using namespace session;
 
 static_assert(sizeof(vhci::imported_device_location::service) == NI_MAXSERV);
 static_assert(sizeof(vhci::imported_device_location::host) == NI_MAXHOST);
 
-/*
- * The Terminal Server session that issued the request, or invalid_session_id if it cannot be
- * determined (e.g. a kernel-mode request), which denies ownership by design.
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(APC_LEVEL)
-ULONG get_requestor_session_id(_In_ WDFREQUEST request)
-{
-        ULONG id;
-        auto irp = WdfRequestWdmGetIrp(request);
-        return NT_SUCCESS(IoGetRequestorSessionId(irp, &id)) ? id : invalid_session_id;
-}
-
-/*
- * Checks whether the requestor has administrative privileges (or is kernel mode).
- * Safely inspects the caller thread's impersonation token, falling back to the process primary token.
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED bool is_admin_request(_In_ WDFREQUEST request)
-{
-        PAGED_CODE();
-
-        if (WdfRequestGetRequestorMode(request) == KernelMode) {
-                return true;
-        }
-
-        auto irp = WdfRequestWdmGetIrp(request);
-        if (!irp) {
-                return false;
-        }
-
-        if (auto thread = irp->Tail.Overlay.Thread) {
-                BOOLEAN copy_on_open{};
-                BOOLEAN effective_only{};
-                SECURITY_IMPERSONATION_LEVEL level{};
-                if (auto token = PsReferenceImpersonationToken(thread, &copy_on_open, &effective_only, &level)) {
-                        auto is_admin = SeTokenIsAdmin(token);
-                        PsDereferenceImpersonationToken(token);
-                        return is_admin;
-                }
-        }
-
-        if (auto process = IoGetRequestorProcess(irp)) {
-                if (auto token = PsReferencePrimaryToken(process)) {
-                        auto is_admin = SeTokenIsAdmin(token);
-                        PsDereferencePrimaryToken(token);
-                        return is_admin;
-                }
-        }
-
-        return false;
-}
 
 struct irp_args
 {
