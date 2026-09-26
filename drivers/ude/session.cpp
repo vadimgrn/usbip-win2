@@ -8,8 +8,6 @@
 #include "trace.h"
 #include "session.tmh"
 
-#include <usbip/consts.h>
-
 /*
  * The Terminal Server session that issued the request, or invalid_session_id if it cannot be
  * determined (e.g. a kernel-mode request), which denies ownership by design.
@@ -36,7 +34,13 @@ ULONG usbip::session::get_requestor_session_id(_In_ WDFREQUEST request)
 {
         ULONG id;
         auto irp = WdfRequestWdmGetIrp(request);
-        return NT_SUCCESS(IoGetRequestorSessionId(irp, &id)) ? id : invalid_session_id;
+
+        if (NT_ERROR(IoGetRequestorSessionId(irp, &id))) {
+                NT_ASSERT(id == invalid_session_id);
+                id = invalid_session_id;
+        }
+
+        return id;
 }
 
 /*

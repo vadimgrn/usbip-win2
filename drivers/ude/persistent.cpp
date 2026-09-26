@@ -97,7 +97,8 @@ void reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash, _In_ ULONG session_id = invalid_session_id)
+auto reattach_req_remove(
+        _Inout_ vhci_ctx &vhci, _In_ ULONG location_hash, _In_ ULONG session_id = invalid_session_id)
 {
         wdf::ObjectRef ref;
         auto col = vhci.reattach_req;
@@ -176,7 +177,8 @@ PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto parse_flags(_Inout_ bool &wsk_events, _Inout_ vhci::isolation &iso, _In_ const UNICODE_STRING &str)
+PAGED auto parse_flags(
+        _Inout_ bool &wsk_events, _Inout_ vhci::isolation &iso, _In_ const UNICODE_STRING &str)
 {
         PAGED_CODE();
 
@@ -625,8 +627,7 @@ PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
 
                 if (!NT_SUCCESS(st)) {
                         Trace(TRACE_LEVEL_ERROR, "parse_device_str(%!USTR!) %!STATUS!", &device_str, st);
-                } else {
-                        // boot-time persistent devices belong to no live session; per-SID persistent state is a follow-up
+                } else { // boot-time persistent devices belong to no live session; per-SID persistent state is a follow-up
                         start_attach_attempts(vhci, ctx, attr, invalid_session_id);
                 }
         }

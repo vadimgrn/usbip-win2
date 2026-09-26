@@ -207,3 +207,8 @@ void usbip::free(_Inout_ device_attributes &r)
         FreeUnicodeString(r.service_name, unique_ptr::pooltag);
         FreeUnicodeString(r.busid, unique_ptr::pooltag);
 }
+
+bool usbip::device_ctx::is_session_isolated() const
+{
+        return iso_mode() == vhci::isolation::session && session_id != invalid_session_id;
+}

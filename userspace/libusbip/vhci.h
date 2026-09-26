@@ -19,6 +19,11 @@
 namespace usbip
 {
 
+/*
+ * A virtual device isolation can be session/user based.
+ */ 
+enum class isolation : unsigned char { none, session, user };
+
 /**
  * How to optimize data reception over the network
  * - zero_copy - use a dedicated thread which executes a loop with two blocking calls
@@ -33,7 +38,6 @@ namespace usbip
  *     but at a high frequency, such as HID keyboard/mouse, etc.
  */
 enum class receive_mode { zero_copy, low_latency };
-enum class isolation : unsigned char { none = 0, session = 1, user = 2 };
 
 struct device_location
 {
@@ -53,7 +57,7 @@ struct persistent_device
         std::string serial; ///< optional device serial number if you want to set/override it
         receive_mode recv_mode = receive_mode::zero_copy; ///< how to optimize data reception over the network
         bool once{}; ///< do not start automatic attach attempts if cannot connect; for attach_args only
-        isolation iso_mode = isolation::none; ///< device isolation mode (none, session, user)
+        isolation iso_mode = isolation::none; ///< device isolation mode
 };
 
 struct imported_device

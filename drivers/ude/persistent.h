@@ -5,6 +5,7 @@
 #pragma once
 
 #include <usbip/consts.h>
+#include "session.h"
 
 #include <libdrv/codeseg.h>
 #include <libdrv/wdf_cpp.h>

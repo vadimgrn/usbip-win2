@@ -42,45 +42,10 @@ constexpr auto is_ascii(unsigned char ch) { return ch < 0x80; }
 namespace usbip::vhci
 {
 
-enum class isolation : unsigned char { none = 0, session = 1, user = 2 };
-
-} // namespace usbip::vhci
-
-
-namespace usbip
-{
-
-constexpr auto pack_attach_flags(bool once, bool wsk_events, vhci::isolation iso = vhci::isolation::none)
-{
-        return (static_cast<ULONG>(iso) << 2) |
-                (static_cast<ULONG>(once) << 1) |
-                static_cast<ULONG>(wsk_events);
-}
-
-/*
- * Unknown flags are ignored.
- */
-constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, _Inout_ vhci::isolation &iso, ULONG flags)
-{
-        once = flags & 2;
-        wsk_events = flags & 1;
-        iso = static_cast<vhci::isolation>((flags >> 2) & 0x3);
-}
-
-constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, ULONG flags)
-{
-        vhci::isolation iso;
-        unpack_attach_flags(once, wsk_events, iso, flags);
-}
-
-} // namespace usbip
-
-
-namespace usbip::vhci
-{
-
 DEFINE_GUID(GUID_DEVINTERFACE_USBIP_VHCI,
         0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);
+
+enum class isolation : unsigned char { none, session, user };
 
 struct base
 {
@@ -130,6 +95,30 @@ struct device_state : base, imported_device
         state state;
         ULONG source_id;
 };
+
+constexpr auto pack_attach_flags(bool once, bool wsk_events, isolation iso = isolation::none)
+{
+        return  (static_cast<ULONG>(iso)  << 2) |
+                (static_cast<ULONG>(once) << 1) |
+                 static_cast<ULONG>(wsk_events);
+}
+
+/*
+ * Unknown flags are ignored.
+ */
+constexpr void unpack_attach_flags(
+        _Inout_ bool &once, _Inout_ bool &wsk_events, _Inout_ isolation &iso, ULONG flags)
+{
+        wsk_events = flags & 1;
+        once = flags & 2;
+        iso = static_cast<isolation>((flags >> 2) & 0x3);
+}
+
+constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, ULONG flags)
+{
+        isolation iso;
+        unpack_attach_flags(once, wsk_events, iso, flags);
+}
 
 } // namespace usbip::vhci
 

@@ -138,12 +138,9 @@ struct device_ctx
         auto speed() const { return ext().properties().speed; }
         auto devid() const { return ext().properties().devid; }
         auto wsk_events() const { return ext().properties().wsk_events; }
-        auto iso_mode() const { return ext().properties().iso_mode; }
 
-        bool is_session_isolated() const
-        {
-                return iso_mode() == vhci::isolation::session && session_id != invalid_session_id;
-        }
+        auto iso_mode() const { return ext().properties().iso_mode; }
+        bool is_session_isolated() const;
 
         WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
 

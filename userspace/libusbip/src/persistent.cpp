@@ -43,7 +43,7 @@ std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<pe
                         return std::unexpected(ERROR_INVALID_PARAMETER);
                 }
 
-                auto flags = pack_attach_flags(d.once, wsk_events, static_cast<usbip::vhci::isolation>(d.iso_mode));
+                auto flags = pack_attach_flags(d.once, wsk_events, static_cast<vhci::isolation>(d.iso_mode));
 
                 if (auto s = std::format("{},{},{},{},{}", dl.hostname, dl.service, dl.busid, d.serial, flags);
                     auto ws = utf8_to_wchar(s)) {

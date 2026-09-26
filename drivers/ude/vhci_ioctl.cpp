@@ -681,9 +681,7 @@ PAGED auto plugin_hardware(
 
         ctx.vhci = vhci;
         ctx.request = request;
-        ctx.session_id = (r.iso_mode == vhci::isolation::session)
-                ? get_requestor_session_id(request)
-                : invalid_session_id;
+        ctx.session_id = r.iso_mode == vhci::isolation::session ? get_requestor_session_id(request) : invalid_session_id;
         ctx.one_attempt = once;
 
         st = create_device_ctx_ext(ctx.ctx_ext, vhci, r);
@@ -816,7 +814,7 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request, _In_ bool reattach)
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
                 auto plugout_and_delete = r->port != vhci::ioctl::PORT_ALL_CLOSEONLY;
-                auto target_session = (is_admin && session_id == 0) ? invalid_session_id : session_id;
+                auto target_session = is_admin && !session_id ? invalid_session_id : session_id;
                 vhci::detach_all_devices(vhci, plugout_and_delete, target_session); // only the caller's own devices unless session 0 admin
         } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
                 st = STATUS_INVALID_PARAMETER;

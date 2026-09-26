@@ -10,7 +10,6 @@ namespace usbip
 inline constexpr auto& tcp_port = "3240";
 inline constexpr auto& driver_filename = L"usbip2_ude"; // used by filter driver
 inline constexpr auto& persistent_devices_value_name = L"PersistentDevices";
-inline constexpr unsigned long invalid_session_id = ~0UL; // MAXULONG, Terminal Server session isolation
 
 enum op_status_t // op_common.status
 {
