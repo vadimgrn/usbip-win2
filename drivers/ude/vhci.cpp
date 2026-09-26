@@ -1067,7 +1067,7 @@ PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool plugou
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = get_device(vhci, port)) {
                         auto d = dev.get<UDECXUSBDEVICE>();
-                        if (get_device_ctx(d)->session_id == session_id) { // Terminal Server session isolation
+                        if (session_id == invalid_session_id || get_device_ctx(d)->session_id == session_id) { // Terminal Server session isolation
                                 device::detach(d, plugout_and_delete);
                         }
                 }

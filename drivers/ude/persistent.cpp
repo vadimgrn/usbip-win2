@@ -93,10 +93,11 @@ void reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
 
 /**
  * @param location_hash remove unconditionally if zero
+ * @param session_id remove unconditionally if invalid_session_id
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
+auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash, _In_ ULONG session_id = invalid_session_id)
 {
         wdf::ObjectRef ref;
         auto col = vhci.reattach_req;
@@ -106,8 +107,13 @@ auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
         for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
 
                 auto req = WdfCollectionGetItem(col, i);
-                
-                if (!location_hash || location_hash == get_attach_ctx(req)->location_hash) {
+                auto r = get_attach_ctx(req);
+
+                if (session_id != invalid_session_id && r->session_id != session_id) {
+                        continue;
+                }
+
+                if (!location_hash || location_hash == r->location_hash) {
                         ref.reset(req);
                         WdfCollectionRemoveItem(col, i);
                         break;
@@ -554,17 +560,17 @@ PAGED void usbip::start_attach_attempts(
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-int usbip::stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
+int usbip::stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash, _In_ ULONG session_id)
 {
         int cnt = 0;
 
-        while (auto req = reattach_req_remove(vhci, location_hash)) {
+        while (auto req = reattach_req_remove(vhci, location_hash, session_id)) {
 
                 ++cnt;
                 auto delivered = WdfRequestCancelSentRequest(req.get<WDFREQUEST>());
 
-                TraceDbg("hash %lx -> req %04x, cancel request was delivered %!BOOLEAN!",
-                          location_hash, ptr04x(req.get()), delivered);
+                TraceDbg("hash %lx, session %lu -> req %04x, cancel request was delivered %!BOOLEAN!",
+                          location_hash, session_id, ptr04x(req.get()), delivered);
         }
 
         return cnt;

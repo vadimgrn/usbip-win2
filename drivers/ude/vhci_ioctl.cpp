@@ -25,10 +25,24 @@
 #include <usbuser.h>
 
 /*
- * IoGetRequestorSessionId is declared in ntifs.h, which a KMDF driver should not include alongside
- * wdm.h. The routine is exported by the kernel, so its prototype is declared locally instead.
+ * IoGetRequestorSessionId, IoGetRequestorProcess, PsReferencePrimaryToken,
+ * PsDereferencePrimaryToken, PsReferenceImpersonationToken, PsDereferenceImpersonationToken,
+ * and SeTokenIsAdmin are exported by the kernel (ntoskrnl.exe).
+ * Declarations are provided locally to avoid pulling ntifs.h into a KMDF translation unit.
  */
-extern "C" NTKERNELAPI NTSTATUS IoGetRequestorSessionId(_In_ PIRP Irp, _Out_ PULONG pSessionId);
+extern "C" {
+NTKERNELAPI NTSTATUS IoGetRequestorSessionId(_In_ PIRP Irp, _Out_ PULONG pSessionId);
+NTKERNELAPI PEPROCESS IoGetRequestorProcess(_In_ PIRP Irp);
+NTKERNELAPI PACCESS_TOKEN PsReferencePrimaryToken(_Inout_ PEPROCESS Process);
+NTKERNELAPI VOID PsDereferencePrimaryToken(_In_ PACCESS_TOKEN PrimaryToken);
+NTKERNELAPI PACCESS_TOKEN PsReferenceImpersonationToken(
+        _Inout_ PETHREAD Thread,
+        _Out_ PBOOLEAN CopyOnOpen,
+        _Out_ PBOOLEAN EffectiveOnly,
+        _Out_ PSECURITY_IMPERSONATION_LEVEL ImpersonationLevel);
+NTKERNELAPI VOID PsDereferenceImpersonationToken(_In_ PACCESS_TOKEN ImpersonationToken);
+NTKERNELAPI BOOLEAN SeTokenIsAdmin(_In_ PACCESS_TOKEN Token);
+}
 
 namespace
 {
@@ -51,6 +65,47 @@ ULONG get_requestor_session_id(_In_ WDFREQUEST request)
         ULONG id;
         auto irp = WdfRequestWdmGetIrp(request);
         return NT_SUCCESS(IoGetRequestorSessionId(irp, &id)) ? id : invalid_session_id;
+}
+
+/*
+ * Checks whether the requestor has administrative privileges (or is kernel mode).
+ * Safely inspects the caller thread's impersonation token, falling back to the process primary token.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED bool is_admin_request(_In_ WDFREQUEST request)
+{
+        PAGED_CODE();
+
+        if (WdfRequestGetRequestorMode(request) == KernelMode) {
+                return true;
+        }
+
+        auto irp = WdfRequestWdmGetIrp(request);
+        if (!irp) {
+                return false;
+        }
+
+        if (auto thread = irp->Tail.Overlay.Thread) {
+                BOOLEAN copy_on_open{};
+                BOOLEAN effective_only{};
+                SECURITY_IMPERSONATION_LEVEL level{};
+                if (auto token = PsReferenceImpersonationToken(thread, &copy_on_open, &effective_only, &level)) {
+                        auto is_admin = SeTokenIsAdmin(token);
+                        PsDereferenceImpersonationToken(token);
+                        return is_admin;
+                }
+        }
+
+        if (auto process = IoGetRequestorProcess(irp)) {
+                if (auto token = PsReferencePrimaryToken(process)) {
+                        auto is_admin = SeTokenIsAdmin(token);
+                        PsDereferencePrimaryToken(token);
+                        return is_admin;
+                }
+        }
+
+        return false;
 }
 
 struct irp_args
@@ -575,9 +630,9 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         if (ctx.one_attempt) {
                 //
         } else if (auto hash = ext.location_hash(); NT_SUCCESS(st)) {
-                stop_attach_attempts(vhci, hash);
+                stop_attach_attempts(vhci, hash, ctx.session_id);
         } else if (!NT_SUCCESS(st) && can_reattach(ctx.vhci, hash, st)) {
-                stop_attach_attempts(vhci, hash);
+                stop_attach_attempts(vhci, hash, ctx.session_id);
                 start_attach_attempts(ctx.vhci, vhci, ext.attr, ctx.session_id, true);
         }
 }
@@ -710,8 +765,10 @@ PAGED auto plugin_hardware(
 
         // A driver-initiated (re)attach reaches this handler through target_self, which erased the
         // original requestor's session. Recover the owning session from the pending attach request.
-        if (auto s = find_attach_session(*get_vhci_ctx(vhci), ext.location_hash()); s != invalid_session_id) {
-                ctx.session_id = s;
+        if (ctx.session_id == invalid_session_id) {
+                if (auto s = find_attach_session(*get_vhci_ctx(vhci), ext.location_hash()); s != invalid_session_id) {
+                        ctx.session_id = s;
+                }
         }
 
         device_state_changed(vhci, ext.attr, 0, vhci::state::connecting, ctx.session_id);
@@ -758,8 +815,12 @@ PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
                 auto vhci = get_vhci(request);
                 auto ctx = get_vhci_ctx(vhci);
 
+                auto session_id = get_requestor_session_id(request);
+                auto is_admin = is_admin_request(request);
+                auto target_session = is_admin ? invalid_session_id : session_id;
+
                 r->location_hash = location_hash;
-                r->count = stop_attach_attempts(*ctx, location_hash);
+                r->count = stop_attach_attempts(*ctx, location_hash, target_session);
 
                 WdfRequestSetInformation(request, sizeof(*r));
         }
@@ -818,16 +879,18 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request, _In_ bool reattach)
         }
 
         auto session_id = get_requestor_session_id(request); // Terminal Server session isolation
-        TraceDbg("port %d, reattach %!bool!, session %lu", r->port, reattach, session_id);
+        auto is_admin = is_admin_request(request);
+        TraceDbg("port %d, reattach %!bool!, session %lu, admin %!bool!", r->port, reattach, session_id, is_admin);
         st = STATUS_SUCCESS;
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
                 auto plugout_and_delete = r->port != vhci::ioctl::PORT_ALL_CLOSEONLY;
-                vhci::detach_all_devices(vhci, plugout_and_delete, session_id); // only the caller's own devices
+                auto target_session = (is_admin && session_id == 0) ? invalid_session_id : session_id;
+                vhci::detach_all_devices(vhci, plugout_and_delete, target_session); // only the caller's own devices unless session 0 admin
         } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
                 st = STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::get_device(vhci, r->port)) {
-                if (get_device_ctx(dev.get())->session_id != session_id) { // owned by another session
+                if (!is_admin && get_device_ctx(dev.get())->session_id != session_id) { // owned by another session
                         st = STATUS_ACCESS_DENIED;
                 } else {
                         device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), reattach);
@@ -868,13 +931,14 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
         auto &ctx = *get_vhci_ctx(vhci);
 
         auto session_id = get_requestor_session_id(request); // Terminal Server session isolation
+        auto is_admin = is_admin_request(request);
         ULONG cnt = 0;
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = vhci::get_device(vhci, port); !dev) {
                         //
-                } else if (auto dc = get_device_ctx(dev.get()); dc->session_id != session_id) {
-                        // owned by another session, hide it from this caller
+                } else if (auto dc = get_device_ctx(dev.get()); !is_admin && dc->session_id != session_id) {
+                        // owned by another session, hide it from this non-admin caller
                 } else if (cnt == max_cnt) {
                         return STATUS_BUFFER_TOO_SMALL;
                 } else if (auto err = fill(r->devices[cnt++], *dc); !NT_SUCCESS(err)) {
@@ -920,6 +984,10 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto set_persistent(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
+
+        if (!is_admin_request(request)) {
+                return STATUS_ACCESS_DENIED;
+        }
 
         void *buf{};
         size_t length{};

@@ -248,13 +248,6 @@ inline auto get_vhci(_In_ WDFREQUEST Request)
         return WdfIoQueueGetDevice(queue);
 }
 
-/*
- * Terminal Server session isolation.
- * invalid_session_id never equals a real session id, so an ownership check against it always denies.
- * @see get_requestor_session_id
- */
-inline constexpr ULONG invalid_session_id = MAXULONG;
-
 
 /*
  * Context space for WDFFILEOBJECT.

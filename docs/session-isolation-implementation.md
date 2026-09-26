@@ -25,42 +25,36 @@ kernel-originated device denies everyone by default.
 
 | Area | File | Change |
 |---|---|---|
-| Owner field | `context.h` | `device_ctx.session_id` (owner) and `fileobject_ctx.session_id` (subscriber); `invalid_session_id` constant |
-| Session of caller | `vhci_ioctl.cpp` | `get_requestor_session_id()` helper (local `extern "C"` prototype for `IoGetRequestorSessionId`, which lives in `ntifs.h` and must not be pulled into a KMDF TU) |
-| Capture owner at attach | `vhci_ioctl.cpp` (`plugin_hardware`, `connected`), `device.cpp` (`device::create` inits to `invalid_session_id`) | stamps `device_ctx.session_id` |
-| **Detach control** | `vhci_ioctl.cpp` (`plugout_hardware`) | single-port detach returns `STATUS_ACCESS_DENIED` if owned by another session; the `port <= 0` mass-detach is scoped to the caller's own devices via `detach_all_devices(..., session_id)` (`vhci.cpp`) |
-| **List** | `vhci_ioctl.cpp` (`get_imported_devices`) | skips devices not owned by the caller |
-| **Event stream** | `vhci.cpp` (`process_event`, `device_state_changed` gains a `session_id`), `vhci.h` | a state change is delivered only to subscribers in the owning session; `device_read` binds a subscription to the caller's session and rejects a cross-session read on a shared handle (`STATUS_ACCESS_DENIED`) |
-| **Owner across auto-reattach** | `persistent.cpp/.h` (`attach_ctx.session_id`, `start_attach_attempts(..., session_id)`, new `find_attach_session`), `vhci_ioctl.cpp`, `device.cpp` | a (re)attach travels to the driver via a `target_self` IOCTL that erases the requestor session; the owner is preserved in the pending attach request and recovered by `location_hash` in `plugin_hardware`, so a network blip does not orphan the user's device |
+| Owner field | `context.h`, `consts.h` | `device_ctx.session_id` (owner) and `fileobject_ctx.session_id` (subscriber); central `invalid_session_id` constant |
+| Session of caller | `vhci_ioctl.cpp` | `get_requestor_session_id()` and `is_admin_request()` helpers (token security and session inspection via kernel exports) |
+| Capture owner at attach | `vhci_ioctl.cpp` (`plugin_hardware`, `connected`), `device.cpp` (`device::create` inits to `invalid_session_id`) | stamps `device_ctx.session_id`; `find_attach_session` only called if requestor is `invalid_session_id` to prevent cross-session attach hijacking |
+| **Detach control** | `vhci_ioctl.cpp` (`plugout_hardware`), `vhci.cpp` (`detach_all_devices`) | single-port detach returns `STATUS_ACCESS_DENIED` across sessions unless caller is administrator; mass-detach (`port <= 0`) is scoped to caller's own session, while Session 0 admin can detach all |
+| **List** | `vhci_ioctl.cpp` (`get_imported_devices`) | skips devices not owned by caller unless caller is administrator (admins can inspect all ports) |
+| **Event stream** | `vhci.cpp` (`process_event`, `device_state_changed`, `replay_plugged_devices`), `vhci.h` | state changes and replays are delivered only to subscribers in the owning session; `device_read` rejects cross-session reads (`STATUS_ACCESS_DENIED`) |
+| **Owner across auto-reattach** | `persistent.cpp/.h` (`attach_ctx.session_id`, `start_attach_attempts`, `find_attach_session`), `vhci_ioctl.cpp`, `device.cpp` | owner preserved across `target_self` loopback and recovered by `location_hash` |
+| **Scoped cancellation** | `persistent.cpp/.h` (`stop_attach_attempts`, `reattach_req_remove`), `vhci_ioctl.cpp` | `STOP_ATTACH_ATTEMPTS` is scoped to caller's session (admins can cancel globally), preventing cross-session DoS |
+| **Persistent state write** | `vhci_ioctl.cpp` (`set_persistent`) | `SET_PERSISTENT` requires administrator privilege (`is_admin_request`), preventing unprivileged HKLM modification |
 
-Net: ~127 insertions / ~35 deletions across 7 files. No new components, no change to the install
-model, the device object, or the SDDL.
+Net: Option A boundary enforced with administrator override, scoped cancellation, and protected registry writes.
 
 ## What this closes (the Phase 4 functional matrix)
 
-- B cannot **list** A's devices (`GET_IMPORTED_DEVICES` filtered).
-- B cannot **detach** A's device (`STATUS_ACCESS_DENIED`); B's `port <= 0` mass-detach only removes B's own.
+- B cannot **list** A's devices (`GET_IMPORTED_DEVICES` filtered; administrators can list all).
+- B cannot **detach** A's device (`STATUS_ACCESS_DENIED`; administrators can detach any stuck port).
+- B cannot **cancel** A's attach attempts (`STOP_ATTACH_ATTEMPTS` scoped to caller's session).
+- B cannot **overwrite** machine-wide persistent configuration (`SET_PERSISTENT` requires administrator privilege).
 - B cannot **see** A's device state changes on the event stream; a leaked read handle is rejected.
 - A leaked control handle is rejected because the check is on the *current* requestor, not the opener.
-- Auto-reattach keeps the original owner.
+- Auto-reattach keeps the original owner without allowing cross-session hijacking.
 
 ## Known residuals (deferred, documented on purpose)
 
-These are **not** gated in this increment and should be a follow-up increment or an explicit decision:
-
-1. **`SET_PERSISTENT` / `GET_PERSISTENT`** — still machine-wide; any session can read or overwrite the
-   `HKLM\...\usbip2_ude\State\PersistentDevices` list. Per-SID persistent state is semantically tricky
-   because boot-time auto-reattach runs with no logged-on session; needs a design decision.
-2. **Boot-persisted devices** now attach with `invalid_session_id`, so they are **not visible in any
-   live session** (previously machine-wide visible). This is the secure default under isolation but
-   disables the persistent feature's visibility until (1) is designed.
-3. **`STOP_ATTACH_ATTEMPTS`** — not scoped; any session can cancel attach attempts (including the empty
-   "stop all"). Deliberately left alone to avoid touching the delicate, DoS-sensitive reattach
-   cancellation path; severity is low (transient attach *retries*, not attached devices).
-4. **`IOCTL_USB_USER_REQUEST`** and other standard USB IOCTLs handled by `udecx` are not filtered — they
+1. **`GET_PERSISTENT`** — still machine-wide read; any session can inspect the boot-time persistent list.
+2. **`IOCTL_USB_USER_REQUEST`** and other standard USB IOCTLs handled by `udecx` are not filtered — they
    are Windows USB queries against the shared controller.
-5. **Roothub port exhaustion** — the port array is a shared pool; one session can exhaust it and deny
+3. **Roothub port exhaustion** — the port array is a shared pool; one session can exhaust it and deny
    attach to others (a shared-resource DoS, not a confidentiality/integrity breach).
+4. **Session Logoff Handling** — without a dedicated service/agent tracking session logoff events (`WTS_SESSION_LOGOFF`), devices remain attached when a user logs off until manually detached or reallocated. Administrators can detach any orphaned device via single-port detach or Session 0 mass-detach.
 
 ## Validation (done — 2026-07-24)
 

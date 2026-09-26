@@ -56,7 +56,7 @@ PAGED void start_attach_attempts(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-int stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash);
+int stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash, _In_ ULONG session_id = invalid_session_id);
 
 /*
  * Recover the owning Terminal Server session of a pending (re)attach by its location_hash.
