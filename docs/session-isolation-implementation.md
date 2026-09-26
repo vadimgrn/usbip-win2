@@ -54,20 +54,23 @@ Net: Option A boundary enforced with administrator override, scoped cancellation
    are Windows USB queries against the shared controller.
 3. **Roothub port exhaustion** — the port array is a shared pool; one session can exhaust it and deny
    attach to others (a shared-resource DoS, not a confidentiality/integrity breach).
-4. **Session Logoff Handling** — without a dedicated service/agent tracking session logoff events (`WTS_SESSION_LOGOFF`), devices remain attached when a user logs off until manually detached or reallocated. Administrators can detach any orphaned device via single-port detach or Session 0 mass-detach.
+4. **Session Logoff Handling & Session ID Recycling** — 
+   - *Risk*: When a Terminal Server user logs off, Windows terminates user-mode processes, but kernel objects (`UDECXUSBDEVICE`) remain attached to the root hub with their original `session_id`. If a subsequent user later logs in and Terminal Services re-allocates that same recycled `SessionId`, the new user would acquire ownership of the previous user's device. Furthermore, until detached, abandoned devices consume roothub ports.
+   - *Operational Mitigation (Implemented)*: Administrators can inspect all attached devices via `GET_IMPORTED_DEVICES` and detach orphaned devices across sessions via single-port detach or Session 0 mass-detach (`detach_all_devices(vhci, true, invalid_session_id)`).
+   - *Automated Kernel Mitigation (Architectural Path)*: Windows provides the kernel-native `IoRegisterContainerNotification` API (`IoSessionStateNotification` class with `IO_SESSION_STATE_NOTIFICATION`). This allows `usbip2_ude.sys` to register an `IO_SESSION_NOTIFICATION_FUNCTION` directly in kernel mode to receive `IO_SESSION_STATE_LOGOFF_EVENT` and `IO_SESSION_STATE_TERMINATION_EVENT` callbacks. Querying `IoGetContainerInformation(IoSessionStateInformation, ...)` retrieves the terminating `SessionId`, enabling purely in-driver automatic detachment via `detach_all_devices(vhci, true, session_id)` without requiring any user-mode service or helper process.
 
-## Validation (done — 2026-07-24)
+## Validation & Evolution
 
-Full results and command evidence: **`docs/session-isolation-test-results.md`**. Summary:
+Full empirical results and command evidence from the initial baseline test run: **`docs/session-isolation-test-results.md`**.
 
-1. **Load smoke test** — passed. Controller enumerates; single-session attach → `usbip port` → detach
-   works (HP mouse + HP composite keyboard over USB/IP, both plain-HID, no crash).
-2. **Phase 4 isolation matrix** — passed with two RDP users (`testA` sess 2, `testB` sess 3) under
-   Driver Verifier Special Pool on both drivers: cross-session list is filtered, cross-session detach
-   (user→user *and* admin→user) is `ACCESS_DENIED` with the device surviving, and `detach -a`
-   (mass-detach) only affects the caller's own session. Residual (1) confirmed live: the persistent
-   list is machine-wide (testB's stash is visible to testA).
+### Baseline Validation (2026-07-24)
+- **Load smoke test**: Passed. Controller enumerates; single-session attach → `usbip port` → detach works (HP mouse + HP composite keyboard over USB/IP, both plain-HID, no crash).
+- **Isolation matrix**: Passed with two RDP users (`testA` sess 2, `testB` sess 3) under Driver Verifier Special Pool on both drivers (`usbip2_ude.sys` + `usbip2_filter.sys`). Cross-session list was filtered, cross-session user-to-user detach returned `STATUS_ACCESS_DENIED`, and `detach -a` only detached the caller's own devices.
 
-Not exercised at runtime (verified by code review): the event-stream cross-session read guard in
-`device_read`, and the leaked-handle current-requestor check (both are on the same
-`get_requestor_session_id`-per-IRP path as the validated `GET_IMPORTED_DEVICES`/detach checks).
+### Hardened Production Model (Commit `b637b8f`)
+Following baseline testing, code review and security analysis identified operational and security issues with the strict session-only model:
+1. **Administrative Override**: Baseline check 6 denied Session-0 admin detach. This caused administrative lockout where stuck/orphaned devices could never be recovered without a host reboot. The hardened driver inspects caller tokens (`is_admin_request`), allowing administrators to view all ports, detach any port across sessions, and execute global mass-detach from Session 0.
+2. **Registry Configuration Protection**: Baseline permitted any user to call `SET_PERSISTENT`. The hardened driver restricts `SET_PERSISTENT` to administrators (`STATUS_ACCESS_DENIED` for standard users).
+3. **Cancellation DoS Mitigation**: Baseline permitted any session to cancel attach retries machine-wide via `STOP_ATTACH_ATTEMPTS`. The hardened driver scopes cancellation to the requestor's session.
+4. **Attach Race Protection**: Baseline allowed pending reattaches to potentially stamp their session onto new attach requests. The hardened driver gates session lookup strictly to requests originating without a valid session.
+

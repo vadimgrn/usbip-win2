@@ -265,3 +265,27 @@ Option A, not a replacement for it.
 2. Confirm the file/function list above (`vhci_ioctl.cpp` dispatch, `context.h:device_ctx`,
    `vhci.cpp:process_event`, `persistent.cpp`) as the Option A change surface before any code is
    written.
+
+---
+
+## 8. Post-Implementation Addendum: Hardening & In-Kernel Lifecycle Discoveries
+
+Subsequent implementation and validation (Phases 3 and 4) yielded important discoveries that refine the findings above:
+
+### 1. In-Kernel Session Lifecycle Notification (`IoRegisterContainerNotification`)
+Section 7 assumed that detecting session logoff and disconnect would require a dedicated user-mode Windows service using `WTSRegisterSessionNotification`. 
+Research into Windows kernel interfaces reveals that Windows provides native kernel-mode container notification support:
+- **`IoRegisterContainerNotification`** with **`IoSessionStateNotification`** (`wdm.h`, supported since Windows 7).
+- A driver registers an `IO_SESSION_NOTIFICATION_FUNCTION` with event masks including `IO_SESSION_STATE_LOGOFF_EVENT` and `IO_SESSION_STATE_TERMINATION_EVENT`.
+- When called, `IoGetContainerInformation(IoSessionStateInformation, SessionObject, &info, sizeof(info))` provides the terminating `SessionId`.
+- **Architectural Impact**: `usbip2_ude.sys` can directly detect user logoff and invoke `detach_all_devices(vhci, true, session_id)` purely inside the kernel driver. No user-mode service, daemon, or named IPC pipes are required for clean session teardown.
+
+### 2. Session ID Recycling Hazard
+Windows Terminal Server re-uses integer session IDs when a session terminates. If user A logs off without detaching a device (and without auto-cleanup on logoff), the device stays attached to the roothub tagged with user A's `SessionId`. If user B subsequently logs in and is assigned that recycled session ID, user B would inherit full visibility and control over user A's USB peripheral.
+
+### 3. Administrative Override vs. Absolute Lockout
+The raw Option A implementation treated all sessions equally, meaning even local administrators (or Session 0 services) were denied access to other users' devices. This caused an operational vulnerability: stuck, faulted, or orphaned devices could never be detached by administrators without rebooting the host. Option A was hardened with `is_admin_request()` (inspecting primary/impersonation tokens for `SeTokenIsAdmin`), allowing administrators to inspect all ports, detach any device, and execute global mass-detach from Session 0.
+
+### 4. Simplified Persistent State Security
+Rather than introducing complex per-SID parsing and subkeys in registry `REG_MULTI_SZ` storage (which complicates boot-time reattach before any user logs in), `SET_PERSISTENT` was gated to administrators via `is_admin_request()`. Standard users receive `STATUS_ACCESS_DENIED`, fully neutralizing unprivileged machine-wide registry modification.
+
