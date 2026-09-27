@@ -30,14 +30,14 @@ void print(_In_ const imported_device &d)
            -> serial: {}
            -> mode: {})";
 
-        auto &loc = d.location;
+        auto &loc = d.config.location;
 
         std::println(fmt, d.port, get_speed_str(d.speed),
                         product,
                         loc.hostname, loc.service, loc.busid,
                         bus, dev,
-                        d.serial,
-                        to_string(d.recv_mode));
+                        d.config.serial,
+                        to_string(d.config.recv_mode));
 }
 
 } // namespace
@@ -59,7 +59,7 @@ bool usbip::cmd_port(const port_args &args)
 
         log::debug("{} imported usb device(s)", devices->size());
 
-        std::optional<std::vector<persistent_device>> persistent;
+        std::optional<std::vector<device_config>> persistent;
         if (args.persistent) {
                 persistent.emplace();
                 persistent->reserve(devices->size());
@@ -78,12 +78,7 @@ bool usbip::cmd_port(const port_args &args)
                         }
                         print(d);
                         if (persistent) {
-                                persistent_device pd {
-                                        .location = d.location,
-                                        .serial = d.serial,
-                                        .recv_mode = d.recv_mode
-                                };
-                                persistent->push_back(std::move(pd));
+                                persistent->push_back(d.config);
                         }
                 }
         }

@@ -123,12 +123,12 @@ auto as_set(_In_ std::vector<T> v)
 void log(_In_ const device_state &st)
 {
         auto &d = st.device;
-        auto &loc = d.location;
+        auto &loc = d.config.location;
 
         auto s = std::format("{}:{}/{} {}, port {}, devid {:x}, speed {}, vid {:x}, pid {:x}, serial '{}', {}, source {:x}",
                               loc.hostname, loc.service, loc.busid, vhci::get_state_str(st.state), d.port, d.devid,
-                              static_cast<int>(d.speed), d.vendor, d.product, d.serial,
-                              to_string(d.recv_mode).utf8_string(), st.source_id);
+                              static_cast<int>(d.speed), d.vendor, d.product, d.config.serial,
+                              to_string(d.config.recv_mode).utf8_string(), st.source_id);
 
         wxLogVerbose(L"%s", wxString::FromUTF8(s));
 }
@@ -234,7 +234,7 @@ auto set_saved_read_only(_Inout_ device_columns &dc, _In_ const device_columns &
 
 auto update_from_registry(
         _Inout_ device_columns &dc, _In_ unsigned int flags, _In_ unsigned int columns,
-        _In_ const std::set<persistent_device> &persistent)
+        _In_ const std::set<device_config> &persistent)
 {
         if (persistent.empty()) {
                 return flags;
@@ -243,7 +243,7 @@ auto update_from_registry(
         wxASSERT(columns & columns::pers_all);
         static_assert(!(get_saved_flags() & mkflag(COL_PERSISTENT)));
 
-        auto key = make_persistent_device(dc);
+        auto key = make_device_config(dc);
 
         if (auto pd = persistent.find(key); pd != persistent.end()) {
 
@@ -269,7 +269,7 @@ auto update_from_registry(
 
 auto update_from_registry(
         _Inout_ device_columns &dc, _In_ unsigned int flags, _In_ unsigned int columns,
-        _In_ const std::set<device_columns> &saved, _In_ const std::set<persistent_device> &persistent)
+        _In_ const std::set<device_columns> &saved, _In_ const std::set<device_config> &persistent)
 {
         wxASSERT(columns & columns::saved_all);
 
@@ -339,20 +339,20 @@ auto get_selected_devices(
         return v;
 }
 
-auto make_persistent_device(
+auto make_device_config(
         _In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem server, _In_ wxTreeListItem device)
 {
         auto &url = tree.GetItemText(server);
         auto &busid = tree.GetItemText(device);
 
-        return usbip::make_persistent_device(url, busid,
+        return usbip::make_device_config(url, busid,
                         tree.GetItemText(device, COL_SERIAL),
                         tree.GetItemText(device, COL_RECEIVE_MODE));
 }
 
 auto get_persistent(_In_ const Handle &vhci = get_vhci())
 {
-        std::set<persistent_device> result;
+        std::set<device_config> result;
 
         if (auto v = vhci::get_persistent(vhci.get())) {
                 result = as_set(*v);
@@ -686,12 +686,12 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
 
         if (m_taskbar_icon && m_taskbar_icon->IsIconInstalled()) {
                 if (std::chrono::steady_clock::now() - m_start_time > std::chrono::seconds(2)) {
-                        auto s = wxString::FromAscii(vhci::get_state_str(st.state)) + L' ' + make_device_url(st.device.location);
+                        auto s = wxString::FromAscii(vhci::get_state_str(st.state)) + L' ' + make_device_url(st.device.config.location);
                         m_taskbar_icon->show_balloon(s);
                 }
         }
 
-        auto [dev, added] = find_or_add_device(st.device.location);
+        auto [dev, added] = find_or_add_device(st.device.config.location);
 
         if (added) {
                 auto server = tree.GetItemParent(dev);
@@ -997,13 +997,15 @@ DWORD MainFrame::attach(
         }
 
         vhci::attach_args args {
-                .location {
-                        .hostname = hostname.utf8_string(),
-                        .service = service.utf8_string(),
-                        .busid = busid.utf8_string(),
+                .config = {
+                        .location {
+                                .hostname = hostname.utf8_string(),
+                                .service = service.utf8_string(),
+                                .busid = busid.utf8_string(),
+                        },
+                        .serial = serial.utf8_string(),
+                        .recv_mode = to_receive_mode(recv_mode),
                 },
-                .serial = serial.utf8_string(),
-                .recv_mode = to_receive_mode(recv_mode),
                 .once = once
         };
 
@@ -1055,7 +1057,7 @@ void MainFrame::on_attach_stop(wxCommandEvent&)
         for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree, is_server)) {
 
                 auto server = tree.GetItemParent(dev);
-                auto pd = make_persistent_device(tree, server, dev);
+                auto pd = make_device_config(tree, server, dev);
 
                 if (auto cnt = vhci::stop_attach_attempts(vhci.get(), &pd.location); cnt >= 0) {
                         total += cnt;
@@ -1294,10 +1296,10 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                 };
                 auto [dc, flags] = make_device_columns(state);
 
-                wxASSERT(state.device.serial.empty());
+                wxASSERT(state.device.config.serial.empty());
                 wxASSERT(!(flags & mkflag(COL_SERIAL)));
 
-                wxASSERT(state.device.recv_mode == receive_mode::zero_copy);
+                wxASSERT(state.device.config.recv_mode == receive_mode::zero_copy);
                 wxASSERT(flags & mkflag(COL_RECEIVE_MODE));
                 wxASSERT(dc[COL_RECEIVE_MODE] == to_string(receive_mode::zero_copy));
 
@@ -1453,7 +1455,7 @@ void MainFrame::save(_In_ const wxTreeListItems &devices)
         cfg.DeleteGroup(g_key_devices);
         cfg.SetPath(g_key_devices);
 
-        std::vector<persistent_device> persistent;
+        std::vector<device_config> persistent;
         auto &tree = *m_treeListCtrl;
 
         for (int cnt = 0; auto &dev: devices) {
@@ -1471,7 +1473,7 @@ void MainFrame::save(_In_ const wxTreeListItems &devices)
                 }
 
                 if (is_checked(dev, COL_PERSISTENT)) {
-                        persistent.emplace_back(make_persistent_device(tree, server, dev));
+                        persistent.emplace_back(make_device_config(tree, server, dev));
                 }
 
                 cfg.SetPath(L"..");
@@ -1558,7 +1560,7 @@ void MainFrame::on_reload(wxCommandEvent &event)
         auto saved = as_set(get_saved());
 
         for (auto &dev: *devices) {
-                auto [item, added] = find_or_add_device(dev.location);
+                auto [item, added] = find_or_add_device(dev.config.location);
                 wxASSERT(added);
                 
                 device_state st {

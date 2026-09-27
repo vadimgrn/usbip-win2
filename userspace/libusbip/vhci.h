@@ -16,7 +16,7 @@
  * Strings encoding is UTF8.
  */
 
-namespace usbip
+namespace usbip::vhci
 {
 
 /**
@@ -32,7 +32,15 @@ namespace usbip
  *   - Should be used for devices that generate small amounts of data
  *     but at a high frequency, such as HID keyboard/mouse, etc.
  */
-enum class receive_mode { zero_copy, low_latency };
+enum class receive_mode : unsigned char { zero_copy, low_latency };
+
+} // namespace usbip::vhci
+
+
+namespace usbip
+{
+
+using vhci::receive_mode;
 
 struct device_location
 {
@@ -46,17 +54,16 @@ struct device_location
  * @see validate_device_serial
  * @see get_device_serial_maxlen
  */
-struct persistent_device
+struct device_config
 {
         device_location location;
         std::string serial; ///< optional device serial number if you want to set/override it
         receive_mode recv_mode = receive_mode::zero_copy; ///< how to optimize data reception over the network
-        bool once{}; ///< do not start automatic attach attempts if cannot connect; for attach_args only
 };
 
 struct imported_device
 {
-        device_location location;
+        device_config config;
         int port{}; ///< hub port number, >= 1
 
         UINT32 devid{};
@@ -64,9 +71,6 @@ struct imported_device
 
         UINT16 vendor{};
         UINT16 product{};
-
-        std::string serial; ///< only filled if you set it in attach_args
-        receive_mode recv_mode = receive_mode::zero_copy; ///< @see attach_args.recv_mode
 };
 
 enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };
@@ -120,7 +124,11 @@ USBIP_API Handle open(_In_ bool overlapped = false);
  */
 USBIP_API std::optional<std::vector<imported_device>> get_imported_devices(_In_ HANDLE dev);
 
-using attach_args = persistent_device;
+struct attach_args
+{
+        device_config config;
+        bool once{}; ///< do not start automatic attach attempts if cannot connect
+};
 
 /**
  * @param dev handle of the driver device
@@ -128,6 +136,11 @@ using attach_args = persistent_device;
  * @return hub port number, >= 1. Call GetLastError() if zero is returned.
  */
 USBIP_API int attach(_In_ HANDLE dev, _In_ const attach_args &args);
+
+inline auto attach(_In_ HANDLE dev, _In_ const device_config &config)
+{
+        return attach(dev, attach_args{ config });
+}
 
 /**
  * @param dev handle of the driver device

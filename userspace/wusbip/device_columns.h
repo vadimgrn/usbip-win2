@@ -7,11 +7,16 @@
 #include <wx/string.h>
 #include <array>
 
+namespace usbip::vhci
+{
+enum class receive_mode : unsigned char;
+}
+
 namespace usbip
 {
 
-enum class receive_mode;
-struct persistent_device;
+using vhci::receive_mode;
+struct device_config;
 struct device_location;
 struct imported_device;
 struct device_state;
@@ -73,9 +78,9 @@ const wxString& to_string(_In_ receive_mode mode) noexcept;
 receive_mode to_receive_mode(_In_ const wxString &mode) noexcept;
 void validate_receive_mode(_Inout_ wxString &mode);
 
-persistent_device make_persistent_device(_In_ const device_columns &dc);
+device_config make_device_config(_In_ const device_columns &dc);
 
-persistent_device make_persistent_device(
+device_config make_device_config(
         _In_ const wxString &url, _In_ const wxString &busid, _In_ const wxString &serial, _In_ const wxString &recv_mode);
 
 std::pair<device_columns, unsigned int> make_device_columns(_In_ const imported_device &dev);

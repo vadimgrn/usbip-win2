@@ -22,12 +22,12 @@ auto is_malformed(_In_ const device_location &d) noexcept
         return d.hostname.empty() || d.service.empty() || d.busid.empty();
 }
 
-auto is_malformed(_In_ const persistent_device &d) noexcept
+auto is_malformed(_In_ const device_config &d) noexcept
 {
         return is_malformed(d.location) || !validate_device_serial(d.serial);
 }
 
-std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<persistent_device> &devices)
+std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<device_config> &devices)
 {
         std::wstring multi_sz;
 
@@ -36,14 +36,14 @@ std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<pe
                 auto wsk_events = d.recv_mode == receive_mode::low_latency;
 
                 if (is_malformed(d)) {
-                        libusbip::output("malformed persistent_device( hostname='{}', service='{}', "
-                                         "busid='{}', serial='{}', wsk_events={}, once={} )",
-                                         dl.hostname, dl.service, dl.busid, d.serial, wsk_events, d.once);
+                        libusbip::output("malformed device_config( hostname='{}', service='{}', "
+                                         "busid='{}', serial='{}', wsk_events={} )",
+                                         dl.hostname, dl.service, dl.busid, d.serial, wsk_events);
 
                         return std::unexpected(ERROR_INVALID_PARAMETER);
                 }
 
-                auto flags = pack_attach_flags(d.once, wsk_events);
+                auto flags = pack_attach_flags(/*once=*/false, wsk_events);
 
                 if (auto s = std::format("{},{},{},{},{}", dl.hostname, dl.service, dl.busid, d.serial, flags);
                     auto ws = utf8_to_wchar(s)) {
@@ -71,9 +71,9 @@ std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<pe
  * - Forward compatibility: future entries with extra trailing comma-separated fields
  *   are accepted; only known fields are parsed and remaining tokens are ignored.
  */
-auto parse_persistent_device(_In_ const std::string &str)
+auto parse_device_config(_In_ const std::string &str)
 {
-        std::optional<persistent_device> result(std::in_place);
+        std::optional<device_config> result(std::in_place);
 
         auto &dev = *result;
         auto &loc = dev.location;
@@ -104,8 +104,9 @@ auto parse_persistent_device(_In_ const std::string &str)
                 auto [end, ec] = std::from_chars(s.data(), s.data() + s.size(), flags);
 
                 if (ec == std::errc{} && end == s.data() + s.size()) {
+                        bool once;
                         bool wsk_events;
-                        unpack_attach_flags(dev.once, wsk_events, flags);
+                        unpack_attach_flags(once, wsk_events, flags);
 
                         dev.recv_mode = wsk_events ? receive_mode::low_latency : receive_mode::zero_copy;
                 } else {
@@ -150,7 +151,7 @@ auto get_persistent_devices(_In_ HANDLE dev)
 } // namespace
 
 
-bool usbip::vhci::set_persistent(_In_ HANDLE dev, _In_ const std::vector<persistent_device> &devices)
+bool usbip::vhci::set_persistent(_In_ HANDLE dev, _In_ const std::vector<device_config> &devices)
 {
         auto val = devices_to_multi_sz(devices);
         if (!val) {
@@ -168,9 +169,9 @@ bool usbip::vhci::set_persistent(_In_ HANDLE dev, _In_ const std::vector<persist
         return ok;
 }
 
-auto usbip::vhci::get_persistent(_In_ HANDLE dev) -> std::optional<std::vector<persistent_device>>
+auto usbip::vhci::get_persistent(_In_ HANDLE dev) -> std::optional<std::vector<device_config>>
 {
-        std::optional<std::vector<persistent_device>> devs;
+        std::optional<std::vector<device_config>> devs;
 
         auto multi_sz = get_persistent_devices(dev);
         if (!multi_sz) {
@@ -188,7 +189,7 @@ auto usbip::vhci::get_persistent(_In_ HANDLE dev) -> std::optional<std::vector<p
         for (auto &ws: strings) {
                 if (auto s = wchar_to_utf8(ws); !s) {
                         libusbip::output("wchar_to_utf8 error {}", s.error());
-                } else if (auto d = parse_persistent_device(*s); d && !is_malformed(*d)) {
+                } else if (auto d = parse_device_config(*s); d && !is_malformed(*d)) {
                         devs->push_back(std::move(*d));
                 } else {
                         libusbip::output("invalid '{}'", *s);

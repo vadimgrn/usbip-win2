@@ -113,10 +113,13 @@ auto usbip::make_imported_device(
         _In_ std::string hostname, _In_ std::string service, _In_ const usb_device &dev) -> imported_device
 {
         return imported_device {
-                .location = {
-                        .hostname = std::move(hostname), 
-                        .service = std::move(service), 
-                        .busid = dev.busid 
+                .config = {
+                        .location = {
+                                .hostname = std::move(hostname), 
+                                .service = std::move(service), 
+                                .busid = dev.busid 
+                        },
+                        .serial = {},
                 },
 
                 .devid = make_devid(dev.busnum, dev.devnum),
@@ -124,7 +127,6 @@ auto usbip::make_imported_device(
 
                 .vendor = dev.idVendor,
                 .product = dev.idProduct,
-                .serial = {},
         };
 }
 

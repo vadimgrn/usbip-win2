@@ -23,12 +23,12 @@ const char *to_string(receive_mode mode) noexcept;
 } // namespace usbip
 
 template <>
-struct std::formatter<usbip::persistent_device> : std::formatter<std::string_view>
+struct std::formatter<usbip::device_config> : std::formatter<std::string_view>
 {
-        auto format(const usbip::persistent_device &d, auto &ctx) const
+        auto format(const usbip::device_config &d, auto &ctx) const
         {
-                return std::format_to(ctx.out(), "{}:{}/{}, serial:{}, mode:{}, once:{}",
+                return std::format_to(ctx.out(), "{}:{}/{}, serial:{}, mode:{}",
                         d.location.hostname, d.location.service, d.location.busid,
-                        d.serial, usbip::to_string(d.recv_mode), d.once);
+                        d.serial, usbip::to_string(d.recv_mode));
         }
 };
