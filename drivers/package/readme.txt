@@ -9,3 +9,10 @@ pvk2pfx -pvk usbip.pvk /pi %PASSWD% -spc usbip.cer -pfx usbip.pfx /f
 
 rem Find installed certificate in the store
 certutil -store root | findstr "USBip"
+
+
+To create the required .CAB files for attestation signing, use the following command at the repository root:
+makecab /f ./drivers/package/makecab-arm64.ddf
+makecab /f ./drivers/package/makecab-amd64.ddf
+
+The files will be generated in the respective `Release` directories for each architecture under the name `usbip_win2_arm64.cab` for ARM64 and `usbip_win2_amd64.cab` for x64. These files are signed and then submitted for attestation signing.

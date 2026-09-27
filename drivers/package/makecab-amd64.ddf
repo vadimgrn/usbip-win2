@@ -1,0 +1,21 @@
+.OPTION EXPLICIT ;
+.Set CabinetName1=usbip_win2_amd64.cab
+.Set DiskDirectory1=./x64/Release
+.Set CompressionType=LZX
+.Set CabinetFileCountThreshold=0
+.Set FolderFileCountThreshold=0
+.Set FolderSizeThreshold=0
+.Set MaxCabinetSize=0
+.Set MaxDiskFileCount=0
+.Set MaxDiskSize=0
+
+.Set DestinationDir= ;
+.Set DestinationDir=usbip2_ude
+x64\Release\usbip2_ude.sys
+x64\release\usbip2_ude.inf
+x64\Release\usbip2_ude.pdb
+
+.Set DestinationDir=usbip2_filter
+x64\Release\usbip2_filter.sys
+x64\Release\usbip2_filter.inf
+x64\Release\usbip2_filter.pdb
