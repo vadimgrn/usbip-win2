@@ -78,12 +78,12 @@ constexpr auto operator <=> (_In_ const device_location &a, _In_ const device_lo
         return get_cmp_key(a) <=> get_cmp_key(b);
 }
 
-constexpr auto operator == (_In_ const persistent_device &a, _In_ const persistent_device &b)
+constexpr auto operator == (_In_ const device_config &a, _In_ const device_config &b)
 {
         return a.location == b.location; // ignore serial
 }
 
-constexpr auto operator <=> (_In_ const persistent_device &a, _In_ const persistent_device &b)
+constexpr auto operator <=> (_In_ const device_config &a, _In_ const device_config &b)
 {
         return a.location <=> b.location; // ignore serial
 }

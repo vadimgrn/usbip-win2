@@ -76,15 +76,15 @@ void usbip::validate_receive_mode(_Inout_ wxString &mode)
         }
 }
 
-auto usbip::make_persistent_device(
+auto usbip::make_device_config(
         _In_ const wxString &url, _In_ const wxString &busid,
-        _In_ const wxString &serial, _In_ const wxString &recv_mode) -> persistent_device
+        _In_ const wxString &serial, _In_ const wxString &recv_mode) -> device_config
 {
         wxString hostname;
         wxString service;
         split_server_url(url, hostname, service);
 
-        return persistent_device {
+        return device_config {
                 .location {
                         .hostname = hostname.utf8_string(), 
                         .service = service.utf8_string(), 
@@ -95,23 +95,23 @@ auto usbip::make_persistent_device(
         };
 }
 
-auto usbip::make_persistent_device(_In_ const device_columns &dc) -> persistent_device
+auto usbip::make_device_config(_In_ const device_columns &dc) -> device_config
 {
         auto &url = get_url(dc);
-        return make_persistent_device(url, dc[COL_BUSID], dc[COL_SERIAL], dc[COL_RECEIVE_MODE]);
+        return make_device_config(url, dc[COL_BUSID], dc[COL_SERIAL], dc[COL_RECEIVE_MODE]);
 }
 
 auto usbip::make_device_columns(_In_ const imported_device &dev) ->
         std::pair<device_columns, unsigned int> 
 {
-        auto res = std::make_pair(make_cmp_key(dev.location), 0U);
+        auto res = std::make_pair(make_cmp_key(dev.config.location), 0U);
         auto& [dc, flags] = res;
 
-        dc[COL_RECEIVE_MODE] = to_string(dev.recv_mode);
+        dc[COL_RECEIVE_MODE] = to_string(dev.config.recv_mode);
         flags |= mkflag(COL_RECEIVE_MODE);
 
-        if (!dev.serial.empty()) {
-                dc[COL_SERIAL] = wxString::FromUTF8(dev.serial);
+        if (!dev.config.serial.empty()) {
+                dc[COL_SERIAL] = wxString::FromUTF8(dev.config.serial);
                 flags |= mkflag(COL_SERIAL);
         }
 

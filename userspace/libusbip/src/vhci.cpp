@@ -87,13 +87,13 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
 
 DWORD assign(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const vhci::attach_args &args)
 {
-        r.wsk_events = args.recv_mode == receive_mode::low_latency;
+        r.wsk_events = args.config.recv_mode == receive_mode::low_latency;
 
-        if (auto err = assign(r, args.serial)) {
+        if (auto err = assign(r, args.config.serial)) {
                 return err;
         }
 
-        return assign(r, args.location);
+        return assign(r, args.config.location);
 }
 
 auto make_device_location(_In_ const vhci::imported_device_location &src)
@@ -113,16 +113,17 @@ auto make_device_location(_In_ const vhci::imported_device_location &src)
 auto make_imported_device(_In_ const vhci::imported_device &d)
 {
         return imported_device {
-                // imported_device_location
-                .location = make_device_location(d),
+                .config = {
+                        .location = make_device_location(d),
+                        .serial{ d.serial, strnlen(d.serial, std::size(d.serial)) },
+                        .recv_mode = d.wsk_events ? receive_mode::low_latency : receive_mode::zero_copy,
+                },
                 .port = d.port,
                 // imported_device_properties
                 .devid = d.devid,
                 .speed = win_speed(d.speed).value_or(UsbLowSpeed),
                 .vendor = d.vendor,
                 .product = d.product,
-                .serial{ d.serial, strnlen(d.serial, std::size(d.serial)) },
-                .recv_mode = d.wsk_events ? receive_mode::low_latency : receive_mode::zero_copy,
         };
 }
 

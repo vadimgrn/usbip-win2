@@ -68,15 +68,16 @@ int main()
         [[maybe_unused]] auto imported = vhci::get_imported_devices(dev.get());
 
         vhci::attach_args args{};
-        args.location.hostname = "localhost";
-        args.location.service = "3240";
-        args.location.busid = "1-1";
-        args.serial = "test";
-        args.recv_mode = receive_mode::zero_copy;
+        args.config.location.hostname = "localhost";
+        args.config.location.service = "3240";
+        args.config.location.busid = "1-1";
+        args.config.serial = "test";
+        args.config.recv_mode = receive_mode::zero_copy;
         args.once = true;
 
         [[maybe_unused]] auto attached_port = vhci::attach(dev.get(), args);
-        [[maybe_unused]] auto stopped_cnt = vhci::stop_attach_attempts(dev.get(), &args.location);
+        [[maybe_unused]] auto attached_config = vhci::attach(dev.get(), args.config);
+        [[maybe_unused]] auto stopped_cnt = vhci::stop_attach_attempts(dev.get(), &args.config.location);
         [[maybe_unused]] auto stopped_all = vhci::stop_attach_attempts(dev.get(), nullptr);
         [[maybe_unused]] auto detached = vhci::detach(dev.get(), 1);
         [[maybe_unused]] auto cancelled = vhci::cancel_io(dev.get());
@@ -88,7 +89,8 @@ int main()
         [[maybe_unused]] auto read_state = vhci::read_device_state(dev.get());
 
         // persistent.h
-        std::vector<persistent_device> pdevs{ args };
+        std::vector<device_config> pdevs{ args.config };
         [[maybe_unused]] auto set_pers = vhci::set_persistent(dev.get(), pdevs);
         [[maybe_unused]] auto get_pers = vhci::get_persistent(dev.get());
 }
+

@@ -85,9 +85,11 @@ bool usbip::cmd_attach(const attach_args &args)
         }
 
         vhci::attach_args cmd_args {
-                .location = std::move(loc),
-                .serial = args.serial,
-                .recv_mode = args.recv_mode,
+                .config = {
+                        .location = std::move(loc),
+                        .serial = args.serial,
+                        .recv_mode = args.recv_mode,
+                },
                 .once = args.once,
         };
 
