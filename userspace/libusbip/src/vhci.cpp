@@ -4,7 +4,7 @@
 
 #include "../vhci.h"
 
-#include "offsetof_ex.h"
+#include <usbip/offsetof_ex.h>
 #include "device_speed.h"
 #include "output.h"
 

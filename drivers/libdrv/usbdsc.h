@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <libusbip/src/offsetof_ex.h>
+#include <usbip/offsetof_ex.h>
 
 #include <stddef.h>
 #include <ntddk.h>

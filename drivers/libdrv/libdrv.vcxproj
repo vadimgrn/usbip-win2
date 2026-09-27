@@ -248,6 +248,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip\ch9.h" />
     <ClInclude Include="..\..\include\usbip\consts.h" />
+    <ClInclude Include="..\..\include\usbip\offsetof_ex.h" />
     <ClInclude Include="..\..\include\usbip\proto.h" />
     <ClInclude Include="..\..\userspace\libusbip\generic_handle_ex.h" />
     <ClInclude Include="ch11.h" />

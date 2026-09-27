@@ -17,6 +17,7 @@
 
 #include "ch9.h"
 #include "consts.h"
+#include "offsetof_ex.h"
 
 /*
  * Strings encoding is UTF8. 
@@ -157,8 +158,8 @@ struct plugin_hardware : base
 
         imported_device_config config;
 };
-static_assert(offsetof(plugin_hardware, port) == sizeof(base));
-static_assert(offsetof(plugin_hardware, location_hash) == sizeof(base) + sizeof(plugin_hardware::port));
+static_assert(offsetof_ex(plugin_hardware, port) == sizeof(base));
+static_assert(offsetof_ex(plugin_hardware, location_hash) == sizeof(base) + sizeof(plugin_hardware::port));
 
 struct stop_attach_attempts : base
 {
@@ -178,15 +179,11 @@ struct get_imported_devices : base
         imported_device devices[ANYSIZE_ARRAY];
 };
 
-/*
- * clang emits an error for offsetof() due to the inheritance.
- */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_imported_devices_size(_In_ ULONG n)
 {
-        const auto offset = reinterpret_cast<size_t>(&static_cast<get_imported_devices*>(nullptr)->devices);
-        return offset + n*sizeof(*get_imported_devices::devices);
+        return offsetof_ex(get_imported_devices, devices) + n*sizeof(*get_imported_devices::devices);
 }
 
 } // namespace usbip::vhci::ioctl

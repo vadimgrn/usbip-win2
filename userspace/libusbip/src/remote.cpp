@@ -225,6 +225,7 @@ constexpr auto as_usb_device(_In_ const usbip_usb_device &d, _In_ USB_DEVICE_SPE
 		.bConfigurationValue = d.bConfigurationValue,
 
 		.bNumConfigurations = d.bNumConfigurations,
+		.interfaces = {},
 	};
 }
 
