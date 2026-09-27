@@ -29,6 +29,9 @@
     <ClInclude Include="..\..\include\usbip\consts.h">
       <Filter>usbip</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\usbip\offsetof_ex.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\usbip\proto.h">
       <Filter>usbip</Filter>
     </ClInclude>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="src\dllmain.cpp">
@@ -71,9 +71,6 @@
     <ClInclude Include="persistent.h" />
     <ClInclude Include="generic_handle_ex.h" />
     <ClInclude Include="resource.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\offsetof_ex.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\hkey.h">
