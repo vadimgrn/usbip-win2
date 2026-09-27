@@ -45,11 +45,11 @@ constexpr auto map_attach_error(_In_ DWORD err)
         return err;
 }
 
-auto assign(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const std::string &serial)
+auto assign(_Inout_ char (&dst)[SERIAL_BUFSZ], _In_ const std::string &serial)
 {
         if (!validate_device_serial(serial)) {
-                *r.serial = '\0';
-        } else if (auto err = strncpy_s(r.serial, serial.data(), serial.size())) {
+                *dst = '\0';
+        } else if (auto err = strncpy_s(dst, serial.data(), serial.size())) {
                 libusbip::output("strncpy_s('{}') error #{} {}", serial, err, std::generic_category().message(err));
         } else {
                 return USBIP_ERROR_SUCCESS;
@@ -79,21 +79,23 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
                 }
         }
 
-        assert(!dst.port);
-        assert(!dst.location_hash);
-
         return ERROR_SUCCESS;
+}
+
+DWORD assign(_Inout_ vhci::imported_device_config &dst, _In_ const device_config &src)
+{
+        dst.wsk_events = src.recv_mode == receive_mode::low_latency;
+
+        if (auto err = assign(dst.serial, src.serial)) {
+                return err;
+        }
+
+        return assign(dst.location, src.location);
 }
 
 DWORD assign(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const vhci::attach_args &args)
 {
-        r.wsk_events = args.config.recv_mode == receive_mode::low_latency;
-
-        if (auto err = assign(r, args.config.serial)) {
-                return err;
-        }
-
-        return assign(r, args.config.location);
+        return assign(r.config, args.config);
 }
 
 auto make_device_location(_In_ const vhci::imported_device_location &src)
@@ -110,20 +112,24 @@ auto make_device_location(_In_ const vhci::imported_device_location &src)
         };
 }
 
+auto make_device_config(_In_ const vhci::imported_device_config &c)
+{
+        return device_config {
+                .location = make_device_location(c.location),
+                .serial{ c.serial, strnlen(c.serial, std::size(c.serial)) },
+                .recv_mode = c.wsk_events ? receive_mode::low_latency : receive_mode::zero_copy,
+        };
+}
+
 auto make_imported_device(_In_ const vhci::imported_device &d)
 {
         return imported_device {
-                .config = {
-                        .location = make_device_location(d),
-                        .serial{ d.serial, strnlen(d.serial, std::size(d.serial)) },
-                        .recv_mode = d.wsk_events ? receive_mode::low_latency : receive_mode::zero_copy,
-                },
+                .config = make_device_config(d.config),
                 .port = d.port,
-                // imported_device_properties
-                .devid = d.devid,
-                .speed = win_speed(d.speed).value_or(UsbLowSpeed),
-                .vendor = d.vendor,
-                .product = d.product,
+                .devid = d.hw.devid,
+                .speed = win_speed(d.hw.speed).value_or(UsbLowSpeed),
+                .vendor = d.hw.vendor,
+                .product = d.hw.product,
         };
 }
 
@@ -142,7 +148,7 @@ auto make_imported_devices(_In_ const std::span<const vhci::imported_device> dev
 auto make_device_state(_In_ const vhci::device_state &r)
 {
         return device_state {
-                .device = make_imported_device(r),
+                .device = make_imported_device(r.device),
                 .state = static_cast<state>(r.state),
                 .source_id = r.source_id
         };
@@ -372,7 +378,7 @@ int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_loc
         r.size = sizeof(r);
 
         if (location) {
-                if (auto err = assign(r, *location)) {
+                if (auto err = assign(r.location, *location)) {
                         SetLastError(err);
                         return -1;
                 }

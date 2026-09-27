@@ -135,17 +135,17 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
         wdf::object_delete del(mem);
         auto &ext = get_device_ctx_ext(mem);
 
-        st = init_device_attributes(ext.attr, r);
+        st = init_device_attributes(ext.attr, r.config.location);
         if (NT_ERROR(st)) {
                 return st;
         }
 
-        auto &props = ext.properties();
-        props.wsk_events = r.wsk_events;
+        auto &config = ext.config();
+        config.wsk_events = r.config.wsk_events;
 
-        st = RtlStringCbCopyNA(props.serial, sizeof(props.serial), r.serial, sizeof(r.serial));
+        st = RtlStringCbCopyNA(config.serial, sizeof(config.serial), r.config.serial, sizeof(r.config.serial));
         if (!NT_SUCCESS(st)) {
-                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", r.serial, st);
+                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", r.config.serial, st);
                 return st;
         }
 

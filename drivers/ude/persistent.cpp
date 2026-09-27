@@ -222,7 +222,7 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
                 return STATUS_INVALID_PARAMETER;
         }
 
-        auto &u8_serial = r.properties.serial;
+        auto &u8_serial = r.config.serial;
 
         auto st = unicode_to_utf8(u8_serial, sizeof(u8_serial), serial);
         if (!NT_SUCCESS(st)) {
@@ -237,7 +237,7 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
         }
 
         if (!empty(tail)) {
-                st = parse_flags(r.properties.wsk_events, tail);
+                st = parse_flags(r.config.wsk_events, tail);
                 if (!NT_SUCCESS(st)) {
                         return st;
                 }
@@ -415,16 +415,16 @@ PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ c
         RtlZeroMemory(&req, sizeof(req));
         req.size = sizeof(req);
 
-        auto &props = attr.properties;
-        req.wsk_events = props.wsk_events;
+        auto &config = attr.config;
+        req.config.wsk_events = config.wsk_events;
 
-        auto st = RtlStringCbCopyNA(req.serial, sizeof(req.serial), props.serial, sizeof(props.serial));
+        auto st = RtlStringCbCopyNA(req.config.serial, sizeof(req.config.serial), config.serial, sizeof(config.serial));
         if (!NT_SUCCESS(st)) {
-                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", props.serial, st);
+                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", config.serial, st);
                 return false;
         }
 
-        return NT_SUCCESS(fill_location(req, attr));
+        return NT_SUCCESS(fill_location(req.config.location, attr));
 }
 
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
@@ -601,9 +601,6 @@ PAGED NTSTATUS usbip::fill_location(
         _Inout_ vhci::imported_device_location &r, _In_ const device_attributes &attr)
 {
         PAGED_CODE();
-
-        NT_ASSERT(attr.location_hash);
-        r.location_hash = attr.location_hash;
 
         struct {
                 char *dst;

@@ -214,7 +214,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto fill_usb_device_serial(
         _In_ WDFREQUEST request, _Inout_ _URB_CONTROL_TRANSFER_EX &r,
-        _In_ const vhci::imported_device_properties &props)
+        _In_ const vhci::imported_device_config &config)
 {
         const UCHAR hdr_sz = usb_string_descr_size(0);
 
@@ -224,9 +224,9 @@ auto fill_usb_device_serial(
         }
 
         size_t serial_cch;
-        auto st = RtlStringCchLengthA(props.serial, ARRAYSIZE(props.serial), &serial_cch);
+        auto st = RtlStringCchLengthA(config.serial, ARRAYSIZE(config.serial), &serial_cch);
         if (NT_ERROR(st)) {
-                Trace(TRACE_LEVEL_ERROR,"RtlStringCchLengthA('%.15s') %!STATUS!", props.serial, st);
+                Trace(TRACE_LEVEL_ERROR,"RtlStringCchLengthA('%.15s') %!STATUS!", config.serial, st);
                 return st;
         }
 
@@ -249,7 +249,7 @@ auto fill_usb_device_serial(
         auto cch = min(buf_cch, serial_cch);
 
         for (size_t i{}; i < cch; ++i) {
-                UCHAR ch = props.serial[i];
+                UCHAR ch = config.serial[i];
                 NT_ASSERT(is_ascii(ch));
                 sd->bString[i] = ch;
         }
@@ -309,9 +309,9 @@ auto control_transfer(
 
         if (auto idx = get_device_string_descr(pkt); !idx) {
                 // not a string descriptor request or get list of supported languages
-        } else if (auto &props = dev.ext().properties(); idx != props.iserial) {
+        } else if (idx != dev.ext().hw().iserial) {
                 // not a iSerialNumber
-        } else if (auto st = fill_usb_device_serial(request, r, props); NT_SUCCESS(st)) {
+        } else if (auto st = fill_usb_device_serial(request, r, dev.ext().config()); NT_SUCCESS(st)) {
                 return st;
         }
 

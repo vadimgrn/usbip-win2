@@ -84,7 +84,8 @@ struct device_attributes
         UNICODE_STRING busid;
         ULONG location_hash; // hash(node_name,service_name,busid)
         //
-        vhci::imported_device_properties properties; // for ioctl::get_imported_devices
+        vhci::imported_device_config config; // for ioctl::get_imported_devices
+        vhci::imported_device_hardware hw;
 };
 
 /*
@@ -111,7 +112,8 @@ struct device_ctx_ext
         auto* busid(this auto&& self) { return &self.attr.busid; }
 
         auto location_hash() const { return attr.location_hash; }
-        auto&& properties(this auto&& self) { return self.attr.properties; }
+        auto&& config(this auto&& self) { return self.attr.config; }
+        auto&& hw(this auto&& self) { return self.attr.hw; }
 };
 
 /*
@@ -135,9 +137,10 @@ struct device_ctx
         auto sock() const { return ext().sock; }
         auto& attributes() const { return ext().attr; }
 
-        auto speed() const { return ext().properties().speed; }
-        auto devid() const { return ext().properties().devid; }
-        auto wsk_events() const { return ext().properties().wsk_events; }
+        auto speed() const { return ext().hw().speed; }
+        auto devid() const { return ext().hw().devid; }
+        auto wsk_events() const { return ext().config().wsk_events; }
+
 
         WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
 
