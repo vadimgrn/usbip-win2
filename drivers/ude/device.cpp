@@ -678,8 +678,7 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
 
         device_init_ptr init(vhci);
 
-        if (auto &prop = ext.properties(); 
-            auto err = init ? prepare_init(init.ptr, prop.speed) : STATUS_INSUFFICIENT_RESOURCES) {
+        if (auto err = init ? prepare_init(init.ptr, ext.hw().speed) : STATUS_INSUFFICIENT_RESOURCES) {
                 Trace(TRACE_LEVEL_ERROR, "UDECXUSBDEVICE_INIT %!STATUS!", err);
                 return err;
         }

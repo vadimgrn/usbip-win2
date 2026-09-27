@@ -67,17 +67,19 @@ struct base
 
 struct imported_device_location
 {
-        int port; // OUT, >= 1 or zero if an error
-        ULONG location_hash; // OUT, hash(host,service,busid)
-
         char busid[BUS_ID_SIZE];
         char service[32]; // NI_MAXSERV
         char host[1025];  // NI_MAXHOST in ws2def.h
 };
-static_assert(!offsetof(imported_device_location, port)); // must be the first member
-static_assert(offsetof(imported_device_location, location_hash) == sizeof(imported_device_location::port));
 
-struct imported_device_properties
+struct imported_device_config
+{
+        imported_device_location location;
+        char serial[SERIAL_BUFSZ];
+        bool wsk_events;
+};
+
+struct imported_device_hardware
 {
         UINT32 devid;
 //      static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
@@ -88,13 +90,19 @@ struct imported_device_properties
         UINT16 vendor;
         UINT16 product;
 
-        char serial[SERIAL_BUFSZ];
         UCHAR iserial; // USB_DEVICE_DESCRIPTOR.iSerialNumber
-
-        bool wsk_events;
 };
 
-struct imported_device : imported_device_location, imported_device_properties {};
+struct imported_device
+{
+        int port; // OUT, >= 1 or zero if an error
+        ULONG location_hash; // OUT, hash(host,service,busid)
+
+        imported_device_config config;
+        imported_device_hardware hw;
+};
+static_assert(!offsetof(imported_device, port)); // must be the first member
+static_assert(offsetof(imported_device, location_hash) == sizeof(imported_device::port));
 
 enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };
 
@@ -102,10 +110,11 @@ enum class state { unplugged, connecting, connected, plugged, disconnected, unpl
  * There can be multiple event sources for one device,
  * each of them emits events with a unique source_id.
  */
-struct device_state : base, imported_device
+struct device_state : base
 {
         state state;
         ULONG source_id;
+        imported_device device;
 };
 
 } // namespace usbip::vhci
@@ -141,15 +150,20 @@ enum {
         PLUGOUT_HARDWARE_AND_REATTACH = make(function::plugout_hardware_and_reattach), // for internal use only
 };
 
-struct plugin_hardware : base, imported_device_location
+struct plugin_hardware : base
 {
-        char serial[SERIAL_BUFSZ];
-        bool wsk_events;
-};
+        int port; // OUT, >= 1 or zero if an error
+        ULONG location_hash; // OUT, hash(host,service,busid)
 
-struct stop_attach_attempts : base, imported_device_location
+        imported_device_config config;
+};
+static_assert(offsetof(plugin_hardware, port) == sizeof(base));
+static_assert(offsetof(plugin_hardware, location_hash) == sizeof(base) + sizeof(plugin_hardware::port));
+
+struct stop_attach_attempts : base
 {
         int count; // OUT, number of canceled requests
+        imported_device_location location;
 };
 
 enum { PORT_ALL_CLOSEONLY = -2, PORT_ALL };

@@ -811,7 +811,7 @@ PAGED auto make_device_state(
         r->state = state;
         r->source_id = make_source_id(&dev); // CONTAINING_RECORD(&dev, device_ctx_ext, attr)
 
-        st = fill(*r, dev, port);
+        st = fill(r->device, dev, port);
 
         if (NT_SUCCESS(st)) {
                 TraceDbg("%04x", ptr04x(mem));
@@ -847,19 +847,19 @@ PAGED void sweep_redundant_events(_Inout_ fileobject_ctx &fobj, _In_ WDFMEMORY n
         auto events = fobj.events;
 
         auto &new_st = get_device_state(new_evt);
-        NT_ASSERT(new_st.location_hash);
+        NT_ASSERT(new_st.device.location_hash);
 
         for (auto i = count; i--; ) {
                 auto mem_i = static_cast<WDFMEMORY>(WdfCollectionGetItem(events, i));
                 auto &st_i = get_device_state(mem_i);
 
-                NT_ASSERT(st_i.location_hash);
-                auto is_redundant = st_i.location_hash == new_st.location_hash;
+                NT_ASSERT(st_i.device.location_hash);
+                auto is_redundant = st_i.device.location_hash == new_st.device.location_hash;
 
                 if (!is_redundant) {
                         for (auto cnt = WdfCollectionGetCount(events), j = i + 1; j < cnt; ++j) {
                                 auto mem_j = static_cast<WDFMEMORY>(WdfCollectionGetItem(events, j));
-                                if (st_i.location_hash == get_device_state(mem_j).location_hash) {
+                                if (st_i.device.location_hash == get_device_state(mem_j).device.location_hash) {
                                         is_redundant = true;
                                         break;
                                 }
@@ -1072,12 +1072,11 @@ PAGED NTSTATUS usbip::vhci::fill(_Out_ imported_device &dev, _In_ const device_a
 {
         PAGED_CODE();
         dev.port = port;
+        dev.location_hash = r.location_hash;
+        dev.config = r.config;
+        dev.hw = r.hw;
 
-        auto st = fill_location(dev, r);
-        if (NT_SUCCESS(st)) {
-                static_cast<imported_device_properties&>(dev) = r.properties;
-        }
-        return st;
+        return fill_location(dev.config.location, r);
 }
 
 _IRQL_requires_same_

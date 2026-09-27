@@ -34,9 +34,9 @@ bool has_device(_In_ WDFDEVICE vhci, _In_ ULONG location_hash);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto has_device(_In_ WDFDEVICE vhci, _In_ const imported_device_location &loc)
+inline auto has_device(_In_ WDFDEVICE vhci, _In_ const imported_device &dev)
 {
-        return has_device(vhci, loc.location_hash);
+        return has_device(vhci, dev.location_hash);
 }
 
 _IRQL_requires_same_

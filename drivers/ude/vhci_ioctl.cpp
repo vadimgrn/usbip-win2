@@ -198,7 +198,7 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
         log(udev);
 
         {
-                auto &p = ext.properties();
+                auto &p = ext.hw();
 
                 p.devid = make_devid(static_cast<UINT16>(udev.busnum), static_cast<UINT16>(udev.devnum));
                 p.speed = static_cast<usb_device_speed>(udev.speed);
@@ -659,7 +659,8 @@ PAGED auto plugin_hardware(
         PAGED_CODE();
 
         Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, serial '%s', once %d, wsk events %d",
-                                        r.host, r.service, r.busid, r.serial, once, r.wsk_events);
+                                        r.config.location.host, r.config.location.service,
+                                        r.config.location.busid, r.config.serial, once, r.config.wsk_events);
 
         auto vhci = get_vhci(request);
 
@@ -709,15 +710,15 @@ PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
                 return USBIP_ERROR_ABI;
         }
 
-        TraceDbg("host '%s', service '%s', busid '%s'", r->host, r->service, r->busid);
+        TraceDbg("host '%s', service '%s', busid '%s'", r->location.host, r->location.service, r->location.busid);
 
         ULONG location_hash{};
 
-        if (auto cnt = bool(*r->host) + bool(*r->service) + bool(*r->busid); !cnt) {
+        if (auto cnt = bool(*r->location.host) + bool(*r->location.service) + bool(*r->location.busid); !cnt) {
                 st = STATUS_SUCCESS; // stop all
         } else if (cnt != 3) {
                 st = STATUS_INVALID_PARAMETER;
-        } else if (device_attributes attr{}; NT_SUCCESS(st = init_device_attributes(attr, *r))) {
+        } else if (device_attributes attr{}; NT_SUCCESS(st = init_device_attributes(attr, r->location))) {
                 location_hash = attr.location_hash;
                 free(attr);
         }
@@ -726,7 +727,6 @@ PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
                 auto vhci = get_vhci(request);
                 auto ctx = get_vhci_ctx(vhci);
 
-                r->location_hash = location_hash;
                 r->count = stop_attach_attempts(*ctx, location_hash);
 
                 WdfRequestSetInformation(request, sizeof(*r));
@@ -753,8 +753,8 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
         } else if (r->size != length) {
                 Trace(TRACE_LEVEL_ERROR, "struct.size %lu != sizeof(struct) %Iu", r->size, length);
                 return USBIP_ERROR_ABI;
-        } else if (st = validate_serial_number(r->serial); NT_ERROR(st)) {
-                Trace(TRACE_LEVEL_ERROR, "bad serial '%s'", r->serial);
+        } else if (st = validate_serial_number(r->config.serial); NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "bad serial '%s'", r->config.serial);
                 return st;
         }
 
