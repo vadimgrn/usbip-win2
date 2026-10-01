@@ -214,19 +214,19 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto fill_usb_device_serial(
         _In_ WDFREQUEST request, _Inout_ _URB_CONTROL_TRANSFER_EX &r,
-        _In_ const vhci::imported_device_config &config)
+        _In_ const vhci::imported_device_config &config, _In_ ULONG buf_len)
 {
         const UCHAR hdr_sz = usb_string_descr_size(0);
 
-        if (r.TransferBufferLength < hdr_sz) {
-                Trace(TRACE_LEVEL_ERROR,"TransferBufferLength(%lu) < %d", r.TransferBufferLength, hdr_sz);
+        if (buf_len < hdr_sz) {
+                Trace(TRACE_LEVEL_ERROR, "buf_len(%lu) < %d", buf_len, hdr_sz);
                 return STATUS_BUFFER_TOO_SMALL;
         }
 
         size_t serial_cch;
         auto st = RtlStringCchLengthA(config.serial, ARRAYSIZE(config.serial), &serial_cch);
-        if (NT_ERROR(st)) {
-                Trace(TRACE_LEVEL_ERROR,"RtlStringCchLengthA('%.15s') %!STATUS!", config.serial, st);
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "RtlStringCchLengthA('%.15s') %!STATUS!", config.serial, st);
                 return st;
         }
 
@@ -234,7 +234,7 @@ auto fill_usb_device_serial(
         ULONG length; // can differ from r.TransferBufferLength, see prepare_wsk_mdl
         st = UdecxUrbRetrieveBuffer(request, reinterpret_cast<UCHAR**>(&sd), &length);
 
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", st);
                 return st;
         } else if (length < hdr_sz) {
@@ -245,7 +245,7 @@ auto fill_usb_device_serial(
         sd->bLength = usb_string_descr_size(static_cast<UCHAR>(serial_cch));
         sd->bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
 
-        auto buf_cch = (min(r.TransferBufferLength, length) - hdr_sz)/sizeof(sd->bString);
+        auto buf_cch = (min(buf_len, length) - hdr_sz)/sizeof(sd->bString);
         auto cch = min(buf_cch, serial_cch);
 
         for (size_t i{}; i < cch; ++i) {
@@ -254,6 +254,7 @@ auto fill_usb_device_serial(
                 sd->bString[i] = ch;
         }
 
+        r.Hdr.Status = USBD_STATUS_SUCCESS;
         r.TransferBufferLength = usb_string_descr_size(static_cast<UCHAR>(cch));
         UdecxUrbSetBytesCompleted(request, r.TransferBufferLength);
         return STATUS_SUCCESS;
@@ -311,8 +312,8 @@ auto control_transfer(
                 // not a string descriptor request or get list of supported languages
         } else if (idx != dev.ext().hw().iserial) {
                 // not a iSerialNumber
-        } else if (auto st = fill_usb_device_serial(request, r, dev.ext().config()); NT_SUCCESS(st)) {
-                return st;
+        } else {
+                return fill_usb_device_serial(request, r, dev.ext().config(), buf_len);
         }
 
         wsk_context_ptr ctx(&dev, request);

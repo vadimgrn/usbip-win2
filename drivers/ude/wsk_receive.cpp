@@ -363,7 +363,7 @@ void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_T
 		break;
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 		if (auto &d = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc); 
-		    dsc_len == sizeof(d) && d.bLength == dsc_len) {
+		    dsc_len >= sizeof(d) && d.bLength == sizeof(d)) {
                         NT_ASSERT(is_valid(d));
                         log(d);
                         if (*dev.ext().config().serial) {

@@ -17,7 +17,7 @@ namespace usbip
  *
  * Supports cancelling either:
  * - Cooperative operations via std::stop_token (e.g. connect).
- * - Pending driver I/O on the VHCI device handle via vhci::cancel_io (e.g. attach, detach).
+ * - Pending driver I/O on the VHCI device handle via vhci::cancel_io (e.g. attach).
  *
  * Only a single instance of ctrl_c_guard may be active in the process at any
  * given time.

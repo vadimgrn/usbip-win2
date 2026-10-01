@@ -108,6 +108,8 @@ void complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 
 	if (status == STATUS_CANCELLED && urb_st == USBD_STATUS_PENDING) {
 		urb_st = USBD_STATUS_CANCELED; // FIXME: is this really required?
+	} else if (NT_SUCCESS(status) && urb_st == USBD_STATUS_PENDING) {
+		urb_st = USBD_STATUS_SUCCESS;
 	}
 
 	if (!NT_SUCCESS(status) || urb_st) {
