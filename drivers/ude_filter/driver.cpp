@@ -4,6 +4,8 @@
  * @see https://github.com/desowin/usbpcap/tree/master/USBPcapDriver
  */
 
+#include <ntifs.h>
+
 #include "driver.h"
 #include "trace.h"
 #include "driver.tmh"
@@ -13,6 +15,7 @@
 #include "int_dev_ctrl.h"
 
 #include <libdrv/remove_lock.h>
+#include <libdrv/security.h>
 
 using namespace usbip;
 using namespace libdrv;
@@ -47,6 +50,7 @@ NTSTATUS irp_complete(
 }
 
 _Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_OTHER)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 auto dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp)
@@ -67,13 +71,92 @@ auto dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp)
         return IoCallDriver(fltr.target, irp);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED auto is_user_access_allowed(_In_ const filter_ext &fltr, _In_ IRP *irp)
+{
+        PAGED_CODE();
+
+        auto &dev = fltr.device;
+        sid_data sid;
+
+        auto allowed = NT_SUCCESS(get_requestor_sid(irp, sid)) &&
+                       (is_system_sid(sid) || equal_sid(sid, dev.owner_sid));
+
+        if (!allowed) {
+                Trace(TRACE_LEVEL_WARNING, "%04x: requestor SID != owner SID", ptr04x(fltr.self));
+        }
+
+        return allowed;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED auto is_session_access_allowed(_In_ const filter_ext &fltr, _In_ IRP *irp)
+{
+        PAGED_CODE();
+
+        auto &dev = fltr.device;
+        auto id = get_requestor_session_id(irp);
+
+        auto allowed = id == dev.session_id || 
+                       id == system_session_id ||
+                       id == invalid_session_id;
+
+        if (!allowed) {
+                Trace(TRACE_LEVEL_WARNING, "%04x: requestor session_id %lu != owner session_id %lu",
+                        ptr04x(fltr.self), id, dev.session_id);
+        }
+
+        return allowed;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED auto is_access_allowed(_In_ const filter_ext &fltr, _In_ IRP *irp)
+{
+        PAGED_CODE();
+        NT_ASSERT(!fltr.is_hub);
+
+        switch (auto &dev = fltr.device; dev.iso_mode) {
+        case isolation::none:
+                return true;
+        case isolation::session:
+                return is_session_access_allowed(fltr, irp);
+        case isolation::user:
+                return is_user_access_allowed(fltr, irp);
+        default:
+                Trace(TRACE_LEVEL_ERROR, "%04x, invalid iso_mode %d",
+                        ptr04x(fltr.self), static_cast<int>(dev.iso_mode));
+
+                return false;
+        }
+}
+
+/*
+ * An IO_REMOVE_LOCK is not required for IRP_MJ_CREATE:
+ * - The I/O Manager holds a reference to the device object for the duration of the dispatch.
+ * - The PnP Manager will not issue IRP_MN_REMOVE_DEVICE while open handles or create requests exist.
+ */
+_Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_CREATE)
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED auto create(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
+{
+        PAGED_CODE();
+
+        if (auto &fltr = *get_filter_ext(devobj);
+            fltr.is_hub || irp->RequestorMode == KernelMode || is_access_allowed(fltr, irp)) {
+                return libdrv::ForwardIrp(fltr.target, irp);
+        }
+
+        return CompleteRequest(irp, STATUS_ACCESS_DENIED);
+}
+
 } // namespace
 
 
-/*
- * warning C28168: The function 'dispatch_lower' does not have a _Dispatch_type_ annotation 
- * matching dispatch table position 'IRP_MJ_CREATE'...
- */
 _Function_class_(DRIVER_INITIALIZE)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -87,15 +170,13 @@ CS_INIT EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *drvobj, _In_ UNICODE_S
 	drvobj->DriverUnload = driver_unload;
 	drvobj->DriverExtension->AddDevice = add_device;
 
-#pragma warning(push)
-#pragma warning(disable:28168)
 	for (int i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; ++i) {
 		drvobj->MajorFunction[i] = dispatch_lower;
 	}
-#pragma warning(pop)
 
-	drvobj->MajorFunction[IRP_MJ_PNP] = pnp;
+        drvobj->MajorFunction[IRP_MJ_CREATE] = create;
 	drvobj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL] = int_dev_ctrl;
+        drvobj->MajorFunction[IRP_MJ_PNP] = pnp;
 
 	return STATUS_SUCCESS;
 }

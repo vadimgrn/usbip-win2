@@ -11,6 +11,7 @@
 #include "vhci.h"
 
 #include <libdrv/strconv.h>
+#include <libdrv/security.h>
 #include <resources/messages.h>
 
 #include <ntstrsafe.h>
@@ -27,6 +28,8 @@ using namespace libdrv;
 struct attach_ctx
 {
         ULONG location_hash; // hash(host,port,busid)
+        ULONG session_id; // Terminal Server session that owns the device being (re)attached
+        vhci::sid_data owner_sid; // User SID that owns the device being (re)attached
 
         WDFDEVICE vhci;
         WDFTIMER timer;
@@ -92,10 +95,14 @@ void reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
 
 /**
  * @param location_hash remove unconditionally if zero
+ * @param session_id remove unconditionally if invalid_session_id
+ * @param owner_sid remove unconditionally if nullptr
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
+auto reattach_req_remove(
+        _Inout_ vhci_ctx &vhci, _In_ ULONG location_hash,
+        _In_ ULONG session_id = invalid_session_id, _In_opt_ const vhci::sid_data *owner_sid = nullptr)
 {
         wdf::ObjectRef ref;
         auto col = vhci.reattach_req;
@@ -105,8 +112,17 @@ auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
         for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
 
                 auto req = WdfCollectionGetItem(col, i);
-                
-                if (!location_hash || location_hash == get_attach_ctx(req)->location_hash) {
+                auto r = get_attach_ctx(req);
+
+                if (session_id != invalid_session_id && r->session_id != session_id) {
+                        continue;
+                }
+
+                if (owner_sid && !libdrv::equal_sid(r->owner_sid, *owner_sid)) {
+                        continue;
+                }
+
+                if (!location_hash || location_hash == r->location_hash) {
                         ref.reset(req);
                         WdfCollectionRemoveItem(col, i);
                         break;
@@ -169,7 +185,8 @@ PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto parse_flags(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &str)
+PAGED auto parse_flags(
+        _Inout_ bool &wsk_events, _Inout_ vhci::isolation &iso, _In_ const UNICODE_STRING &str)
 {
         PAGED_CODE();
 
@@ -190,7 +207,7 @@ PAGED auto parse_flags(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &str)
         }
 
         bool once; // ignore, does not make sense for persistent
-        unpack_attach_flags(once, wsk_events, val);
+        unpack_attach_flags(once, wsk_events, iso, val);
 
         return STATUS_SUCCESS;
 }
@@ -237,7 +254,7 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
         }
 
         if (!empty(tail)) {
-                st = parse_flags(r.config.wsk_events, tail);
+                st = parse_flags(r.config.wsk_events, r.config.iso_mode, tail);
                 if (!NT_SUCCESS(st)) {
                         return st;
                 }
@@ -417,6 +434,7 @@ PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ c
 
         auto &config = attr.config;
         req.config.wsk_events = config.wsk_events;
+        req.config.iso_mode = config.iso_mode;
 
         auto st = RtlStringCbCopyNA(req.config.serial, sizeof(req.config.serial), config.serial, sizeof(config.serial));
         if (!NT_SUCCESS(st)) {
@@ -443,7 +461,9 @@ PAGED void cleanup_attach_request(_In_ WDFOBJECT obj)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ const device_attributes &dev)
+PAGED auto create_attach_request(
+        _In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ const device_attributes &dev,
+        _In_ ULONG session_id, _In_ const vhci::sid_data &owner_sid)
 {
         PAGED_CODE();
 
@@ -457,11 +477,13 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ c
                 return req;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "%04x, %!USTR!:%!USTR!/%!USTR!, hash %lx",
-                ptr04x(req.get()), &dev.node_name, &dev.service_name, &dev.busid, dev.location_hash);
+        Trace(TRACE_LEVEL_INFORMATION, "%04x, %!USTR!:%!USTR!/%!USTR!, hash %lx, session %lu",
+                ptr04x(req.get()), &dev.node_name, &dev.service_name, &dev.busid, dev.location_hash, session_id);
 
         auto &r = *get_attach_ctx(req.get());
         r.vhci = vhci;
+        r.session_id = session_id; // preserve the owning session across (re)attach
+        r.owner_sid = owner_sid; // preserve the owning user SID across (re)attach
 
         vhci::ioctl::plugin_hardware *buf{};
 
@@ -515,7 +537,8 @@ PAGED decltype(WdfDriverOpenParametersRegistryKey) *get_function(_In_ DRIVER_REG
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::start_attach_attempts(
-        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ const device_attributes &attr, _In_ bool delayed)
+        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ const device_attributes &attr,
+        _In_ ULONG session_id, _In_ const vhci::sid_data &owner_sid, _In_ bool delayed)
 {
         PAGED_CODE();
 
@@ -523,7 +546,7 @@ PAGED void usbip::start_attach_attempts(
                 TraceDbg("vhci is being removing");
         } else if (auto cnt = reattach_req_count(ctx); cnt >= 4*static_cast<ULONG>(ctx.devices_cnt)) {
                 Trace(TRACE_LEVEL_WARNING, "too many active attach requests, %lu", cnt);
-        } else if (auto req = create_attach_request(vhci, ctx, attr); !req) {
+        } else if (auto req = create_attach_request(vhci, ctx, attr, session_id, owner_sid); !req) {
                 //
         } else if (auto &r = *get_attach_ctx(req.get()); !delayed) {
                 send_plugin_hardware(ctx.target_self, r.inbuf, r.outbuf, req);
@@ -551,20 +574,77 @@ PAGED void usbip::start_attach_attempts(
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-int usbip::stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
+int usbip::stop_attach_attempts(
+        _Inout_ vhci_ctx &vhci, _In_ ULONG location_hash,
+        _In_ ULONG session_id, _In_opt_ const vhci::sid_data *owner_sid)
 {
         int cnt = 0;
 
-        while (auto req = reattach_req_remove(vhci, location_hash)) {
+        while (auto req = reattach_req_remove(vhci, location_hash, session_id, owner_sid)) {
 
                 ++cnt;
                 auto delivered = WdfRequestCancelSentRequest(req.get<WDFREQUEST>());
 
-                TraceDbg("hash %lx -> req %04x, cancel request was delivered %!BOOLEAN!",
-                          location_hash, ptr04x(req.get()), delivered);
+                TraceDbg("hash %lx, session %lu -> req %04x, cancel request was delivered %!BOOLEAN!",
+                          location_hash, session_id, ptr04x(req.get()), delivered);
         }
 
         return cnt;
+}
+
+/*
+ * A device (re)attach travels to the driver through an IOCTL to target_self, which erases the
+ * original requestor's session. The owning session is preserved in the pending attach request's
+ * context, so the inbound attach handler can recover it by location_hash.
+ * @see start_attach_attempts, plugin_hardware
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+ULONG usbip::find_attach_session(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
+{
+        if (!location_hash) {
+                return invalid_session_id;
+        }
+
+        auto col = vhci.reattach_req;
+        wdf::spinlock lck(vhci.reattach_req_lock);
+
+        for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
+                if (auto r = get_attach_ctx(WdfCollectionGetItem(col, i)); r->location_hash == location_hash) {
+                        return r->session_id;
+                }
+        }
+
+        return invalid_session_id;
+}
+
+/*
+ * Recover both owning session and owner SID of a pending (re)attach by its location_hash.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool usbip::find_attach_owner(
+        _Inout_ vhci_ctx &vhci, _In_ ULONG location_hash, _Out_ ULONG &session_id, _Out_ vhci::sid_data &owner_sid)
+{
+        session_id = invalid_session_id;
+        RtlZeroMemory(&owner_sid, sizeof(owner_sid));
+
+        if (!location_hash) {
+                return false;
+        }
+
+        auto col = vhci.reattach_req;
+        wdf::spinlock lck(vhci.reattach_req_lock);
+
+        for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
+                if (auto r = get_attach_ctx(WdfCollectionGetItem(col, i)); r->location_hash == location_hash) {
+                        session_id = r->session_id;
+                        owner_sid = r->owner_sid;
+                        return true;
+                }
+        }
+
+        return false;
 }
 
 _IRQL_requires_same_
@@ -589,8 +669,8 @@ PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
 
                 if (!NT_SUCCESS(st)) {
                         Trace(TRACE_LEVEL_ERROR, "parse_device_str(%!USTR!) %!STATUS!", &device_str, st);
-                } else {
-                        start_attach_attempts(vhci, ctx, attr);
+                } else { // boot-time persistent devices belong to no live session; per-SID persistent state is a follow-up
+                        start_attach_attempts(vhci, ctx, attr, invalid_session_id, vhci::sid_data{});
                 }
         }
 }

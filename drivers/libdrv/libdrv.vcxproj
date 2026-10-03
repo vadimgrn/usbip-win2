@@ -37,6 +37,7 @@
     <ClCompile Include="usbd_helper.cpp" />
     <ClCompile Include="wdf_cpp.cpp" />
     <ClCompile Include="wsk_cpp.cpp" />
+    <ClCompile Include="security.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{27AB4325-4980-4634-9818-AE6BD61DE532}</ProjectGuid>
@@ -273,6 +274,7 @@
     <ClInclude Include="usb_util.h" />
     <ClInclude Include="wdf_cpp.h" />
     <ClInclude Include="wsk_cpp.h" />
+    <ClInclude Include="security.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

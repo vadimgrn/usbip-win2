@@ -141,6 +141,10 @@ struct device_ctx
         auto devid() const { return ext().hw().devid; }
         auto wsk_events() const { return ext().config().wsk_events; }
 
+        auto iso_mode() const { return ext().config().iso_mode; }
+        bool is_session_isolated() const;
+        bool is_user_isolated() const;
+        bool is_isolated() const;
 
         WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
 
@@ -164,6 +168,8 @@ struct device_ctx
         };
 
         int port; // vhci_ctx.devices[port - 1]
+        ULONG session_id; // Terminal Server session that attached this device, @see session::get_requestor_session_id
+        vhci::sid_data owner_sid; // User SID that attached this device (for isolation::user)
         seqnum_t seqnum; // @see next_seqnum
 
         SLIST_HEADER pending_sends;
@@ -260,6 +266,9 @@ struct fileobject_ctx
         LIST_ENTRY entry; // head is vhci_ctx::fileobjects
         WDFCOLLECTION events; // WDFMEMORY(device_state_ex) that are waiting for IRP_MJ_READ
         bool process_events; // if IRP_MJ_READ was issued, see vhci_ctx::events_subscribers
+        ULONG session_id; // Terminal Server session of the subscriber, set on the first IRP_MJ_READ
+        vhci::sid_data owner_sid; // User SID of the subscriber
+        bool is_admin; // whether subscriber has administrative privileges
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(fileobject_ctx, get_fileobject_ctx)
 

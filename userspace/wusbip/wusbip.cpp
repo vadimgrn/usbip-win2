@@ -14,6 +14,7 @@
 
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
+#include <libusbip/volume_isolation.h>
 #include <libusbip/src/file_ver.h>
 
 #include <wx/event.h>
@@ -1014,6 +1015,9 @@ DWORD MainFrame::attach(
         { 
                 auto port = vhci::attach(vhci, args); 
                 err = port > 0 ? ERROR_SUCCESS : GetLastError();
+                if (port > 0 && args.config.iso_mode != isolation::none) {
+                        isolate_port_volumes(port);
+                }
         };
 
         auto msg = wxString::Format(L"%s/%s", url, busid);

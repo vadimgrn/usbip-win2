@@ -12,6 +12,7 @@
 #include "network.h"
 #include "ioctl.h"
 #include "persistent.h"
+#include "isolation.h"
 #include "wsk_receive_irp.h"
 #include "wsk_receive_events.h"
 
@@ -30,9 +31,11 @@ namespace
 using namespace usbip;
 using namespace libdrv;
 using namespace wdf;
+using namespace session;
 
 static_assert(sizeof(vhci::imported_device_location::service) == NI_MAXSERV);
 static_assert(sizeof(vhci::imported_device_location::host) == NI_MAXHOST);
+
 
 struct irp_args
 {
@@ -51,6 +54,8 @@ struct workitem_ctx
 
         ADDRINFOEXW *addrinfo; // list head
         irp_args args;
+        ULONG session_id; // Terminal Server session that requested the attach
+        vhci::sid_data owner_sid; // User SID that requested the attach (for isolation::user)
         bool one_attempt;
 
         workitem_ctx& operator=(const workitem_ctx&) = delete;
@@ -68,6 +73,8 @@ workitem_ctx& workitem_ctx::operator=(workitem_ctx &&src)
         if (this != &src) {
                 vhci = src.vhci;
                 args = src.args;
+                session_id = src.session_id;
+                owner_sid = src.owner_sid;
                 one_attempt = src.one_attempt;
 
                 NT_ASSERT(!request);
@@ -331,7 +338,7 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
         vhci::ioctl::plugin_hardware *r{};
         NT_VERIFY(NT_SUCCESS(WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)));
 
-        device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::connected);
+        device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::connected, ctx.session_id);
 
         auto st = import_remote_device(ext);
         if (NT_ERROR(st)) {
@@ -344,6 +351,10 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
                 return st;
         }
         ctx.ctx_ext = WDF_NO_HANDLE; // now dev owns it
+
+        auto &dev_ctx = *get_device_ctx(dev);
+        dev_ctx.session_id = ctx.session_id; // Terminal Server session that owns this device
+        dev_ctx.owner_sid = ctx.owner_sid; // User SID that owns this device (for isolation::user)
 
         bool plugout_and_delete{};
         st = plugin(dev, r->port, plugout_and_delete);
@@ -551,10 +562,10 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         if (ctx.one_attempt) {
                 //
         } else if (auto hash = ext.location_hash(); NT_SUCCESS(st)) {
-                stop_attach_attempts(vhci, hash);
+                stop_attach_attempts(vhci, hash, ctx.session_id, ctx.owner_sid.length ? &ctx.owner_sid : nullptr);
         } else if (!NT_SUCCESS(st) && can_reattach(ctx.vhci, hash, st)) {
-                stop_attach_attempts(vhci, hash);
-                start_attach_attempts(ctx.vhci, vhci, ext.attr, true);
+                stop_attach_attempts(vhci, hash, ctx.session_id, ctx.owner_sid.length ? &ctx.owner_sid : nullptr);
+                start_attach_attempts(ctx.vhci, vhci, ext.attr, ctx.session_id, ctx.owner_sid, true);
         }
 }
 
@@ -581,7 +592,7 @@ PAGED void workitem_cleanup(_In_ WDFOBJECT object)
                 auto &ext = get_device_ctx_ext(mem); // or ctx.ext()
 
                 close_socket(ext.sock);
-                device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::disconnected);
+                device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::disconnected, ctx.session_id);
 
                 WdfObjectDelete(mem);
                 mem = WDF_NO_HANDLE;
@@ -674,6 +685,16 @@ PAGED auto plugin_hardware(
 
         ctx.vhci = vhci;
         ctx.request = request;
+        ctx.session_id = r.config.iso_mode == vhci::isolation::session ? get_requestor_session_id(request) : invalid_session_id;
+        if (r.config.iso_mode == vhci::isolation::user) {
+                ctx.session_id = get_requestor_session_id(request);
+                auto sid_st = session::get_requestor_sid(request, ctx.owner_sid);
+                if (!NT_SUCCESS(sid_st)) {
+                        Trace(TRACE_LEVEL_ERROR, "Failed to get requestor SID for user isolation %!STATUS!", sid_st);
+                        WdfObjectDelete(wi);
+                        return STATUS_ACCESS_DENIED;
+                }
+        }
         ctx.one_attempt = once;
 
         st = create_device_ctx_ext(ctx.ctx_ext, vhci, r);
@@ -683,7 +704,22 @@ PAGED auto plugin_hardware(
         }
 
         auto &ext = ctx.ext();
-        device_state_changed(vhci, ext.attr, 0, vhci::state::connecting);
+
+        // A driver-initiated (re)attach reaches this handler through target_self, which erased the
+        // original requestor's session/user. Recover the owning session/user from the pending attach request.
+        if (r.config.iso_mode == vhci::isolation::session && ctx.session_id == invalid_session_id) {
+                if (auto s = find_attach_session(*get_vhci_ctx(vhci), ext.location_hash()); s != invalid_session_id) {
+                        ctx.session_id = s;
+                }
+        } else if (r.config.iso_mode == vhci::isolation::user && !ctx.owner_sid.length) {
+                ULONG s{};
+                if (find_attach_owner(*get_vhci_ctx(vhci), ext.location_hash(), s, ctx.owner_sid)) {
+                        ctx.session_id = s;
+                }
+        }
+
+        device_state_changed(vhci, ext.attr, 0, vhci::state::connecting, ctx.session_id,
+                             ctx.owner_sid.length ? &ctx.owner_sid : nullptr);
 
         getaddrinfo(request, wi, ctx, ext); // completion handler will be called anyway
         return STATUS_PENDING;
@@ -727,7 +763,17 @@ PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
                 auto vhci = get_vhci(request);
                 auto ctx = get_vhci_ctx(vhci);
 
-                r->count = stop_attach_attempts(*ctx, location_hash);
+                auto session_id = get_requestor_session_id(request);
+                auto is_admin = is_admin_request(request);
+                auto target_session = is_admin ? invalid_session_id : session_id;
+
+                vhci::sid_data caller_sid{};
+                const vhci::sid_data *target_sid = nullptr;
+                if (!is_admin && NT_SUCCESS(session::get_requestor_sid(request, caller_sid))) {
+                        target_sid = &caller_sid;
+                }
+
+                r->count = stop_attach_attempts(*ctx, location_hash, target_session, target_sid);
 
                 WdfRequestSetInformation(request, sizeof(*r));
         }
@@ -785,16 +831,31 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request, _In_ bool reattach)
                 return USBIP_ERROR_ABI;
         }
 
-        TraceDbg("port %d, reattach %!bool!", r->port, reattach);
+        auto session_id = get_requestor_session_id(request); // Terminal Server session isolation
+        auto is_admin = is_admin_request(request);
+        TraceDbg("port %d, reattach %!bool!, session %lu, admin %!bool!", r->port, reattach, session_id, is_admin);
         st = STATUS_SUCCESS;
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
                 auto plugout_and_delete = r->port != vhci::ioctl::PORT_ALL_CLOSEONLY;
-                vhci::detach_all_devices(vhci, plugout_and_delete);
+                auto target_session = is_admin && session_id == system_session_id ? invalid_session_id : session_id;
+                vhci::sid_data caller_sid{};
+                const vhci::sid_data *target_sid = nullptr;
+                if (!is_admin && NT_SUCCESS(session::get_requestor_sid(request, caller_sid))) {
+                        target_sid = &caller_sid;
+                }
+                vhci::detach_all_devices(vhci, plugout_and_delete, target_session, target_sid); // only the caller's own devices unless session 0 admin
         } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
                 st = STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::get_device(vhci, r->port)) {
-                device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), reattach);
+                auto dc = get_device_ctx(dev.get());
+                if (dc->is_session_isolated() && !is_admin && dc->session_id != session_id) { // owned by another session with session isolation
+                        st = STATUS_ACCESS_DENIED;
+                } else if (dc->is_user_isolated() && !is_admin && !session::is_caller_sid(request, dc->owner_sid)) { // owned by another user with user isolation
+                        st = STATUS_ACCESS_DENIED;
+                } else {
+                        device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), reattach);
+                }
         } else {
                 st = STATUS_DEVICE_NOT_CONNECTED;
         }
@@ -829,20 +890,21 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
 
         auto vhci = get_vhci(request);
         auto &ctx = *get_vhci_ctx(vhci);
-        
+
+        auto session_id = get_requestor_session_id(request); // Terminal Server session isolation
+        auto is_admin = is_admin_request(request);
         ULONG cnt = 0;
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = vhci::get_device(vhci, port); !dev) {
                         //
+                } else if (auto dc = get_device_ctx(dev.get()); (dc->is_session_isolated() && !is_admin && dc->session_id != session_id) ||
+                                                                (dc->is_user_isolated() && !is_admin && !session::is_caller_sid(request, dc->owner_sid))) {
+                        // owned by another session or user with isolation enabled, hide it from this non-admin caller
                 } else if (cnt == max_cnt) {
                         return STATUS_BUFFER_TOO_SMALL;
-                } else {
-                        auto dc = get_device_ctx(dev.get());
-                        st = fill(r->devices[cnt++], *dc);
-                        if (NT_ERROR(st)) {
-                                return st;
-                        }
+                } else if (auto err = fill(r->devices[cnt++], *dc); !NT_SUCCESS(err)) {
+                        return err;
                 }
         }
 
@@ -884,6 +946,10 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto set_persistent(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
+
+        if (!is_admin_request(request)) {
+                return STATUS_ACCESS_DENIED;
+        }
 
         void *buf{};
         size_t length{};
@@ -1113,13 +1179,23 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
 
         auto device = WdfIoQueueGetDevice(queue);
         auto &vhci = *get_vhci_ctx(device);
-        
+        auto caller = get_requestor_session_id(request); // Terminal Server session isolation
+
         waitlock lck(vhci.events_lock);
 
         if (auto &val = fobj.process_events; !val) {
+                fobj.session_id = caller; // bind the subscription to the caller's session
+                fobj.is_admin = is_admin_request(request);
+                session::get_requestor_sid(request, fobj.owner_sid);
                 ++vhci.events_subscribers;
                 val = true;
                 vhci::replay_plugged_devices(device, fobj);
+        } else if (fobj.session_id != caller) {
+                WdfRequestCompleteWithInformation(request, STATUS_ACCESS_DENIED, 0);
+                return; // a handle opened by one session must not be read from another
+        } else if (fobj.owner_sid.length && !session::is_caller_sid(request, fobj.owner_sid)) {
+                WdfRequestCompleteWithInformation(request, STATUS_ACCESS_DENIED, 0);
+                return; // a handle opened by one user must not be read from another
         }
 
         if (auto evt = static_cast<WDFMEMORY>(WdfCollectionGetFirstItem(fobj.events))) {
@@ -1136,6 +1212,62 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
                 }
                 WdfRequestCompleteWithInformation(request, st, 0);
         }
+}
+
+_Function_class_(EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void internal_device_control(
+        _In_ WDFQUEUE queue,
+        _In_ WDFREQUEST request,
+        _In_ size_t output_len,
+        _In_ size_t input_len,
+        _In_ ULONG ioctl)
+{
+        if (ioctl != vhci::ioctl::INTERNAL_GET_PORT_ISOLATION) {
+                WdfRequestComplete(request, STATUS_INVALID_DEVICE_REQUEST);
+                return;
+        }
+
+        if (input_len < sizeof(vhci::ioctl::get_port_isolation) ||
+            output_len < sizeof(vhci::ioctl::get_port_isolation)) {
+                WdfRequestComplete(request, STATUS_BUFFER_TOO_SMALL);
+                return;
+        }
+
+        vhci::ioctl::get_port_isolation *iso{};
+        if (auto st = WdfRequestRetrieveInputBuffer(request, sizeof(*iso), reinterpret_cast<PVOID*>(&iso), nullptr); !NT_SUCCESS(st)) {
+                WdfRequestComplete(request, st);
+                return;
+        }
+
+        if (iso->size != sizeof(*iso)) {
+                Trace(TRACE_LEVEL_ERROR, "iso.size %lu != sizeof(iso) %Iu", iso->size, sizeof(*iso));
+                WdfRequestComplete(request, USBIP_ERROR_ABI);
+                return;
+        }
+
+        auto vhci = WdfIoQueueGetDevice(queue);
+        auto &ctx = *get_vhci_ctx(vhci);
+
+        auto port = iso->port;
+        *iso = {};
+        iso->size = sizeof(*iso);
+        auto st = STATUS_NOT_FOUND;
+
+        if (is_valid_port(ctx, port)) {
+                wdf::spinlock lck(ctx.devices_lock);
+                if (auto hdev = ctx.devices[port - 1]) {
+                        auto dev = get_device_ctx(hdev);
+                        iso->port = port;
+                        iso->session_id = dev->session_id;
+                        iso->iso_mode = dev->iso_mode();
+                        iso->owner_sid = dev->owner_sid;
+                        st = STATUS_SUCCESS;
+                }
+        }
+
+        WdfRequestCompleteWithInformation(request, st, NT_SUCCESS(st) ? sizeof(*iso) : 0);
 }
 
 } // namespace
@@ -1157,6 +1289,7 @@ PAGED NTSTATUS usbip::vhci::create_queues(_In_ WDFDEVICE vhci)
         WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential); // WdfDeviceGetDefaultQueue
         cfg.PowerManaged = PowerManaged;
         cfg.EvtIoDeviceControl = device_control;
+        cfg.EvtIoInternalDeviceControl = internal_device_control;
         cfg.EvtIoRead = device_read;
 
         auto st = WdfIoQueueCreate(vhci, &cfg, &attr, nullptr);

@@ -7,6 +7,8 @@
 namespace usbip
 {
 
+enum : unsigned long { system_session_id, invalid_session_id = ~0UL };
+
 inline constexpr auto& tcp_port = "3240";
 inline constexpr auto& driver_filename = L"usbip2_ude"; // used by filter driver
 inline constexpr auto& persistent_devices_value_name = L"PersistentDevices";

@@ -80,6 +80,9 @@ The project uses `libusbip_check` as a **compile-time validation** tool (not a r
 - Indent should be eight spaces
 - Do not inherit from concrete types like `std::array`, `std::string`, etc.
 - Use C++23 "deducing this" (explicit object parameter) for member accessors and operators to collapse redundant `const` and non-`const` overloads into a single implementation (e.g., `constexpr auto& get(this auto&& self) { return self.m_val; }`)
+- Avoid disjunctive negative conditions like `if (!a || !b)`; use negated conjunctions like `if (!(a && b))` (e.g., `if (!(irp && expected_sid.length))` instead of `if (!irp || !expected_sid.length)`)
+- Zero structures by assigning `{}` (e.g., `info = {};` or `*ptr = {};`) instead of calling `RtlZeroMemory` (e.g., `info = {};` instead of `RtlZeroMemory(&info, sizeof(info))`)
+- Prefer designated initializers for aggregates and structs to improve readability, self-documentation, and safety against member reordering or additions (e.g., `vhci::ioctl::get_port_isolation req{ .port = port };` instead of `req{ port };`)
 
 ## Key Dependencies
 
@@ -131,6 +134,9 @@ Enables running build and validation commands:
 
 ## Important Notes
 
+- **Check if Commit Was Amended Before Modifying Source Code**:
+  - Before modifying any source files, **always check if the commit was amended, updated, or rebased by the user** (run `git log -n 1` and `git status`).
+  - The user frequently amends commits or updates code directly between turns. Never rely on stale assumptions or cached file contents from prior steps. Always verify the current commit hash and inspect the latest on-disk file state before making edits, so that user modifications are never overwritten or clobbered.
 - **Driver Frameworks**: `drivers/ude` is a **KMDF driver**; `drivers/ude_filter` is a **WDM driver**
 - **C++ Standards**: `libusbip` public API uses C++17, while the implementation uses C++23 (compile-time verified by `libusbip_check`)
 - **Kernel vs. Userspace**: Code in `drivers/` uses kernel APIs and must follow driver safety rules (no heap allocation without lookaside lists, proper IRQL handling, etc.)
@@ -159,6 +165,7 @@ Enables running build and validation commands:
   - **Immediate Deallocation Pattern**: Use unnamed temporary wrappers (`unique_ptr{ptr};`) for idiomatic, tag-safe pool freeing.
   - **Partial MDLs & Locking**: Never call `MmUnlockPages` on a partial MDL created by `IoBuildPartialMdl`. Partial MDLs inherit `MDL_PAGES_LOCKED` from their source MDL; unlocking a partial MDL prematurely decrements physical page lock counts and triggers Driver Verifier bugchecks (`0xC4` / `PFN_SHARE_COUNT`).
   - **WaitLock Status Handling**: When checking the result of `WdfWaitLockAcquire`, verify `status == STATUS_SUCCESS`. Do NOT use `NT_SUCCESS(status)` because `NT_SUCCESS(STATUS_TIMEOUT)` evaluates to `TRUE` (`0x00000102`), which would falsely indicate the lock was acquired.
+  - **Zeroing Structures**: Zero structures or objects by assigning `{}` (e.g., `info = {};` or `*ptr = {};`) instead of invoking `RtlZeroMemory(&info, sizeof(info))`. This is type-safe, eliminates `sizeof` errors, and ensures idiomatic C++ value-initialization.
 - **NTSTATUS Severity & Error Handling (`NT_SUCCESS` vs. `NT_ERROR`)**:
   - `NTSTATUS` severity encoding (bits 31:30): `00` = Success (`0x00000000`–`0x3FFFFFFF`), `01` = Informational/Notice (`0x40000000`–`0x7FFFFFFF` and `STATUS_TIMEOUT` `0x00000102`), `10` = Warning (`0x80000000`–`0xBFFFFFFF`), `11` = Error (`0xC0000000`–`0xFFFFFFFF`).
   - **Do NOT use `NT_ERROR` for failure checks**: `NT_ERROR(status)` evaluates only severity `11`. It evaluates to `FALSE` for Warning (`10`) and Informational (`01`). Routines such as `RtlStringCbCopyNA`, `RtlStringCbPrintfExA`, `RtlUnicodeStringPrintf`, and `WdfRegistryQueryMultiString` return `STATUS_BUFFER_OVERFLOW` (`0x80000005`, warning) on truncation/insufficient buffer. Using `NT_ERROR` silently ignores the warning and treats truncation as success. Always use `!NT_SUCCESS(status)` to detect failures.

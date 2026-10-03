@@ -11,6 +11,7 @@
 #include <libusbip/remote.h>
 #include <libusbip/vhci.h>
 #include <libusbip/persistent.h>
+#include <libusbip/volume_isolation.h>
 #include <libusbip/src/setupapi.h>
 #include <libusbip/src/hkey.h>
 
@@ -74,6 +75,8 @@ int main()
         args.config.serial = "test";
         args.config.recv_mode = receive_mode::zero_copy;
         args.once = true;
+        args.config.iso_mode = isolation::session;
+        args.config.iso_mode = isolation::user;
 
         [[maybe_unused]] auto attached_port = vhci::attach(dev.get(), args);
         [[maybe_unused]] auto attached_config = vhci::attach(dev.get(), args.config);
@@ -92,5 +95,9 @@ int main()
         std::vector<device_config> pdevs{ args.config };
         [[maybe_unused]] auto set_pers = vhci::set_persistent(dev.get(), pdevs);
         [[maybe_unused]] auto get_pers = vhci::get_persistent(dev.get());
+
+        // volume_isolation.h
+        [[maybe_unused]] auto vols = isolate_port_volumes(1, 100);
+        [[maybe_unused]] auto clean_ok = cleanup_port_volumes(1);
 }
 

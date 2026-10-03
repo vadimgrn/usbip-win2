@@ -3,22 +3,44 @@
  */
 
 #include <ntifs.h>
+#include <initguid.h>
 
 #include "device.h"
 #include "trace.h"
 #include "device.tmh"
 
 #include "driver.h"
-#include <usbip/consts.h>
 
-#include <ntstrsafe.h>
+#include <usbip/consts.h>
 #include <libdrv/timeout.h>
+#include <libusbip/generic_handle_ex.h>
+#include <resources/messages.h>
+#include <ntstrsafe.h>
 
 using namespace usbip;
 using namespace libdrv;
 
 namespace
 {
+
+struct device_interfaces_traits
+{
+        static PZZWSTR invalid() { return nullptr; }
+};
+
+/*
+ * IoGetDeviceInterfaces allocates a multi-string buffer from PagedPool.
+ * It must be freed using ExFreePool at IRQL <= APC_LEVEL (PASSIVE_LEVEL).
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED inline void close_handle(_In_ PZZWSTR ptr, _In_ device_interfaces_traits)
+{
+        PAGED_CODE();
+        ExFreePool(ptr);
+}
+
+using device_interfaces_handle = generic_handle<device_interfaces_traits>;
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
@@ -30,11 +52,11 @@ PAGED auto init(_Inout_ filter_ext &f, _In_opt_ filter_ext *parent)
 
 	if (!parent) {
 		NT_ASSERT(f.is_hub);
-	} else if (auto lck = &parent->remove_lock; auto err = IoAcquireRemoveLock(lck, f.self)) {
-		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
+	} else if (auto err = IoAcquireRemoveLock(&parent->remove_lock, f.self)) {
+		Trace(TRACE_LEVEL_ERROR, "IoAcquireRemoveLock %!STATUS!", err);
 		return err;
 	} else {
-		f.device.parent_remove_lock = lck;
+		f.device.parent = parent;
 	}
 
 	return STATUS_SUCCESS;
@@ -51,12 +73,18 @@ PAGED void do_destroy(_Inout_ filter_ext &f)
 
 	if (f.is_hub) {
                 destroy_relations(f.hub.previous);
+
+                if (auto &file = f.hub.vhci_file) {
+                        ObDereferenceObject(file); // see get_vhci_device, IoGetDeviceObjectPointer
+                        file = nullptr;
+                        f.hub.vhci_device = nullptr;
+                }
 	} else {
 		auto &dev = f.device;
 		NT_ASSERT(!dev.usbd_handle); // @see IRP_MN_REMOVE_DEVICE
 
-                if (auto lck = dev.parent_remove_lock) {
-			IoReleaseRemoveLock(lck, f.self);
+		if (auto parent = dev.parent) {
+			IoReleaseRemoveLock(&parent->remove_lock, f.self);
 		}
 	}
 }
@@ -116,9 +144,46 @@ PAGED auto is_above_vhci(_In_ DEVICE_OBJECT *pdo)
 
 	return driver_name_equal(pdo->DriverObject, driver_name, true);
 }
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS get_vhci_device(_Inout_ filter_ext &hub_fltr, _Out_ DEVICE_OBJECT* &vhci)
+{
+        PAGED_CODE();
 
-} // namespace
+        NT_ASSERT(hub_fltr.is_hub);
+        auto &hub = hub_fltr.hub;
 
+        if (auto d = hub.vhci_device) {
+                vhci = d;
+                return STATUS_SUCCESS;
+        }
+
+        vhci = nullptr;
+
+        PZZWSTR list{};
+        auto st = IoGetDeviceInterfaces(&vhci::GUID_DEVINTERFACE_USBIP_VHCI, nullptr, 0, &list);
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "IoGetDeviceInterfaces %!STATUS!", st);
+                return st;
+        }
+        device_interfaces_handle del(list);
+
+        for (auto p = list; *p; ) {
+                UNICODE_STRING link;
+                RtlInitUnicodeString(&link, p);
+
+                st = IoGetDeviceObjectPointer(&link, FILE_READ_DATA, &hub.vhci_file, &hub.vhci_device);
+                if (NT_SUCCESS(st)) {
+                        vhci = hub.vhci_device;
+                        return STATUS_SUCCESS;
+                }
+
+                Trace(TRACE_LEVEL_WARNING, "IoGetDeviceObjectPointer('%!USTR!') %!STATUS!", &link, st);
+                p += link.Length/sizeof(*link.Buffer) + 1;
+        }
+
+        return STATUS_NOT_FOUND;
+}
 
 constexpr size_t SizeOf_DEVICE_RELATIONS(ULONG cnt)
 {
@@ -127,6 +192,9 @@ constexpr size_t SizeOf_DEVICE_RELATIONS(ULONG cnt)
 static_assert(SizeOf_DEVICE_RELATIONS(0) == sizeof(DEVICE_RELATIONS));
 static_assert(SizeOf_DEVICE_RELATIONS(1) == sizeof(DEVICE_RELATIONS));
 static_assert(SizeOf_DEVICE_RELATIONS(2) == sizeof(DEVICE_RELATIONS) + sizeof(PDEVICE_OBJECT));
+
+} // namespace
+
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -218,34 +286,86 @@ PAGED void usbip::destroy(_Inout_ filter_ext &f)
 	IoDeleteDevice(f.self);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS usbip::query_port_isolation(
+        _Inout_ filter_ext &hub_fltr, _In_ int port, _Out_ get_port_isolation &iso)
+{
+        PAGED_CODE();
+        NT_ASSERT(hub_fltr.is_hub);
+
+        DEVICE_OBJECT *vhci{};
+        auto st = get_vhci_device(hub_fltr, vhci);
+        if (!NT_SUCCESS(st)) {
+                return st;
+        }
+
+        iso = { .port = port };
+        iso.size = sizeof(iso);
+
+        KEVENT event;
+        KeInitializeEvent(&event, NotificationEvent, false);
+
+        IO_STATUS_BLOCK iost{};
+
+        auto irp = IoBuildDeviceIoControlRequest(
+                        vhci::ioctl::INTERNAL_GET_PORT_ISOLATION, vhci,
+                        &iso, sizeof(iso),
+                        &iso, sizeof(iso),
+                        true, &event, &iost);
+
+        if (!irp) {
+                Trace(TRACE_LEVEL_ERROR, "IoBuildDeviceIoControlRequest failed");
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        st = IoCallDriver(vhci, irp);
+        if (st == STATUS_PENDING) {
+                KeWaitForSingleObject(&event, Executive, KernelMode, false, nullptr);
+                st = iost.Status;
+        }
+
+        if (auto ok = NT_SUCCESS(st) && iost.Information == sizeof(iso) &&
+                      iso.size == sizeof(iso) && iso.port == port; !ok) {
+                st = USBIP_ERROR_ABI;
+        }
+
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "port %d, %!STATUS!", port, st);
+        }
+
+        return st;
+}
+
 /*
- * We're propagating a few Flags bits, DeviceType and Characteristics from the device object next beneath us.
- * We need to make these copies because the I/O Manager bases some of its decisions on what it sees 
- * in the topmost device object. 
- * 
- * In particular, whether a read or write IRP gets a memory descriptor list (MDL) 
- * or a system copy buffer depends on what the top object's DO_DIRECT_IO and DO_BUFFERED_IO flags are.
- * 
+ * We propagate a few Flags bits, DeviceType, and Characteristics from the device object next beneath us.
+ * We need to make these copies because the I/O Manager bases some of its decisions (such as MDL vs.
+ * system buffer for read/write requests) on what it sees in the topmost device object.
+ *
  * We don't need to copy the SectorSize or AlignmentRequirement members of the lower device object,
  * IoAttachDeviceToDeviceStack will do that automatically.
  *
- * There's ordinarily no need for a filter device object (FiDO) to have its own name. 
- * If the function driver names its device object and creates a symbolic link, or if the function driver 
- * registers a device interface for its device object, an application will be able to open a handle 
- * for the device. Every IRP sent to the device gets sent first to the topmost FiDO driver, 
- * whether or not that FiDO has its own name.
+ * There's ordinarily no need for a filter device object (FiDO) to have its own name. If the function
+ * driver names its device object and creates a symbolic link, or registers a device interface for it,
+ * an application will be able to open a handle for the device. Every IRP sent to the device gets sent
+ * first to the topmost FiDO driver, whether or not that FiDO has its own name.
  *
- * A filter should mirror the lower device object's FILE_DEVICE_SECURE_OPEN bit, never strip or force it.
- * From the official "Propagating the FILE_DEVICE_SECURE_OPEN Flag" page, the canonical pattern is:
- * if (FlagOn(DeviceObject->Characteristics, FILE_DEVICE_SECURE_OPEN))
- *     SetFlag(myLegacyFilterDeviceObject->Characteristics, FILE_DEVICE_SECURE_OPEN);
- * i.e. copy it in if it's set below you — which is exactly what fido->Characteristics = target->Characteristics;
- * achieves (it's a full mirror rather than an OR, but the effect on this bit is the same: match the lower object).
+ * FILE_DEVICE_SECURE_OPEN:
+ * We explicitly enforce FILE_DEVICE_SECURE_OPEN on the FiDO. When set, the I/O Manager applies the
+ * device object's security descriptor to all open requests—including relative opens and opens with
+ * trailing path/file names across the device's namespace. Because ude_filter serves as the security gate
+ * for session and user isolation in create (IRP_MJ_CREATE), setting this characteristic ensures
+ * that the I/O Manager performs security checks across the entire namespace and dispatches every open
+ * request to this driver, preventing unprivileged callers from bypassing access checks via relative or
+ * namespace opens even if the underlying PDO or FDO did not set this flag.
  */
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 PAGED NTSTATUS usbip::do_add_device(
-	_In_ DRIVER_OBJECT *drvobj, _In_ DEVICE_OBJECT *pdo, _In_opt_ filter_ext *parent)
+        _In_ DRIVER_OBJECT *drvobj, 
+        _In_ DEVICE_OBJECT *pdo, 
+        _In_opt_ filter_ext *parent,
+        _Out_opt_ filter_ext **out_fltr)
 {
 	PAGED_CODE();
 
@@ -280,7 +400,7 @@ PAGED NTSTATUS usbip::do_add_device(
 	}
 
 	fido->DeviceType = target->DeviceType;
-	fido->Characteristics = target->Characteristics; 
+	fido->Characteristics = target->Characteristics | FILE_DEVICE_SECURE_OPEN; 
 	fido->Flags |= target->Flags & (DO_BUFFERED_IO | DO_DIRECT_IO | DO_POWER_PAGABLE | DO_POWER_INRUSH);
 
 	if (!fltr->is_hub) {
@@ -294,6 +414,10 @@ PAGED NTSTATUS usbip::do_add_device(
 
 	Trace(TRACE_LEVEL_INFORMATION, "FiDO %04x, pdo %04x (DeviceType %#lx), target %04x (DeviceType %#lx)", 
 		ptr04x(fido), ptr04x(pdo), pdo->DeviceType, ptr04x(target), target->DeviceType);
+
+        if (out_fltr) {
+                *out_fltr = fltr;
+        }
 
 	fido->Flags &= ~DO_DEVICE_INITIALIZING;
 	return STATUS_SUCCESS;
