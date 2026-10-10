@@ -12,7 +12,7 @@
 namespace usbip
 {
 
-struct hkey_traits 
+struct hkey_traits
 {
         static HKEY invalid() noexcept { return nullptr; }
 };

@@ -13,7 +13,7 @@ auto init_wsa() noexcept
         const BYTE MAJOR = 2;
         const BYTE MINOR = 2;
 
-        WSADATA	wsaData;
+        WSADATA wsaData;
         if (auto err = WSAStartup(MAKEWORD(MAJOR, MINOR), &wsaData)) {
                 SetLastError(err);
                 libusbip::output("WSAStartup version {}.{} error {:#x}", MAJOR, MINOR, err);

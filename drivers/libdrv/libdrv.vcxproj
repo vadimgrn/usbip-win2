@@ -25,6 +25,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dbgcommon.cpp" />
+    <ClCompile Include="handle_ptr.cpp" />
     <ClCompile Include="irp.cpp" />
     <ClCompile Include="lists.cpp" />
     <ClCompile Include="mdl_cpp.cpp" />
@@ -37,6 +38,7 @@
     <ClCompile Include="usbd_helper.cpp" />
     <ClCompile Include="wdf_cpp.cpp" />
     <ClCompile Include="wsk_cpp.cpp" />
+    <ClCompile Include="security.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{27AB4325-4980-4634-9818-AE6BD61DE532}</ProjectGuid>
@@ -248,12 +250,14 @@
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip\ch9.h" />
     <ClInclude Include="..\..\include\usbip\consts.h" />
+    <ClInclude Include="..\..\include\usbip\hex.h" />
     <ClInclude Include="..\..\include\usbip\offsetof_ex.h" />
     <ClInclude Include="..\..\include\usbip\proto.h" />
     <ClInclude Include="..\..\userspace\libusbip\generic_handle_ex.h" />
     <ClInclude Include="ch11.h" />
     <ClInclude Include="ch9.h" />
     <ClInclude Include="dbgcommon.h" />
+    <ClInclude Include="handle_ptr.h" />
     <ClInclude Include="ioctl.h" />
     <ClInclude Include="irp.h" />
     <ClInclude Include="lists.h" />
@@ -273,6 +277,7 @@
     <ClInclude Include="usb_util.h" />
     <ClInclude Include="wdf_cpp.h" />
     <ClInclude Include="wsk_cpp.h" />
+    <ClInclude Include="security.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

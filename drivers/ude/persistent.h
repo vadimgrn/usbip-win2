@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include <usbip/consts.h>
-
 #include <libdrv/codeseg.h>
 #include <libdrv/wdf_cpp.h>
+
+#include <usbip/consts.h>
 
 namespace usbip
 {
@@ -20,6 +20,7 @@ struct device_attributes;
 
 namespace vhci
 {
+        struct device_owner;
         struct imported_device_location;
 }
 
@@ -55,7 +56,9 @@ PAGED void start_attach_attempts(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-int stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash);
+int stop_attach_attempts(
+        _Inout_ vhci_ctx &vhci, _In_ ULONG location_hash,
+        _In_opt_ const vhci::device_owner *owner = nullptr);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

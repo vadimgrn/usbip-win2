@@ -12,7 +12,9 @@
 
 #include <libdrv/remove_lock.h>
 #include <libdrv/unique_ptr.h>
+#include <libdrv/dbgcommon.h>
 #include <libdrv/ioctl.h>
+#include <libdrv/security.h>
 
 #include <usbbusif.h>
 #include <wdmguid.h>
@@ -23,6 +25,7 @@
 #include <strmini.h>
 #include <initguid.h>
 #include <usbcamdi.h>
+#include <devpkey.h>
 
 using namespace usbip;
 using namespace libdrv;
@@ -50,48 +53,82 @@ PAGED auto contains(_In_ const DEVICE_RELATIONS &r, _In_ const DEVICE_OBJECT *ob
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED bool has_filterable_children(_In_ const filter_ext &fltr, _In_ const DEVICE_RELATIONS &r)
+{
+        PAGED_CODE();
+
+        if (!r.Count) {
+                return false;
+        }
+
+        if (fltr.is_hub()) {
+                return true;
+        }
+
+        for (ULONG i = 0; i < r.Count; ++i) {
+                if (auto pdo = r.Objects[i]; pdo && is_filterable_child_driver(pdo->DriverObject)) {
+                        return true;
+                }
+        }
+
+        return false;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void query_bus_relations(_Inout_ filter_ext &fltr, _In_ const DEVICE_RELATIONS &r)
 {
-	PAGED_CODE();
+        PAGED_CODE();
 
-	NT_ASSERT(fltr.is_hub);
-	auto &previous = fltr.hub.previous;
+        auto &previous = fltr.previous;
 
-	auto next = r.Count ? clone_relations_retry(r) : nullptr;
-	if (r.Count && !next) {
-		Trace(TRACE_LEVEL_ERROR, 
-		      "hub %04x: failed to allocate relations buffer for %lu PDOs; skipping FiDO attachment", 
-		      ptr04x(fltr.self), r.Count);
-		return;
-	}
+        if (!has_filterable_children(fltr, r)) {
+                destroy_relations(previous);
+                return;
+        }
 
-	ULONG count{};
+        auto next = clone_relations_retry(r);
+        if (!next) {
+                Trace(TRACE_LEVEL_ERROR,
+                      "dev %04x: failed to allocate relations buffer for %lu PDOs; skipping FiDO attachment",
+                      ptr04x(fltr.self), r.Count);
+                return;
+        }
 
-	for (ULONG i = 0; i < r.Count; ++i) {
+        ULONG count{};
 
-                if (auto pdo = r.Objects[i]; !(previous && contains(*previous, pdo))) {
+        for (ULONG i = 0; i < r.Count; ++i) {
+
+                auto pdo = r.Objects[i];
+
+                if (!(fltr.is_hub() || (pdo && is_filterable_child_driver(pdo->DriverObject)))) {
+                        ObDereferenceObject(next->Objects[i]);
+                        continue;
+                }
+
+                if (!(previous && contains(*previous, pdo))) {
 
                         TraceDbg("Creating a FiDO for PDO %04x", ptr04x(pdo));
 
                         auto st = do_add_device(fltr.self->DriverObject, pdo, &fltr);
-                        if (NT_ERROR(st)) {
-				Trace(TRACE_LEVEL_ERROR, 
-				      "Failed to add a FiDO for PDO %04x (%lu of %lu), %!STATUS! - device will lack URB fixup", 
-				      ptr04x(pdo), i + 1, r.Count, st);
-				ObDereferenceObject(next->Objects[i]);
-				continue;
-			}
-		}
+                        if (!NT_SUCCESS(st)) {
+                                Trace(TRACE_LEVEL_ERROR,
+                                      "Failed to add a FiDO for PDO %04x (%lu of %lu), %!STATUS! - device will lack URB fixup",
+                                      ptr04x(pdo), i + 1, r.Count, st);
+                                ObDereferenceObject(next->Objects[i]);
+                                continue;
+                        }
+                }
 
-		next->Objects[count++] = next->Objects[i];
-	}
+                next->Objects[count++] = next->Objects[i];
+        }
 
         destroy_relations(previous);
 
-	previous = next;
-	if (previous) {
-		previous->Count = count;
-	}
+        previous = next;
+        if (previous) {
+                previous->Count = count;
+        }
 }
 
 /*
@@ -121,20 +158,20 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ remove_lock_guard &lock)
 {
-	PAGED_CODE();
-	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(fltr.self));
+        PAGED_CODE();
+        Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(fltr.self));
 
-	lock.release_and_wait(); // all allocated URBs are freed after this, USBD_HANDLE can be closed
+        lock.release_and_wait(); // all allocated URBs are freed after this, USBD_HANDLE can be closed
 
-	if (!fltr.is_hub) {
-		if (auto &h = fltr.device.usbd_handle) {
-			USBD_CloseHandle(h); // must be called before sending the IRP down the USB driver stack
-			h = nullptr;
-		}
-	}
+        if (!fltr.is_hub()) {
+                if (auto &h = fltr.device.usbd_handle) {
+                        USBD_CloseHandle(h); // must be called before sending the IRP down the USB driver stack
+                        h = nullptr;
+                }
+        }
 
-	auto st = ForwardIrp(fltr, irp); // drivers must not fail this IRP
-	destroy(fltr);
+        auto st = ForwardIrp(fltr, irp); // drivers must not fail this IRP
+        destroy(fltr);
         return st;
 }
 
@@ -206,6 +243,139 @@ PAGED auto query_interface(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const Q
 	return CompleteRequest(irp, st);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto get_port_number(_In_ DEVICE_OBJECT *pdo, _Out_ ULONG &port)
+{
+	PAGED_CODE();
+
+        port = 0;
+        ULONG req_sz{};
+        DEVPROPTYPE type{};
+
+        auto st = IoGetDevicePropertyData(pdo, &DEVPKEY_Device_Address,
+                        LOCALE_NEUTRAL, 0, sizeof(port), &port, &req_sz, &type);
+
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "IoGetDevicePropertyData(Device_Address) %!STATUS!", st);
+                return st;
+        }
+
+        if (!port) {
+                Trace(TRACE_LEVEL_ERROR, "IoGetDevicePropertyData(Device_Address) port 0");
+                return STATUS_DEVICE_CONFIGURATION_ERROR;
+        }
+
+        NT_ASSERT(req_sz == sizeof(port));
+        NT_ASSERT(type == DEVPROP_TYPE_UINT32);
+
+        return STATUS_SUCCESS;
+}
+
+/*
+ * Only stamp DEVPKEY_Device_SessionId for session-isolated devices in interactive sessions.
+ * User-isolated devices must not be bound to a specific session ID so that their ownership
+ * persists across RDS session reconnects and Fast User Switching.
+ * session::system is excluded because it is a non-interactive service session.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto stamp_session_id(_In_ filter_ext &fltr, _In_ ULONG port)
+{
+        PAGED_CODE();
+
+        auto &iso = fltr.device.iso;
+        if (iso.mode != vhci::isolation::session) {
+                return STATUS_SUCCESS;
+        }
+
+        auto &owner = iso.owner;
+        auto session_id = owner.session_id;
+
+        if (!owner.has_session()) {
+                Trace(TRACE_LEVEL_ERROR, "PDO %04x, port %lu, session-isolated device without a valid session (%lu)",
+                                          ptr04x(fltr.pdo), port, session_id);
+
+                return STATUS_DEVICE_CONFIGURATION_ERROR;
+        }
+
+        auto st = IoSetDevicePropertyData(fltr.pdo, &DEVPKEY_Device_SessionId, LOCALE_NEUTRAL, 0,
+                                          DEVPROP_TYPE_UINT32, sizeof(session_id), &session_id);
+
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "IoSetDevicePropertyData(SessionId=%lu) %!STATUS!", session_id, st);
+        } else {
+                Trace(TRACE_LEVEL_INFORMATION, "PDO %04x, port %lu, session %lu", ptr04x(fltr.pdo), port, session_id);
+        }
+
+        return st;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto apply_isolation(_Inout_ filter_ext &fltr)
+{
+        PAGED_CODE();
+
+        NT_ASSERT(!fltr.is_hub());
+        auto &dev = fltr.device;
+
+        if (fltr.is_device()) {
+                auto st = get_port_number(fltr.pdo, dev.port);
+                if (!NT_SUCCESS(st)) {
+                        return st;
+                }
+
+                st = query_port_isolation(*fltr.parent, static_cast<int>(dev.port), fltr.pdo, dev.iso);
+                if (!NT_SUCCESS(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "query_port_isolation(port=%lu) %!STATUS!", dev.port, st);
+                        return st;
+                }
+        } else {
+                dev.port = fltr.parent->device.port;
+                dev.iso = fltr.parent->device.iso;
+        }
+
+        switch (dev.iso.mode) {
+        using vhci::isolation;
+        case isolation::none:
+                return STATUS_SUCCESS;
+        case isolation::session: {
+                auto st = stamp_session_id(fltr, dev.port);
+                if (!NT_SUCCESS(st)) {
+                        return st;
+                }
+                if (dev.iso.owner.has_sid()) {
+                        auto err = set_device_dacl(fltr.pdo, dev.iso.owner.sid);
+                        if (!NT_SUCCESS(err)) {
+                                Trace(TRACE_LEVEL_WARNING, "PDO %04x, port %lu, set_device_dacl %!STATUS!",
+                                                           ptr04x(fltr.pdo), dev.port, err);
+                        }
+                }
+                return STATUS_SUCCESS;
+        }
+        case isolation::user: {
+                if (!dev.iso.owner.has_sid()) {
+                        Trace(TRACE_LEVEL_ERROR, "PDO %04x, port %lu, user-isolated device without an owner SID",
+                                                  ptr04x(fltr.pdo), dev.port);
+
+                        return STATUS_DEVICE_CONFIGURATION_ERROR;
+                }
+                auto err = set_device_dacl(fltr.pdo, dev.iso.owner.sid);
+                if (!NT_SUCCESS(err)) {
+                        Trace(TRACE_LEVEL_WARNING, "PDO %04x, port %lu, set_device_dacl %!STATUS!",
+                                                   ptr04x(fltr.pdo), dev.port, err);
+                }
+                return STATUS_SUCCESS;
+        }
+        }
+
+        Trace(TRACE_LEVEL_ERROR, "PDO %04x, port %lu, invalid isolation mode %d",
+                                  ptr04x(fltr.pdo), dev.port, static_cast<int>(dev.iso.mode));
+
+        return STATUS_DEVICE_CONFIGURATION_ERROR;
+}
+
 } // namespace
 
 
@@ -232,34 +402,37 @@ _Function_class_(DRIVER_DISPATCH)
 _Dispatch_type_(IRP_MJ_PNP)
 PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
-	PAGED_CODE();
-	auto &fltr = *get_filter_ext(devobj);
+        PAGED_CODE();
+        auto &fltr = *get_filter_ext(devobj);
 
-	remove_lock_guard lck(fltr.remove_lock, irp);
-	if (!lck) {
-		auto err = lck.status();
-		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
-		return CompleteRequest(irp, err);
-	}
+        remove_lock_guard lck(fltr.remove_lock, irp);
+        if (!lck) {
+                auto err = lck.status();
+                Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
+                return CompleteRequest(irp, err);
+        }
 
-	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
-	case IRP_MN_START_DEVICE: { // must be started after lower device objects
-		auto st = ForwardIrpSynchronously(fltr, irp);
-		return CompleteRequest(irp, st);
-	}
-	case IRP_MN_REMOVE_DEVICE:
-		return remove_device(fltr, irp, lck);
-	case IRP_MN_QUERY_DEVICE_RELATIONS:
-		if (fltr.is_hub && stack.Parameters.QueryDeviceRelations.Type == BusRelations) {
-			return query_bus_relations(fltr, irp);
-		}
-		break;
-	case IRP_MN_QUERY_INTERFACE:
-		if (auto &qi = stack.Parameters.QueryInterface; !fltr.is_hub) {
-			return ::query_interface(fltr, irp, qi);
-		}
-		break;
-	}
+        switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
+        case IRP_MN_START_DEVICE: { // must be started after lower device objects
+                auto st = ForwardIrpSynchronously(fltr, irp);
+                if (NT_SUCCESS(st) && !fltr.is_hub()) {
+                        st = apply_isolation(fltr);
+                }
+                return CompleteRequest(irp, st);
+        }
+        case IRP_MN_REMOVE_DEVICE:
+                return remove_device(fltr, irp, lck);
+        case IRP_MN_QUERY_DEVICE_RELATIONS:
+                if (stack.Parameters.QueryDeviceRelations.Type == BusRelations) {
+                        return query_bus_relations(fltr, irp);
+                }
+                break;
+        case IRP_MN_QUERY_INTERFACE:
+                if (auto &qi = stack.Parameters.QueryInterface; fltr.is_device()) {
+                        return ::query_interface(fltr, irp, qi);
+                }
+                break;
+        }
 
-	return ForwardIrp(fltr, irp);
+        return ForwardIrp(fltr, irp);
 }

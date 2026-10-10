@@ -6,10 +6,10 @@
 
 #include "dllspec.h"
 
-#include <windows.h>
-
 #include <vector>
 #include <optional>
+
+using HANDLE = void*; // windows.h
 
 namespace usbip
 {

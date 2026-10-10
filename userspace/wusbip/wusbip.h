@@ -9,6 +9,8 @@
 #include "tree_comparator.h"
 
 #include <libusbip/win_handle.h>
+#include <libusbip/vhci.h>
+#include <libusbip/remote.h>
 
 #include <stop_token>
 #include <thread>
@@ -58,8 +60,6 @@ private:
         std::unique_ptr<wxMenu> m_tree_popup_menu;
 
         usbip::Handle m_read;
-        std::mutex m_read_close_mtx;
-
         std::jthread m_read_thread;
         std::chrono::steady_clock::time_point m_start_time{std::chrono::steady_clock::now()};
 
@@ -143,7 +143,6 @@ private:
         void restore_state();
 
         void start_read_thread();
-        void read_loop(std::stop_token stoken);
         void break_and_join_read_loop();
 
         wxTreeListItem find_or_add_server(_In_ const wxString &url);
@@ -167,9 +166,10 @@ private:
         void set_checked(_In_ wxTreeListItem device, _In_ usbip::column_pos_t col, _In_ bool checked);
 
         void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_columns &dc, _In_ unsigned int flags);
-
-        auto connect(_In_ const wxString &hostname, _In_ const wxString &service,
-                     _In_ const std::string &hostname_u8, _In_ const std::string &service_u8);
+        void add_devices(
+                _In_ const std::string &u8_host,
+                _In_ const std::string &u8_port,
+                _In_ const std::vector<usbip::usb_device> &devices);
 
         wxDataViewColumn* find_column(_In_ const wxString &title) const noexcept;
         wxDataViewColumn* find_column(_In_ int item_id) const noexcept;

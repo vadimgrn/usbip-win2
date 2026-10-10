@@ -6,6 +6,7 @@
 
 #include "dllspec.h"
 #include "win_handle.h"
+
 #include <usbspec.h>
 
 #include <string>
@@ -18,6 +19,14 @@
 
 namespace usbip::vhci
 {
+
+/*
+ * A virtual device isolation can be session/user based.
+ */
+#ifndef USBIP_VHCI_ISOLATION_DEFINED
+#define USBIP_VHCI_ISOLATION_DEFINED
+  enum class isolation : unsigned char { none, session, user };
+#endif
 
 /**
  * How to optimize data reception over the network
@@ -40,6 +49,7 @@ enum class receive_mode : unsigned char { zero_copy, low_latency };
 namespace usbip
 {
 
+using vhci::isolation;
 using vhci::receive_mode;
 
 struct device_location
@@ -50,6 +60,13 @@ struct device_location
 };
 
 /**
+ * Possible values for user (used only when iso_mode is isolation::user):
+ * - Empty string (""): automatically resolves to the calling process's current User SID (TokenUser).
+ * - Standard string SID: e.g. "S-1-5-21-XXXXXXXXXX-XXXXXXXXXX-XXXXXXXXXX-XXXX"
+ *   (parsed via ConvertStringSidToSid).
+ * - Windows account name: e.g. "DOMAIN\\Username" or "Username"
+ *   (resolved via LookupAccountName).
+ *
  * @see generate_device_serial
  * @see validate_device_serial
  * @see get_device_serial_maxlen
@@ -59,6 +76,8 @@ struct device_config
         device_location location;
         std::string serial; ///< optional device serial number if you want to set/override it
         receive_mode recv_mode = receive_mode::zero_copy; ///< how to optimize data reception over the network
+        isolation iso_mode = isolation::none; ///< device isolation mode
+        std::string user; ///< optional user identity (account name or SID) for isolation::user
 };
 
 struct imported_device
@@ -67,7 +86,7 @@ struct imported_device
         int port{}; ///< hub port number, >= 1
 
         UINT32 devid{};
-        USB_DEVICE_SPEED speed = UsbLowSpeed;
+        USB_DEVICE_SPEED speed{}; // UsbLowSpeed
 
         UINT16 vendor{};
         UINT16 product{};
@@ -82,7 +101,7 @@ enum class state { unplugged, connecting, connected, plugged, disconnected, unpl
 struct device_state
 {
         imported_device device;
-        state state = state::unplugged;
+        state state{}; // state::unplugged
         ULONG source_id{};
 };
 
@@ -134,13 +153,16 @@ struct attach_args
  * @param dev handle of the driver device
  * @param args arguments
  * @return hub port number, >= 1. Call GetLastError() if zero is returned.
+ * @note Does not call isolate_port_volumes(). Attach only triggers virtual hardware
+ *       plug-in and returns immediately; storage volumes are enumerated asynchronously
+ *       by Windows PnP and MountMgr over several seconds (the VHCI driver automatically
+ *       hardens arriving volume DACLs in kernel mode). Callers attaching storage devices
+ *       with isolation enabled (args.config.iso_mode != isolation::none) should call
+ *       isolate_port_volumes() immediately after attach() succeeds to migrate any global
+ *       drive letter into their session DosDevices namespace and finish root ACL setup.
+ * @see isolate_port_volumes
  */
 USBIP_API int attach(_In_ HANDLE dev, _In_ const attach_args &args);
-
-inline auto attach(_In_ HANDLE dev, _In_ const device_config &config)
-{
-        return attach(dev, attach_args{ config });
-}
 
 /**
  * @param dev handle of the driver device
@@ -152,12 +174,17 @@ USBIP_API int stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_locati
 enum { port_all_closeonly = -2, port_all };
 
 /**
+ * Detaches a port. Automatically cleans up any session-isolated volumes before detaching.
+ *
  * @param dev handle of the driver device
  * @param port hub port number starting from 1
  *        port_all - detach all ports
  *        port_all_closeonly - close tcp/ip connections for all ports,
  *              use to skip unnecessary steps on Windows reboot/shutdown
  * @return call GetLastError() if false is returned
+ * @note Unlike global drive letters, session DosDevices links are not removed automatically
+ *       by Windows PnP on device teardown. They are cleaned up before hardware plugout
+ *       while the DevNode hierarchy is still intact to avoid orphan drive letters in the user session.
  */
 USBIP_API bool detach(_In_ HANDLE dev, _In_ int port);
 

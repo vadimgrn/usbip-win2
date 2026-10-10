@@ -81,6 +81,30 @@ bool list_persistent_devices()
         return true;
 }
 
+bool list_exportable_devices(const list_args &args)
+{
+        ctrl_c_guard guard;
+        auto sock = connect(args.remote, global_args.tcp_port, guard.token());
+        if (!sock) {
+                log::error(get_last_error_msg());
+                return false;
+        }
+
+        std::stop_callback stop_cb(guard.token(), [s = sock.get()] { cancel_io(s); });
+
+        if (auto devs = get_exportable_devices(sock.get())) {
+                print_exportable_devices(*devs);
+                return true;
+        }
+
+        if (guard.token().stop_requested()) {
+                SetLastError(ERROR_CANCELLED);
+        }
+
+        log::error(get_last_error_msg());
+        return false;
+}
+
 } // namespace
 
 
@@ -90,22 +114,5 @@ bool usbip::cmd_list(const list_args &args)
                 return list_persistent_devices();
         }
 
-        ctrl_c_guard guard;
-        auto sock = connect(args.remote.c_str(), global_args.tcp_port.c_str(), guard.token());
-        if (!sock) {
-                log::error(get_last_error_msg());
-                return false;
-        }
-
-        log::debug("connected to {}:{}", args.remote, global_args.tcp_port);
-
-        auto devices = get_exportable_devices(sock.get());
-
-        if (!devices) {
-                log::error(get_last_error_msg());
-        } else {
-                print_exportable_devices(*devices);
-        }
-
-        return devices.has_value();
+        return list_exportable_devices(args);
 }

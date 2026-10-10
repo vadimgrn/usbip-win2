@@ -34,6 +34,7 @@ struct attach_args
         bool stop{};
         bool once{};
         receive_mode recv_mode = receive_mode::zero_copy;
+        isolation iso_mode = isolation::none;
 
         // --persistent,--stashed
         bool persistent{};

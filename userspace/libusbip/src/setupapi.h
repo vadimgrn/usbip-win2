@@ -12,17 +12,17 @@
 namespace usbip
 {
 
-struct hdevinfo_traits 
+struct hdevinfo_traits
 {
         static HDEVINFO invalid() noexcept { return INVALID_HANDLE_VALUE; }
 };
 
-struct hinf_traits 
+struct hinf_traits
 {
         static HINF invalid() noexcept { return INVALID_HANDLE_VALUE; }
 };
 
-struct hspfileq_traits 
+struct hspfileq_traits
 {
         static HSPFILEQ invalid() noexcept { return INVALID_HANDLE_VALUE; }
 };
@@ -33,8 +33,8 @@ using hdevinfo = generic_handle<hdevinfo_traits>;
 template<>
 inline void close_handle(_In_ hdevinfo::type h, _In_ hdevinfo::tag_type) noexcept
 {
-	[[maybe_unused]] auto ok = SetupDiDestroyDeviceInfoList(h);
-	assert(ok);
+        [[maybe_unused]] auto ok = SetupDiDestroyDeviceInfoList(h);
+        assert(ok);
 }
 
 

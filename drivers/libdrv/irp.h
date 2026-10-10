@@ -166,5 +166,13 @@ inline void CompleteRequest(_In_ IRP *irp)
         IoCompleteRequest(irp, IO_NO_INCREMENT);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS device_io_control(
+        _In_ DEVICE_OBJECT *devobj, _In_ ULONG ioctl_code,
+        _In_reads_bytes_opt_(in_len) void *in_buf, _In_ ULONG in_len,
+        _Out_writes_bytes_opt_(out_len) void *out_buf, _In_ ULONG out_len,
+        _In_ bool internal = false);
+
 } // namespace libdrv
 

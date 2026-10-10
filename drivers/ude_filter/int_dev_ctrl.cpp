@@ -357,7 +357,7 @@ NTSTATUS irp_complete(
         auto &fltr = *get_filter_ext(devobj);
         remove_lock_guard lck(fltr.remove_lock, adopt_lock, irp);
 
-        if (fltr.is_hub) {
+        if (!fltr.is_device()) {
                 NT_ASSERT(!context);
         } else if (context) { // legacy control transfer
                 auto urb = urb_from_irp(irp);
@@ -416,7 +416,7 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 			Trace(TRACE_LEVEL_ERROR, "dev %04x, submit URB has no URB pointer", ptr04x(fltr.self));
 			return CompleteRequest(irp, STATUS_INVALID_PARAMETER);
 		}
-		if (!fltr.is_hub) {
+		if (fltr.is_device()) {
 			ctx = try_legacy_ctrl(fltr, irp, *urb);
 		}
 	}

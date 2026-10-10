@@ -5,6 +5,7 @@
 #pragma once
 
 #include <libdrv/ioctl.h>
+#include <usbip/vhci.h>
 
 namespace usbip
 {
@@ -31,8 +32,26 @@ inline auto& get_urb(_In_ WDFREQUEST request)
 {
 	auto irp = WdfRequestWdmGetIrp(request);
 	NT_ASSERT(libdrv::has_urb(irp));
-	return *libdrv::urb_from_irp(irp);
+        return *libdrv::urb_from_irp(irp);
 }
 
 } // namespace usbip
+
+
+namespace usbip::vhci::ioctl
+{
+
+struct plugin_hardware_ex : plugin_hardware
+{
+        sid_blob caller_user_sid;
+        sid_blob caller_logon_sid;
+};
+
+struct plugout_hardware_ex : plugout_hardware
+{
+        device_owner owner;
+        bool has_owner;
+};
+
+} // namespace usbip::vhci::ioctl
 

@@ -4,10 +4,8 @@
 
 #include "select.h"
 #include "usbdsc.h"
-#include "codeseg.h"
 #include "dbgcommon.h"
 
-#include <stddef.h>
 #include <ntintsafe.h>
 #include <ntstrsafe.h>
 

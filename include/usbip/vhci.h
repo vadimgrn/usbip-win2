@@ -33,24 +33,18 @@ namespace usbip
  * @return < 0 if parameters/characters are invalid,
  *         otherwise the same as strnlen(s, maxlen)
  */
-constexpr SSIZE_T is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen);
+constexpr SSIZE_T is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen) noexcept;
 
-constexpr auto is_ascii(unsigned char ch) { return ch < 0x80; }
-
-constexpr auto pack_attach_flags(bool once, bool wsk_events)
-{
-        return (static_cast<ULONG>(once) << 1) |
-                static_cast<ULONG>(wsk_events);
-}
+constexpr auto is_ascii(unsigned char ch) noexcept { return ch < 0x80; }
 
 /*
- * Unknown flags are ignored.
+ * @see ntifs.h, struct SID
  */
-constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, ULONG flags)
+struct sid_blob
 {
-        once = flags & 2;
-        wsk_events = flags & 1;
-}
+        ULONG length; // data[length]
+        UCHAR data[68]; // SECURITY_MAX_SID_SIZE, ntifs.h
+};
 
 } // namespace usbip
 
@@ -60,6 +54,47 @@ namespace usbip::vhci
 
 DEFINE_GUID(GUID_DEVINTERFACE_USBIP_VHCI,
         0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);
+
+#ifndef USBIP_VHCI_ISOLATION_DEFINED
+#define USBIP_VHCI_ISOLATION_DEFINED
+  enum class isolation : unsigned char { none, session, user }; // see libusbip/vhci.h
+#endif
+
+static_assert(sizeof(session::system) == sizeof(ULONG)); // session id type
+
+/*
+ * An owner may possess both an active Terminal Server Session ID and a User SID
+ * (e.g., interactive user-mode callers and user-isolated devices).
+ * When evaluating ownership or access permissions, User SID (has_sid()) takes
+ * precedence over Session ID (has_session()) because user identity is persistent
+ * across logon sessions. Session ID serves as a fallback for session-only isolation.
+ *
+ * sid - User Account SID (TokenUser, S-1-5-21-...) of the device owner or caller.
+ * In isolation_data::owner, this is populated only for isolation::user
+ * (either the attaching caller's User SID or an explicit target user's SID).
+ * It must remain empty (has_sid() == false) for isolation::session and
+ * isolation::none, because access checks, persistent config matching, and
+ * GET_IMPORTED_DEVICES rely on has_sid() to distinguish isolation::user from
+ * isolation::session.
+ */
+struct device_owner
+{
+        ULONG session_id;
+        sid_blob sid;
+
+        constexpr auto has_session() const noexcept
+        {
+                return session_id != session::invalid && session_id != session::system;
+        }
+
+        constexpr bool has_sid() const noexcept { return sid.length; }
+};
+
+struct isolation_data
+{
+        device_owner owner;
+        isolation mode;
+};
 
 struct base
 {
@@ -76,10 +111,26 @@ struct imported_device_location
 struct imported_device_config
 {
         imported_device_location location;
-        char serial[SERIAL_BUFSZ];
         bool wsk_events;
+        char serial[SERIAL_BUFSZ];
+        isolation_data iso;
 };
 
+/**
+ * storage_flags - monotonic bitmask populated in driver from
+ * USB_DEVICE_DESCRIPTOR and full USB_CONFIGURATION_DESCRIPTOR
+ * during enumeration.
+ *
+ * Starts at 0 until asynchronous USB enumeration delivers the full
+ * configuration descriptor (and remains 0 with older drivers), so
+ * flag_config_seen is needed to distinguish "unknown" (0, keep polling)
+ * from "inspected and conclusively non-storage" (flag_config_seen alone).
+ *
+ * Using two monotonic |= bits ensures flag_maybe_storage (from
+ * bDeviceClass or any configuration/interface descriptor) permanently
+ * overrides flag_config_seen regardless of descriptor order or multiple
+ * configurations.
+ */
 struct imported_device_hardware
 {
         UINT32 devid;
@@ -92,12 +143,23 @@ struct imported_device_hardware
         UINT16 product;
 
         UCHAR iserial; // USB_DEVICE_DESCRIPTOR.iSerialNumber
+
+        enum : UCHAR {
+                flag_config_seen = 1, // full USB_CONFIGURATION_DESCRIPTOR inspected
+                flag_maybe_storage = 2, // bDeviceClass or any bInterfaceClass is Storage (0x08) or Vendor-Specific (0xFF)
+        };
+        UCHAR storage_flags;
+
+        constexpr bool is_non_storage() const noexcept
+        {
+                return (storage_flags & (flag_config_seen | flag_maybe_storage)) == flag_config_seen;
+        }
 };
 
 struct imported_device
 {
         int port; // OUT, >= 1 or zero if an error
-        ULONG location_hash; // OUT, hash(host,service,busid)
+        ULONG location_hash; // OUT, hash(host,service,busid), driver-internal (ignored in userspace)
 
         imported_device_config config;
         imported_device_hardware hw;
@@ -118,6 +180,42 @@ struct device_state : base
         imported_device device;
 };
 
+constexpr auto is_valid(isolation mode) noexcept
+{
+        switch (mode) {
+        case isolation::none:
+        case isolation::session:
+        case isolation::user:
+                return true;
+        }
+
+        return false;
+}
+
+constexpr auto pack_attach_flags(bool once, bool wsk_events, isolation iso = isolation::none) noexcept
+{
+        return  (static_cast<ULONG>(iso)  << 2) |
+                (static_cast<ULONG>(once) << 1) |
+                 static_cast<ULONG>(wsk_events);
+}
+
+/*
+ * Unknown flags are ignored.
+ */
+constexpr void unpack_attach_flags(
+        _Inout_ bool &once, _Inout_ bool &wsk_events, _Inout_ isolation &iso, ULONG flags) noexcept
+{
+        wsk_events = flags & 1;
+        once = flags & 2;
+        iso = static_cast<isolation>((flags >> 2) & 0x3);
+}
+
+constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, ULONG flags) noexcept
+{
+        isolation iso;
+        unpack_attach_flags(once, wsk_events, iso, flags);
+}
+
 } // namespace usbip::vhci
 
 
@@ -133,11 +231,13 @@ enum class function { // 12 bit
         stop_attach_attempts,
         plugin_hardware_once,
         plugout_hardware_and_reattach,
+        internal_get_port_isolation,
+        isolate_port_volume,
 };
 
-constexpr auto make(function id)
+constexpr auto make(function id, ULONG access = FILE_READ_DATA | FILE_WRITE_DATA)
 {
-        return CTL_CODE(FILE_DEVICE_UNKNOWN, static_cast<int>(id), METHOD_BUFFERED, FILE_READ_DATA | FILE_WRITE_DATA);
+        return CTL_CODE(FILE_DEVICE_UNKNOWN, static_cast<int>(id), METHOD_BUFFERED, access);
 }
 
 enum {
@@ -149,23 +249,33 @@ enum {
         STOP_ATTACH_ATTEMPTS = make(function::stop_attach_attempts),
         PLUGIN_HARDWARE_ONCE = make(function::plugin_hardware_once),
         PLUGOUT_HARDWARE_AND_REATTACH = make(function::plugout_hardware_and_reattach), // for internal use only
+        INTERNAL_GET_PORT_ISOLATION = make(function::internal_get_port_isolation, FILE_ANY_ACCESS),
+        ISOLATE_PORT_VOLUME = make(function::isolate_port_volume),
 };
 
 struct plugin_hardware : base
 {
         int port; // OUT, >= 1 or zero if an error
-        ULONG location_hash; // OUT, hash(host,service,busid)
-
         imported_device_config config;
+
+        static constexpr auto output_size() noexcept
+        {
+                return offset_plus_size(plugin_hardware, port);
+        }
 };
-static_assert(offsetof_ex(plugin_hardware, port) == sizeof(base));
-static_assert(offsetof_ex(plugin_hardware, location_hash) == sizeof(base) + sizeof(plugin_hardware::port));
+static_assert(offsetof_ex(plugin_hardware, port) == sizeof(base)); // must be the first member
 
 struct stop_attach_attempts : base
 {
         int count; // OUT, number of canceled requests
         imported_device_location location;
+
+        static constexpr auto output_size() noexcept
+        {
+                return offset_plus_size(stop_attach_attempts, count);
+        }
 };
+static_assert(offsetof_ex(stop_attach_attempts, count) == sizeof(base)); // must be the first member
 
 enum { PORT_ALL_CLOSEONLY = -2, PORT_ALL };
 
@@ -181,10 +291,38 @@ struct get_imported_devices : base
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto get_imported_devices_size(_In_ ULONG n)
+inline auto get_imported_devices_size(_In_ ULONG n) noexcept
 {
         return offsetof_ex(get_imported_devices, devices) + n*sizeof(*get_imported_devices::devices);
 }
+
+struct get_port_isolation : base
+{
+        int port; // IN/OUT, >= 1 or zero if an error
+        void *pdo; // IN, DEVICE_OBJECT* of the USB PDO on port
+        isolation_data data; // OUT
+};
+
+/*
+ * drive_letter:
+ * - IN:  L'A'-L'Z' (or L'a'-L'z') to remove that specific \GLOBAL??\<drive_letter>: link if its
+ *        target matches nt_device; or L'\0' to look up a letter already removed by on_volume_arrival
+ *        (or scan \GLOBAL??\A:..Z: for nt_device and remove it).
+ * - OUT: the global drive letter (L'A'-L'Z') removed from \GLOBAL?? so userspace can map it in
+ *        the caller's session DosDevices, or L'\0' if none was assigned yet.
+ */
+struct isolate_port_volume : base
+{
+        wchar_t drive_letter; // IN/OUT
+        int port; // IN, >= 1
+        wchar_t nt_device[MAX_PATH]; // IN, e.g. \Device\HarddiskVolumeN
+
+        static constexpr auto output_size() noexcept
+        {
+                return offset_plus_size(isolate_port_volume, drive_letter);
+        }
+};
+static_assert(offsetof_ex(isolate_port_volume, drive_letter) == sizeof(base)); // must be the first member
 
 } // namespace usbip::vhci::ioctl
 
@@ -193,7 +331,7 @@ inline auto get_imported_devices_size(_In_ ULONG n)
  * UTF-8 is designed so that all ASCII characters (0–127)
  * are represented by a single byte with the high bit set to 0.
  */
-constexpr SSIZE_T usbip::is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen)
+constexpr SSIZE_T usbip::is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen) noexcept
 {
         if (!(s && maxlen >= 0)) {
                 return -1;

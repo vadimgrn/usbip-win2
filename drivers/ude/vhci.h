@@ -41,11 +41,26 @@ inline auto has_device(_In_ WDFDEVICE vhci, _In_ const imported_device &dev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::ObjectRef get_device(_In_ WDFDEVICE vhci, _In_ int port);
+int count_user_devices(_In_ WDFDEVICE vhci, _In_ const sid_blob &user_sid);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS get_device(_In_ WDFDEVICE vhci, _In_ int port, _Out_ wdf::ObjectRef &device);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto get_device(_In_ WDFDEVICE vhci, _In_ int port)
+{
+        wdf::ObjectRef dev;
+        get_device(vhci, port, dev);
+        return dev;
+}
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool plugout_and_delete);
+PAGED void detach_all_devices(
+        _In_ WDFDEVICE vhci, _In_ bool plugout_and_delete,
+        _In_opt_ const device_owner *owner = nullptr);
 
 struct imported_device;
 enum class state;
@@ -69,7 +84,8 @@ PAGED void replay_plugged_devices(_In_ WDFDEVICE vhci, _Inout_ fileobject_ctx &f
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void device_state_changed(_In_ WDFDEVICE vhci, _In_ const device_attributes &attr, _In_ int port, _In_ state state);
+PAGED void device_state_changed(
+        _In_ WDFDEVICE vhci, _In_ const device_attributes &attr, _In_ int port, _In_ state state);
 
 inline void device_state_changed(_In_ const device_ctx &dev, _In_ state state)
 {

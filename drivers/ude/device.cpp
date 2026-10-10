@@ -554,18 +554,23 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port)
+auto create_detach_request_inbuf(
+        _In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port, _In_opt_ const vhci::device_owner *owner)
 {
         WDFMEMORY mem{}; 
-        vhci::ioctl::plugout_hardware *req{};
+        vhci::ioctl::plugout_hardware_ex *req{};
         auto st = WdfMemoryCreate(&attr, NonPagedPoolNx, 0, sizeof(*req), &mem, reinterpret_cast<PVOID*>(&req));
 
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", st);
         } else {
-                RtlZeroMemory(req, sizeof(*req));
+                *req = {};
                 req->size = sizeof(*req);
                 req->port = port;
+                if (owner) {
+                        req->owner = *owner;
+                        req->has_owner = true;
+                }
         }
 
         return mem;
@@ -614,7 +619,8 @@ PAGED void plugout_and_delete(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void async_detach_and_delete(_In_ WDFDEVICE vhci, _In_ int port, _In_ bool reattach)
+void async_detach_and_delete(
+        _In_ WDFDEVICE vhci, _In_ int port, _In_ bool reattach, _In_opt_ const vhci::device_owner *owner = nullptr)
 {
         auto &ctx = *get_vhci_ctx(vhci);
 
@@ -631,7 +637,7 @@ void async_detach_and_delete(_In_ WDFDEVICE vhci, _In_ int port, _In_ bool reatt
         TraceDbg("req %04x, port %d, reattach %!bool!", ptr04x(request), port, reattach);
 
         attr.ParentObject = request;
-        auto inbuf = create_detach_request_inbuf(attr, port);
+        auto inbuf = create_detach_request_inbuf(attr, port, owner);
         if (!inbuf) {
                 return;
         }
@@ -678,7 +684,7 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
 
         device_init_ptr init(vhci);
 
-        if (auto err = init ? prepare_init(init.ptr, ext.hw().speed) : STATUS_INSUFFICIENT_RESOURCES) {
+        if (auto err = init ? prepare_init(init.ptr, ext.attr.hw.speed) : STATUS_INSUFFICIENT_RESOURCES) {
                 Trace(TRACE_LEVEL_ERROR, "UDECXUSBDEVICE_INIT %!STATUS!", err);
                 return err;
         }
@@ -698,9 +704,10 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         NT_ASSERT(!init); // zeroed by UdecxUsbDeviceCreate
         auto &ctx = *get_device_ctx(device);
 
-        ctx.vhci = vhci;
         ctx.ctx_ext = ctx_ext;
         ext.ctx = &ctx;
+
+        ctx.vhci = vhci;
 
         st = init_device(device, ctx);
 
@@ -726,9 +733,9 @@ void usbip::device::async_detach_and_delete(_In_ UDECXUSBDEVICE device, _In_ boo
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::async_detach_and_delete_all(_In_ WDFDEVICE vhci)
+void usbip::async_detach_and_delete_all(_In_ WDFDEVICE vhci, _In_opt_ const vhci::device_owner *owner)
 {
-        ::async_detach_and_delete(vhci, -1, false);
+        ::async_detach_and_delete(vhci, vhci::ioctl::PORT_ALL, false, owner);
 }
 
 /*
@@ -795,7 +802,7 @@ PAGED wdm::object_reference usbip::device::detach(
         if (reattach) {
                 auto ctx = get_vhci_ctx(vhci);
                 auto delayed = plugout_and_delete;
-                start_attach_attempts(vhci, *ctx, ext.attr, delayed);
+                start_attach_attempts(vhci, *ctx, ext.attr, delayed); // keep the same owner across reattach
         }
 
         return thread;

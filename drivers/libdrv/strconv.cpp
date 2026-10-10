@@ -133,7 +133,7 @@ PAGED int libdrv::strchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch)
                 return -1;
         }
 
-        for (int i = 0; i < s.Length/sizeof(*s.Buffer); ++i) {
+        for (int i = 0; i < length_cch(s); ++i) {
                 if (s.Buffer[i] == ch) {
                         return i;
                 }

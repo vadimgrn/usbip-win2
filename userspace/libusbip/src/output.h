@@ -14,6 +14,11 @@ namespace libusbip
 
 inline output_func_type output_function;
 
+inline auto is_output_enabled() noexcept
+{
+        return static_cast<bool>(output_function);
+}
+
 template<typename... Args>
 inline void output(std::format_string<Args...> fmt, Args&&... args)
 {
