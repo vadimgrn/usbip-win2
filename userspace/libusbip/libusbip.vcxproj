@@ -90,7 +90,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>Version.lib;ws2_32.lib;CfgMgr32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Version.lib;ws2_32.lib;CfgMgr32.lib;Setupapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
@@ -111,7 +111,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>Version.lib;ws2_32.lib;CfgMgr32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Version.lib;ws2_32.lib;CfgMgr32.lib;Setupapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
@@ -136,7 +136,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>Version.lib;ws2_32.lib;CfgMgr32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Version.lib;ws2_32.lib;CfgMgr32.lib;Setupapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
@@ -161,7 +161,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>Version.lib;ws2_32.lib;CfgMgr32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Version.lib;ws2_32.lib;CfgMgr32.lib;Setupapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
@@ -176,6 +176,7 @@
     <ClCompile Include="src\strconv.cpp" />
     <ClCompile Include="src\usb_ids.cpp" />
     <ClCompile Include="src\vhci.cpp" />
+    <ClCompile Include="src\volume_isolation.cpp" />
     <ClCompile Include="src\win_socket.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -197,6 +198,7 @@
     <ClInclude Include="src\usb_ids.h" />
     <ClInclude Include="src\setupapi.h" />
     <ClInclude Include="vhci.h" />
+    <ClInclude Include="volume_isolation.h" />
     <ClInclude Include="win_handle.h" />
     <ClInclude Include="win_socket.h" />
   </ItemGroup>

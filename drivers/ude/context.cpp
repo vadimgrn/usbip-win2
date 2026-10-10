@@ -142,6 +142,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
 
         auto &config = ext.config();
         config.wsk_events = r.config.wsk_events;
+        config.iso_mode = r.config.iso_mode;
 
         st = RtlStringCbCopyNA(config.serial, sizeof(config.serial), r.config.serial, sizeof(r.config.serial));
         if (!NT_SUCCESS(st)) {
@@ -175,9 +176,10 @@ bool usbip::is_valid_port(_In_ const vhci_ctx &ctx, _In_ int port)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::init_device_attributes(
-        _Inout_ device_attributes &attr, _In_ const vhci::imported_device_location &loc)
+        _Out_ device_attributes &attr, _In_ const vhci::imported_device_location &loc)
 {
         PAGED_CODE();
+        attr = {};
 
         auto st = save_device_location(attr, loc);
         if (NT_SUCCESS(st)) {
@@ -205,4 +207,14 @@ void usbip::free(_Inout_ device_attributes &r)
         FreeUnicodeString(r.node_name, unique_ptr::pooltag); // @see RtlFreeUnicodeString
         FreeUnicodeString(r.service_name, unique_ptr::pooltag);
         FreeUnicodeString(r.busid, unique_ptr::pooltag);
+}
+
+bool usbip::device_ctx::is_session_isolated() const
+{
+        return owner.has_session() && iso_mode() == vhci::isolation::session;
+}
+
+bool usbip::device_ctx::is_user_isolated() const
+{
+        return owner.has_sid() && iso_mode() == vhci::isolation::user;
 }

@@ -86,6 +86,7 @@ struct device_attributes
         //
         vhci::imported_device_config config; // for ioctl::get_imported_devices
         vhci::imported_device_hardware hw;
+        vhci::sid_blob sid; // owner for isolation::user
 };
 
 /*
@@ -141,6 +142,9 @@ struct device_ctx
         auto devid() const { return ext().hw().devid; }
         auto wsk_events() const { return ext().config().wsk_events; }
 
+        auto iso_mode() const { return ext().config().iso_mode; }
+        bool is_session_isolated() const;
+        bool is_user_isolated() const;
 
         WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
 
@@ -164,6 +168,7 @@ struct device_ctx
         };
 
         int port; // vhci_ctx.devices[port - 1]
+        vhci::device_owner owner; // Terminal Server session and user SID that attached this device
         seqnum_t seqnum; // @see next_seqnum
 
         SLIST_HEADER pending_sends;
@@ -260,6 +265,8 @@ struct fileobject_ctx
         LIST_ENTRY entry; // head is vhci_ctx::fileobjects
         WDFCOLLECTION events; // WDFMEMORY(device_state_ex) that are waiting for IRP_MJ_READ
         bool process_events; // if IRP_MJ_READ was issued, see vhci_ctx::events_subscribers
+        vhci::device_owner owner; // Terminal Server session and user SID of the subscriber, set on the first IRP_MJ_READ
+        bool is_admin; // whether subscriber has administrative privileges
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(fileobject_ctx, get_fileobject_ctx)
 
@@ -291,7 +298,7 @@ PAGED NTSTATUS create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDFOBJECT 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS init_device_attributes(_Inout_ device_attributes &attr, _In_ const vhci::imported_device_location &loc);
+PAGED NTSTATUS init_device_attributes(_Out_ device_attributes &attr, _In_ const vhci::imported_device_location &loc);
 
 /*
  * Not PAGED: called by destroy_device_ctx_ext at DISPATCH_LEVEL.
