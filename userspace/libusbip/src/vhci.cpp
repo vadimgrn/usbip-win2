@@ -3,16 +3,23 @@
  */
 
 #include "../vhci.h"
+#include "../persistent.h"
+
+#include "volume_isolation.h"
+#include "strconv.h"
+#include "output.h"
+#include "last_error.h"
+#include "device_speed.h"
 
 #include <usbip/offsetof_ex.h>
-#include "device_speed.h"
-#include "output.h"
-
 #include <resources/messages.h>
+
 #include <cfgmgr32.h>
+#include <strsafe.h>
 
 #include <initguid.h>
 #include <usbip/vhci.h>
+#include "sid.h"
 
 #include <span>
 #include <random>
@@ -49,8 +56,8 @@ auto assign(_Inout_ char (&dst)[SERIAL_BUFSZ], _In_ const std::string &serial)
 {
         if (!validate_device_serial(serial)) {
                 *dst = '\0';
-        } else if (auto err = strncpy_s(dst, serial.data(), serial.size())) {
-                libusbip::output("strncpy_s('{}') error #{} {}", serial, err, std::generic_category().message(err));
+        } else if (auto hr = StringCchCopyA(dst, std::size(dst), serial.c_str()); FAILED(hr)) {
+                libusbip::output("StringCchCopyA('{}') error {:#x}", serial, static_cast<unsigned long>(hr));
         } else {
                 return USBIP_ERROR_SUCCESS;
         }
@@ -71,9 +78,9 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
         };
 
         for (auto &i: v) {
-                if (auto err = strncpy_s(i.dst, i.len, i.src.data(), i.src.size())) {
-                        libusbip::output("strncpy_s('{}') error #{} {}", i.src, err, 
-                                          std::generic_category().message(err));
+                if (auto hr = StringCchCopyA(i.dst, i.len, i.src.c_str()); FAILED(hr)) {
+                        libusbip::output("StringCchCopyA('{}', max={}) error {:#x}",
+                                         i.src, i.len, static_cast<unsigned long>(hr));
 
                         return ERROR_INVALID_PARAMETER;
                 }
@@ -82,9 +89,31 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
         return ERROR_SUCCESS;
 }
 
+DWORD assign(_Inout_ vhci::isolation_data &dst, _In_ const device_config &src)
+{
+        dst = { .mode = src.iso_mode };
+
+        if (src.user.empty()) {
+                return ERROR_SUCCESS;
+        } else if (src.iso_mode != vhci::isolation::user) {
+                libusbip::output("user '{}' specified without user isolation", src.user);
+                return ERROR_INVALID_PARAMETER;
+        } else if (auto sid = parse_sid(src.user)) {
+                dst.owner.sid = *sid;
+                return ERROR_SUCCESS;
+        } else {
+                libusbip::output("parse_sid('{}') error #{}", src.user, sid.error());
+                return sid.error();
+        }
+}
+
 DWORD assign(_Inout_ vhci::imported_device_config &dst, _In_ const device_config &src)
 {
         dst.wsk_events = src.recv_mode == receive_mode::low_latency;
+
+        if (auto err = assign(dst.iso, src)) {
+                return err;
+        }
 
         if (auto err = assign(dst.serial, src.serial)) {
                 return err;
@@ -93,38 +122,56 @@ DWORD assign(_Inout_ vhci::imported_device_config &dst, _In_ const device_config
         return assign(dst.location, src.location);
 }
 
-DWORD assign(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const vhci::attach_args &args)
+std::optional<device_location> make_device_location(_In_ const vhci::imported_device_location &src)
 {
-        return assign(r.config, args.config);
-}
+        auto host = to_string_view(src.host);
+        auto service = to_string_view(src.service);
+        auto busid = to_string_view(src.busid);
 
-auto make_device_location(_In_ const vhci::imported_device_location &src)
-{
-        auto str = [] (const char *str, size_t maxlen)
-        {
-                return std::string(str, strnlen(str, maxlen));
-        };
+        if (host.empty() || service.empty() || busid.empty()) {
+                libusbip::output("empty or unterminated imported_device_location");
+                return std::nullopt;
+        }
 
         return device_location {
-                .hostname = str(src.host, std::size(src.host)),
-                .service = str(src.service, std::size(src.service)),
-                .busid = str(src.busid, std::size(src.busid)),
+                .hostname{host},
+                .service{service},
+                .busid{busid}
         };
 }
 
-auto make_device_config(_In_ const vhci::imported_device_config &c)
+std::optional<device_config> make_device_config(_In_ const vhci::imported_device_config &c)
 {
+        auto loc = make_device_location(c.location);
+        if (!loc) {
+                return std::nullopt;
+        }
+
+        auto serial = to_string_view(c.serial);
+
+        if (serial.empty() && *c.serial) {
+                libusbip::output("unterminated imported_device_config::serial");
+                return std::nullopt;
+        }
+
         return device_config {
-                .location = make_device_location(c.location),
-                .serial{ c.serial, strnlen(c.serial, std::size(c.serial)) },
+                .location = std::move(*loc),
+                .serial{serial},
                 .recv_mode = c.wsk_events ? receive_mode::low_latency : receive_mode::zero_copy,
+                .iso_mode = c.iso.mode,
+                .user = c.iso.owner.has_sid() ? to_string(c.iso.owner.sid) : std::string{},
         };
 }
 
-auto make_imported_device(_In_ const vhci::imported_device &d)
+std::optional<imported_device> make_imported_device(_In_ const vhci::imported_device &d)
 {
+        auto cfg = make_device_config(d.config);
+        if (!cfg) {
+                return std::nullopt;
+        }
+
         return imported_device {
-                .config = make_device_config(d.config),
+                .config = std::move(*cfg),
                 .port = d.port,
                 .devid = d.hw.devid,
                 .speed = win_speed(d.hw.speed).value_or(UsbLowSpeed),
@@ -134,21 +181,31 @@ auto make_imported_device(_In_ const vhci::imported_device &d)
 }
 
 auto make_imported_devices(_In_ const std::span<const vhci::imported_device> devices)
+        -> std::optional<std::vector<imported_device>>
 {
         std::vector<imported_device> v;
         v.reserve(devices.size());
 
         for (auto &d: devices) {
-                v.push_back(make_imported_device(d));
+                if (auto dev = make_imported_device(d)) {
+                        v.push_back(std::move(*dev));
+                } else {
+                        return std::nullopt;
+                }
         }
 
         return v;
 }
 
-auto make_device_state(_In_ const vhci::device_state &r)
+std::optional<device_state> make_device_state(_In_ const vhci::device_state &r)
 {
+        auto dev = make_imported_device(r.device);
+        if (!dev) {
+                return std::nullopt;
+        }
+
         return device_state {
-                .device = make_imported_device(r.device),
+                .device = std::move(*dev),
                 .state = static_cast<state>(r.state),
                 .source_id = r.source_id
         };
@@ -167,7 +224,7 @@ auto get_path()
                         auto code = CM_MapCrToWin32Err(err, ERROR_INVALID_PARAMETER);
                         SetLastError(code);
                         return path;
-                } 
+                }
 
                 multi_sz.resize(cch); // "path1\0path2\0pathn\0\0"
 
@@ -194,6 +251,59 @@ auto get_path()
                         auto code = CM_MapCrToWin32Err(err, ERROR_NOT_ENOUGH_MEMORY);
                         SetLastError(code);
                         return path;
+                }
+        }
+}
+
+auto read_imported_devices(_In_ HANDLE dev, _Inout_ std::vector<char> &buf)
+        -> std::expected<std::span<vhci::imported_device>, DWORD>
+{
+        DWORD bytes_returned{}; // must be set if the last arg is NULL
+
+        for (ULONG cnt = 4; ; cnt = std::min(cnt << 1, static_cast<ULONG>(MAX_HUB_PORTS))) {
+
+                buf.resize(vhci::ioctl::get_imported_devices_size(cnt));
+
+                auto r = reinterpret_cast<vhci::ioctl::get_imported_devices*>(buf.data());
+                r->size = sizeof(*r);
+
+                if (DeviceIoControl(dev, vhci::ioctl::GET_IMPORTED_DEVICES, r, sizeof(r->size),
+                                    buf.data(), DWORD(buf.size()), &bytes_returned, nullptr)) {
+                        break;
+                }
+
+                if (auto err = GetLastError(); !(err == ERROR_INSUFFICIENT_BUFFER && cnt < MAX_HUB_PORTS)) {
+                        return std::unexpected(err);
+                }
+        }
+
+        constexpr auto devices_offset = offsetof_ex(vhci::ioctl::get_imported_devices, devices);
+
+        if (bytes_returned < devices_offset) [[unlikely]] {
+                return std::unexpected(USBIP_ERROR_DRIVER_RESPONSE);
+        }
+
+        auto &r = *reinterpret_cast<vhci::ioctl::get_imported_devices*>(buf.data());
+        auto devices_size = bytes_returned - devices_offset;
+
+        if (devices_size % sizeof(*r.devices)) [[unlikely]] { // remainder must be zero
+                libusbip::output("{}: N*sizeof(imported_device) != {}", __func__, devices_size);
+                return std::unexpected(USBIP_ERROR_DRIVER_RESPONSE);
+        }
+
+        return std::span(r.devices, devices_size/sizeof(*r.devices));
+}
+
+void cleanup_isolated_volumes(_In_ HANDLE dev, _In_ int port)
+{
+        auto devices = vhci::get_imported_devices(dev);
+        if (!devices) {
+                return;
+        }
+
+        for (auto &d: *devices) {
+                if ((port == vhci::port_all || d.port == port) && d.config.iso_mode != isolation::none) {
+                        cleanup_port_volumes(d.port);
                 }
         }
 }
@@ -276,11 +386,11 @@ auto usbip::vhci::open(_In_ bool overlapped) -> Handle
         Handle h;
 
         if (auto path = get_path(); !path.empty()) {
-                h.reset(CreateFile(path.c_str(), 
-                                GENERIC_READ | GENERIC_WRITE, 
-                                FILE_SHARE_READ | FILE_SHARE_WRITE, 
+                h.reset(CreateFile(path.c_str(),
+                                GENERIC_READ | GENERIC_WRITE,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE,
                                 nullptr, // lpSecurityAttributes
-                                OPEN_EXISTING, 
+                                OPEN_EXISTING,
                                 FlagsAndAttributes,
                                 nullptr)); // hTemplateFile
         }
@@ -288,74 +398,64 @@ auto usbip::vhci::open(_In_ bool overlapped) -> Handle
         return h;
 }
 
-std::optional<std::vector<usbip::imported_device>> usbip::vhci::get_imported_devices(_In_ HANDLE dev)
+auto usbip::vhci::get_imported_devices(_In_ HANDLE dev)
+        -> std::optional<std::vector<usbip::imported_device>>
 {
-        std::optional<std::vector<usbip::imported_device>> devices;
-        constexpr auto devices_offset = offsetof_ex(ioctl::get_imported_devices, devices);
-
-        ioctl::get_imported_devices *r{};
         std::vector<char> buf;
-
-        constexpr auto max_devices = 1024;
-        bool ok = false;
-
-        for (auto cnt = 4; cnt <= max_devices; cnt <<= 1) {
-                buf.resize(ioctl::get_imported_devices_size(cnt));
-
-                r = reinterpret_cast<ioctl::get_imported_devices*>(buf.data());
-                r->size = sizeof(*r);
-
-                if (DWORD BytesReturned{}; // must be set if the last arg is NULL
-                    DeviceIoControl(dev, ioctl::GET_IMPORTED_DEVICES, r, sizeof(r->size), 
-                                    buf.data(), DWORD(buf.size()), &BytesReturned, nullptr)) {
-
-                        if (BytesReturned < devices_offset) [[unlikely]] {
-                                SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
-                                return devices;
-                        }
-                                
-                        buf.resize(BytesReturned);
-                        ok = true;
-                        break;
-
-                } else if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-                        return devices;
-                }
+        auto devs = read_imported_devices(dev, buf);
+        if (!devs) {
+                SetLastError(devs.error());
+                return std::nullopt;
         }
 
-        if (!ok) {
-                return devices;
-        }
-
-        if (auto devices_size = buf.size() - devices_offset;
-            devices_size % sizeof(*r->devices)) { // reminder must be zero
-                libusbip::output("{}: N*sizeof(imported_device) != {}", __func__, devices_size);
+        auto devices = make_imported_devices(*devs);
+        if (!devices) {
                 SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
-        } else {
-                auto cnt = devices_size/sizeof(*r->devices);
-                devices = make_imported_devices({r->devices, cnt});
         }
-
         return devices;
 }
 
+auto usbip::vhci::get_port_storage(_In_ HANDLE dev, _In_ int port)
+        -> std::expected<port_storage, DWORD>
+{
+        std::vector<char> buf;
+        auto devs = read_imported_devices(dev, buf);
+        if (!devs) {
+                return std::unexpected(devs.error());
+        }
+
+        for (const auto &d: *devs) {
+                if (d.port == port) {
+                        return d.hw.is_non_storage() ? port_storage::non_storage : port_storage::maybe_storage;
+                }
+        }
+
+        return port_storage::detached;
+}
+
+/*
+ * Note: attach does not call isolate_port_volumes(). The IOCTL only initiates
+ * virtual hardware plug-in and returns immediately. Storage volumes are
+ * enumerated asynchronously by Windows PnP and MountMgr, requiring polling,
+ * timeouts, and cancellation tokens handled by the caller (e.g. CLI or GUI).
+ */
 int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
 {
         ioctl::plugin_hardware r{};
         r.size = sizeof(r);
 
-        if (auto err = assign(r, args)) {
+        if (auto err = assign(r.config, args.config)) {
                 SetLastError(err);
                 return 0;
         }
 
         auto ctl = args.once ? ioctl::PLUGIN_HARDWARE_ONCE : ioctl::PLUGIN_HARDWARE;
-        constexpr auto outlen = offsetof_ex(ioctl::plugin_hardware, port) + sizeof(r.port);
+        constexpr auto outlen = ioctl::plugin_hardware::output_size();
 
-        if (DWORD BytesReturned{}; // must be set if the last arg is NULL
-            DeviceIoControl(dev, ctl, &r, sizeof(r), &r, outlen, &BytesReturned, nullptr)) {
+        if (DWORD bytes_returned; // must be set if the last arg is NULL
+            DeviceIoControl(dev, ctl, &r, sizeof(r), &r, outlen, &bytes_returned, nullptr)) {
 
-                if (BytesReturned != outlen) [[unlikely]] {
+                if (bytes_returned != outlen) [[unlikely]] {
                         SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
                         return 0;
                 }
@@ -383,11 +483,13 @@ int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_loc
                         return -1;
                 }
         }
-        
-        if (DWORD BytesReturned{}; // must be set if the last arg is NULL
-            !DeviceIoControl(dev, ioctl::STOP_ATTACH_ATTEMPTS, &r, sizeof(r), &r, sizeof(r), &BytesReturned, nullptr)) {
+
+        constexpr auto outlen = ioctl::stop_attach_attempts::output_size();
+
+        if (DWORD bytes_returned; // must be set if the last arg is NULL
+            !DeviceIoControl(dev, ioctl::STOP_ATTACH_ATTEMPTS, &r, sizeof(r), &r, outlen, &bytes_returned, nullptr)) {
                 return -1;
-        } else if (BytesReturned != sizeof(r)) [[unlikely]] {
+        } else if (bytes_returned != outlen) [[unlikely]] {
                 SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
                 return -1;
         } else {
@@ -396,13 +498,24 @@ int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_loc
         }
 }
 
+/*
+ * Clean up session-isolated drive letters before hardware plugout.
+ * Unlike \GLOBAL??, session DosDevices links are not removed automatically
+ * by MountMgr/PnP when the PDO is removed. Furthermore, DevNode
+ * traversal requires the device tree to still be intact.
+ * The query is instantaneous (no waiting) as the devices already exist.
+ */
 bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
 {
+        if (port > 0 || port == port_all) {
+                cleanup_isolated_volumes(dev, port);
+        }
+
         ioctl::plugout_hardware r { .port = port };
         r.size = sizeof(r);
 
-        DWORD BytesReturned{}; // must be set if the last arg is NULL
-        return DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
+        DWORD bytes_returned; // must be set if the last arg is NULL
+        return DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), nullptr, 0, &bytes_returned, nullptr);
 }
 
 bool usbip::vhci::cancel_io(_In_ HANDLE dev, _In_opt_ OVERLAPPED *overlapped) noexcept
@@ -433,8 +546,8 @@ std::optional<usbip::device_state> usbip::vhci::get_device_state(_In_ const void
                 SetLastError(ERROR_INVALID_PARAMETER);
         } else if (r->size != sizeof(*r)) {
                 SetLastError(USBIP_ERROR_ABI);
-        } else {
-                state = make_device_state(*r);
+        } else if (state = make_device_state(*r); !state) {
+                SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
         }
 
         return state;

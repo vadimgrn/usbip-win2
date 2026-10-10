@@ -40,6 +40,7 @@ struct vhci_ctx
         int usb2_ports; // constant
 
         int devices_cnt; // constant, usb2_ports + usb3 ports
+        int max_user_ports; // constant, per-user non-admin port limit
         UDECXUSBDEVICE *devices; // do not access directly, functions must be used
         WDFSPINLOCK devices_lock;
 
@@ -56,6 +57,11 @@ struct vhci_ctx
 
         WDFCOLLECTION reattach_req; // WDFREQUEST
         WDFSPINLOCK reattach_req_lock;
+
+        void *volume_notification; // IoRegisterPlugPlayNotification(GUID_DEVINTERFACE_VOLUME)
+        EX_RUNDOWN_REF volume_rundown;
+
+        void *session_notification; // IoRegisterContainerNotification(IoSessionStateNotification)
 
         LONG removing; // use set_flag/get_flag
 };
@@ -76,6 +82,17 @@ bool is_valid_port(_In_ const vhci_ctx &ctx, _In_ int port);
 struct device_ctx;
 struct ring_buffer_data;
 
+/*
+ * SIDs for volume DACL hardening (libdrv::set_volume_dacl) and per-user port quotas:
+ * - caller_user_sid: User Account SID (TokenUser, S-1-5-21-...).
+ *   In isolation::user mode this equals config.iso.owner.sid.
+ *   In isolation::session mode config.iso.owner.sid must remain empty
+ *   (owner.has_sid() == false), so the attaching caller's User SID is stored here.
+ *   Also recorded for user-mode isolation::none attaches for per-user port quota accounting.
+ * - caller_logon_sid: Logon Session SID (TokenGroups SE_GROUP_LOGON_ID, S-1-5-5-X-Y)
+ *   of the attaching user-mode caller (in isolation::user, set only when the
+ *   caller matches caller_user_sid).
+ */
 struct device_attributes
 {
         // from ioctl::plugin_hardware, .Buffer-s are allocated in PagedPool
@@ -84,8 +101,16 @@ struct device_attributes
         UNICODE_STRING busid;
         ULONG location_hash; // hash(node_name,service_name,busid)
         //
-        vhci::imported_device_config config; // for ioctl::get_imported_devices
         vhci::imported_device_hardware hw;
+        vhci::imported_device_config config; // for ioctl::get_imported_devices
+
+        sid_blob caller_user_sid;
+        sid_blob caller_logon_sid;
+
+        LONG volume_letters['Z' - 'A' + 1]; // HarddiskVolume number (vol_num) indexed by drive letter ('A'..'Z')
+
+        wchar_t pdo_instance_id[max_device_id_len]; // DEVPKEY_Device_InstanceId of USB PDO
+        GUID container_id; // DEVPKEY_Device_ContainerId of USB PDO
 };
 
 /*
@@ -104,16 +129,7 @@ struct device_ctx_ext
 {
         device_ctx *ctx;
         wsk::SOCKET *sock;
-
         device_attributes attr;
-
-        auto* node_name(this auto&& self) { return &self.attr.node_name; }
-        auto* service_name(this auto&& self) { return &self.attr.service_name; }
-        auto* busid(this auto&& self) { return &self.attr.busid; }
-
-        auto location_hash() const { return attr.location_hash; }
-        auto&& config(this auto&& self) { return self.attr.config; }
-        auto&& hw(this auto&& self) { return self.attr.hw; }
 };
 
 /*
@@ -137,10 +153,12 @@ struct device_ctx
         auto sock() const { return ext().sock; }
         auto& attributes() const { return ext().attr; }
 
-        auto speed() const { return ext().hw().speed; }
-        auto devid() const { return ext().hw().devid; }
-        auto wsk_events() const { return ext().config().wsk_events; }
+        auto speed() const { return attributes().hw.speed; }
+        auto wsk_events() const { return attributes().config.wsk_events; }
+        auto&& owner(this auto&& self) { return self.attributes().config.iso.owner; }
 
+        bool is_session_isolated() const;
+        bool is_user_isolated() const;
 
         WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
 
@@ -260,6 +278,8 @@ struct fileobject_ctx
         LIST_ENTRY entry; // head is vhci_ctx::fileobjects
         WDFCOLLECTION events; // WDFMEMORY(device_state_ex) that are waiting for IRP_MJ_READ
         bool process_events; // if IRP_MJ_READ was issued, see vhci_ctx::events_subscribers
+        vhci::device_owner owner; // Terminal Server session and user SID of the subscriber, set on the first IRP_MJ_READ
+        bool is_admin; // whether subscriber has administrative privileges
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(fileobject_ctx, get_fileobject_ctx)
 
@@ -291,7 +311,7 @@ PAGED NTSTATUS create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDFOBJECT 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS init_device_attributes(_Inout_ device_attributes &attr, _In_ const vhci::imported_device_location &loc);
+PAGED NTSTATUS init_device_attributes(_Out_ device_attributes &attr, _In_ const vhci::imported_device_location &loc);
 
 /*
  * Not PAGED: called by destroy_device_ctx_ext at DISPATCH_LEVEL.

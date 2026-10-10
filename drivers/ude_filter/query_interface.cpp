@@ -81,6 +81,28 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTimeEx(
 	return st;
 }
 
+template <typename Fn>
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void substitute_if_failed(
+        _Inout_ Fn* &fn, _In_opt_ void *bus_ctx, _In_ Fn *replacement, _In_z_ const char *name)
+{
+        PAGED_CODE();
+
+        if (!fn) {
+                TraceDbg("%s is NULL, substituted", name);
+                fn = replacement;
+                return;
+        }
+
+        ULONG dummy;
+        auto st = fn(bus_ctx, &dummy);
+        if (!NT_SUCCESS(st)) {
+                TraceDbg("%s -> %!STATUS!, substituted", name, st);
+                fn = replacement;
+        }
+}
+
 } // namespace
 
 
@@ -91,43 +113,31 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::query_interface(_Inout_ [[maybe_unused]] filter_ext &fltr, _Inout_ _USB_BUS_INTERFACE_USBDI_V3 &r)
 {
-	PAGED_CODE();
+        PAGED_CODE();
 
-	const auto end = offsetof(_USB_BUS_INTERFACE_USBDI_V3, QueryBusTime) + sizeof(r.QueryBusTime);
-	const auto ex_end = offsetof(_USB_BUS_INTERFACE_USBDI_V3, QueryBusTimeEx) + sizeof(r.QueryBusTimeEx);
+        const auto end = offsetof(_USB_BUS_INTERFACE_USBDI_V3, QueryBusTime) + sizeof(r.QueryBusTime);
+        const auto ex_end = offsetof(_USB_BUS_INTERFACE_USBDI_V3, QueryBusTimeEx) + sizeof(r.QueryBusTimeEx);
 
-	if (r.Size < end) {
-		return STATUS_INVALID_PARAMETER;
-	}
+        if (r.Size < end) {
+                return STATUS_INVALID_PARAMETER;
+        }
 
-	switch (ULONG dummy; r.Version) {
-	case USB_BUSIF_USBDI_VERSION_3:
-		if (r.Size < ex_end) {
-			return STATUS_INVALID_PARAMETER;
-		}
-		if (!r.QueryBusTimeEx) {
-			TraceDbg("QueryBusTimeEx is NULL, substituted");
-			r.QueryBusTimeEx = QueryBusTimeEx;
-		} else if (auto st = r.QueryBusTimeEx(r.BusContext, &dummy); !NT_SUCCESS(st)) {
-			TraceDbg("QueryBusTimeEx -> %!STATUS!, substituted", st);
-			r.QueryBusTimeEx = QueryBusTimeEx;
-		}
-		[[fallthrough]];
-	case USB_BUSIF_USBDI_VERSION_2:
-	case USB_BUSIF_USBDI_VERSION_1:
-	case USB_BUSIF_USBDI_VERSION_0:
-		if (!r.QueryBusTime) {
-			TraceDbg("QueryBusTime is NULL, substituted");
-			r.QueryBusTime = QueryBusTime;
-		} else if (auto st = r.QueryBusTime(r.BusContext, &dummy); !NT_SUCCESS(st)) {
-			TraceDbg("QueryBusTime -> %!STATUS!, substituted", st);
-			r.QueryBusTime = QueryBusTime;
-		}
-		break;
-	default:
-		Trace(TRACE_LEVEL_WARNING, "Unexpected USB_BUSIF_USBDI_VERSION_%lu", r.Version);
-		break;
-	}
+        switch (r.Version) {
+        case USB_BUSIF_USBDI_VERSION_3:
+                if (r.Size < ex_end) {
+                        return STATUS_INVALID_PARAMETER;
+                }
+                substitute_if_failed(r.QueryBusTimeEx, r.BusContext, QueryBusTimeEx, "QueryBusTimeEx");
+                [[fallthrough]];
+        case USB_BUSIF_USBDI_VERSION_2:
+        case USB_BUSIF_USBDI_VERSION_1:
+        case USB_BUSIF_USBDI_VERSION_0:
+                substitute_if_failed(r.QueryBusTime, r.BusContext, QueryBusTime, "QueryBusTime");
+                break;
+        default:
+                Trace(TRACE_LEVEL_WARNING, "Unexpected USB_BUSIF_USBDI_VERSION_%lu", r.Version);
+                break;
+        }
 
-	return STATUS_SUCCESS;
+        return STATUS_SUCCESS;
 }

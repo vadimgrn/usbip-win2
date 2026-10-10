@@ -2,15 +2,21 @@
  * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
+#include <initguid.h>
+
 #include "device.h"
 #include "trace.h"
 #include "device.tmh"
 
 #include "driver.h"
 
-#include <usbip/consts.h>
+#include <libdrv/handle_ptr.h>
+#include <libdrv/irp.h>
 #include <libdrv/timeout.h>
 #include <libdrv/strconv.h>
+#include <libdrv/dbgcommon.h>
+#include <usbip/offsetof_ex.h>
+#include <resources/messages.h>
 
 #include <ntstrsafe.h>
 
@@ -24,20 +30,19 @@ _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 PAGED auto init(_Inout_ filter_ext &f, _In_opt_ filter_ext *parent)
 {
-	PAGED_CODE();
+        PAGED_CODE();
+        IoInitializeRemoveLock(&f.remove_lock, unique_ptr::pooltag, 0, 0);
 
-	IoInitializeRemoveLock(&f.remove_lock, unique_ptr::pooltag, 0, 0);
+        if (parent) {
+                auto err = IoAcquireRemoveLock(&parent->remove_lock, f.self);
+                if (!NT_SUCCESS(err)) {
+                        Trace(TRACE_LEVEL_ERROR, "IoAcquireRemoveLock %!STATUS!", err);
+                        return err;
+                }
+                f.parent = parent;
+        }
 
-	if (!parent) {
-		NT_ASSERT(f.is_hub);
-	} else if (auto lck = &parent->remove_lock; auto err = IoAcquireRemoveLock(lck, f.self)) {
-		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
-		return err;
-	} else {
-		f.device.parent_remove_lock = lck;
-	}
-
-	return STATUS_SUCCESS;
+        return STATUS_SUCCESS;
 }
 
 /*
@@ -47,18 +52,16 @@ _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 PAGED void do_destroy(_Inout_ filter_ext &f)
 {
-	PAGED_CODE();
+        PAGED_CODE();
+        destroy_relations(f.previous);
 
-	if (f.is_hub) {
-                destroy_relations(f.hub.previous);
-	} else {
-		auto &dev = f.device;
-		NT_ASSERT(!dev.usbd_handle); // @see IRP_MN_REMOVE_DEVICE
-
-                if (auto lck = dev.parent_remove_lock) {
-			IoReleaseRemoveLock(lck, f.self);
-		}
-	}
+        if (!f.is_hub()) {
+                NT_ASSERT(!f.device.usbd_handle); // @see IRP_MN_REMOVE_DEVICE
+                IoReleaseRemoveLock(&f.parent->remove_lock, f.self);
+        } else if (auto &obj = f.hub.vhci) {
+                ObDereferenceObject(obj); // see get_vhci_device
+                obj = nullptr;
+        }
 }
 
 /*
@@ -94,16 +97,63 @@ PAGED bool is_above_vhci(_In_ DRIVER_OBJECT *driver)
         return RtlEqualUnicodeString(&driver->DriverName, &driver_name, true);
 }
 
+/*
+ * IoGetDeviceObjectPointer adds a reference to the FILE_OBJECT.
+ * We take an extra reference on DEVICE_OBJECT and immediately dereference
+ * the FILE_OBJECT. ObDereferenceObject on vhci must be called on destroy.
+ * @see do_destroy
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto get_vhci_device(_Inout_ filter_ext &fltr, _Out_ DEVICE_OBJECT* &vhci)
+{
+        PAGED_CODE();
+
+        NT_ASSERT(fltr.is_hub());
+        auto &hub = fltr.hub;
+
+        if (auto d = hub.vhci) {
+                vhci = d;
+                return STATUS_SUCCESS;
+        }
+
+        vhci = nullptr;
+
+        device_interfaces_ptr list;
+        auto st = get_device_interfaces(list, vhci::GUID_DEVINTERFACE_USBIP_VHCI);
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "IoGetDeviceInterfaces %!STATUS!", st);
+                return st;
+        }
+
+        for (auto p = list.get(); *p; ) {
+
+                UNICODE_STRING link;
+                RtlInitUnicodeString(&link, p);
+
+                FILE_OBJECT *file;
+                DEVICE_OBJECT *dev;
+                st = IoGetDeviceObjectPointer(&link, FILE_READ_DATA, &file, &dev);
+
+                if (NT_SUCCESS(st)) {
+                        ObReferenceObject(dev);
+                        ObDereferenceObject(file);
+
+                        vhci = dev;
+                        hub.vhci = dev;
+
+                        return STATUS_SUCCESS;
+                }
+
+                Trace(TRACE_LEVEL_WARNING, "IoGetDeviceObjectPointer('%!USTR!') %!STATUS!", &link, st);
+                p += length_cch(link) + 1;
+        }
+
+        return STATUS_NOT_FOUND;
+}
+
 } // namespace
 
-
-constexpr size_t SizeOf_DEVICE_RELATIONS(ULONG cnt)
-{
-	return sizeof(DEVICE_RELATIONS) + (cnt > 1 ? (cnt - 1) * sizeof(PDEVICE_OBJECT) : 0);
-}
-static_assert(SizeOf_DEVICE_RELATIONS(0) == sizeof(DEVICE_RELATIONS));
-static_assert(SizeOf_DEVICE_RELATIONS(1) == sizeof(DEVICE_RELATIONS));
-static_assert(SizeOf_DEVICE_RELATIONS(2) == sizeof(DEVICE_RELATIONS) + sizeof(PDEVICE_OBJECT));
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -117,7 +167,7 @@ PAGED DEVICE_RELATIONS* usbip::clone_relations(_In_ const DEVICE_RELATIONS &src)
 		return nullptr;
 	}
 
-	auto sz = SizeOf_DEVICE_RELATIONS(src.Count);
+	auto sz = sizeof_anysize_struct(DEVICE_RELATIONS, Objects, src.Count);
 	unique_ptr ptr(uninitialized, PagedPool, sz);
 
 	if (ptr) {
@@ -195,34 +245,98 @@ PAGED void usbip::destroy(_Inout_ filter_ext &f)
 	IoDeleteDevice(f.self);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED bool usbip::is_filterable_child_driver(_In_opt_ const DRIVER_OBJECT *driver)
+{
+        PAGED_CODE();
+
+        if (!driver || empty(driver->DriverName)) {
+                return false;
+        }
+
+        const UNICODE_STRING names[] {
+                RTL_CONSTANT_STRING(L"\\Driver\\usbccgp"),
+                RTL_CONSTANT_STRING(L"\\Driver\\HidUsb"),
+        };
+
+        for (auto &name: names) {
+                if (RtlEqualUnicodeString(&driver->DriverName, &name, true)) {
+                        return true;
+                }
+        }
+
+        return false;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS usbip::query_port_isolation(
+        _Inout_ filter_ext &hub, _In_ int port, _In_ DEVICE_OBJECT *pdo, _Out_ vhci::isolation_data &data)
+{
+        PAGED_CODE();
+
+        NT_ASSERT(hub.is_hub());
+        data = {};
+
+        DEVICE_OBJECT *vhci;
+        auto st = get_vhci_device(hub, vhci);
+        if (!NT_SUCCESS(st)) {
+                return st;
+        }
+
+        vhci::ioctl::get_port_isolation req { .port = port, .pdo = pdo };
+        req.size = sizeof(req);
+
+        st = device_io_control(vhci, vhci::ioctl::INTERNAL_GET_PORT_ISOLATION,
+                               &req, sizeof(req), &req, sizeof(req), true);
+
+        if (!NT_SUCCESS(st)) {
+                //
+        } else if (req.size != sizeof(req)) {
+                st = USBIP_ERROR_ABI;
+        } else if (req.port != port) {
+                st = USBIP_ERROR_DRIVER_RESPONSE;
+        } else {
+                data = req.data;
+        }
+
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "port %d, %!STATUS!", port, st);
+        }
+
+        return st;
+}
+
 /*
- * We're propagating a few Flags bits, DeviceType and Characteristics from the device object next beneath us.
- * We need to make these copies because the I/O Manager bases some of its decisions on what it sees 
- * in the topmost device object. 
- * 
- * In particular, whether a read or write IRP gets a memory descriptor list (MDL) 
- * or a system copy buffer depends on what the top object's DO_DIRECT_IO and DO_BUFFERED_IO flags are.
- * 
+ * We propagate a few Flags bits, DeviceType, and Characteristics from the device object next beneath us.
+ * We need to make these copies because the I/O Manager bases some of its decisions (such as MDL vs.
+ * system buffer for read/write requests) on what it sees in the topmost device object.
+ *
  * We don't need to copy the SectorSize or AlignmentRequirement members of the lower device object,
  * IoAttachDeviceToDeviceStack will do that automatically.
  *
- * There's ordinarily no need for a filter device object (FiDO) to have its own name. 
- * If the function driver names its device object and creates a symbolic link, or if the function driver 
- * registers a device interface for its device object, an application will be able to open a handle 
- * for the device. Every IRP sent to the device gets sent first to the topmost FiDO driver, 
- * whether or not that FiDO has its own name.
+ * There's ordinarily no need for a filter device object (FiDO) to have its own name. If the function
+ * driver names its device object and creates a symbolic link, or registers a device interface for it,
+ * an application will be able to open a handle for the device. Every IRP sent to the device gets sent
+ * first to the topmost FiDO driver, whether or not that FiDO has its own name.
  *
- * A filter should mirror the lower device object's FILE_DEVICE_SECURE_OPEN bit, never strip or force it.
- * From the official "Propagating the FILE_DEVICE_SECURE_OPEN Flag" page, the canonical pattern is:
- * if (FlagOn(DeviceObject->Characteristics, FILE_DEVICE_SECURE_OPEN))
- *     SetFlag(myLegacyFilterDeviceObject->Characteristics, FILE_DEVICE_SECURE_OPEN);
- * i.e. copy it in if it's set below you — which is exactly what fido->Characteristics = target->Characteristics;
- * achieves (it's a full mirror rather than an OR, but the effect on this bit is the same: match the lower object).
+ * FILE_DEVICE_SECURE_OPEN:
+ * We explicitly enforce FILE_DEVICE_SECURE_OPEN on the FiDO. When set, the I/O Manager applies the
+ * device object's security descriptor to all open requests—including relative opens and opens with
+ * trailing path/file names across the device's namespace. Because ude_filter serves as the security gate
+ * for session and user isolation in create (IRP_MJ_CREATE), setting this characteristic ensures
+ * that the I/O Manager performs security checks across the entire namespace and dispatches every open
+ * request to this driver, preventing unprivileged callers from bypassing access checks via relative or
+ * namespace opens even if the underlying PDO or FDO did not set this flag.
  */
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 PAGED NTSTATUS usbip::do_add_device(
-	_In_ DRIVER_OBJECT *drvobj, _In_ DEVICE_OBJECT *pdo, _In_opt_ filter_ext *parent)
+        _In_ DRIVER_OBJECT *drvobj, 
+        _In_ DEVICE_OBJECT *pdo, 
+        _In_opt_ filter_ext *parent,
+        _Out_opt_ filter_ext **out_fltr)
 {
 	PAGED_CODE();
 
@@ -237,40 +351,43 @@ PAGED NTSTATUS usbip::do_add_device(
 
 	fltr = get_filter_ext(fido); // zeroed by IoCreateDevice
 
-	fltr->self = fido;
-	fltr->pdo = pdo;
-	fltr->is_hub = !parent;
+        fltr->self = fido;
+        fltr->pdo = pdo;
 
-	if (auto err = init(*fltr, parent)) {
-		destroy(*fltr);
-		return err;
-	}
+        if (auto err = init(*fltr, parent)) {
+                destroy(*fltr);
+                return err;
+        }
 
-	auto &target = fltr->target; // FDO or another FiDO
+        auto &target = fltr->target; // FDO or another FiDO
 
-	target = IoAttachDeviceToDeviceStack(fido, pdo); // object to which fido was attached
-	if (!target) {
-		auto err = STATUS_NO_SUCH_DEVICE;
-		Trace(TRACE_LEVEL_ERROR, "IoAttachDeviceToDeviceStack %!STATUS!", err);
-		destroy(*fltr);
-		return err;
-	}
+        target = IoAttachDeviceToDeviceStack(fido, pdo); // object to which fido was attached
+        if (!target) {
+                auto err = STATUS_NO_SUCH_DEVICE;
+                Trace(TRACE_LEVEL_ERROR, "IoAttachDeviceToDeviceStack %!STATUS!", err);
+                destroy(*fltr);
+                return err;
+        }
 
-	fido->DeviceType = target->DeviceType;
-	fido->Characteristics = target->Characteristics; 
-	fido->Flags |= target->Flags & (DO_BUFFERED_IO | DO_DIRECT_IO | DO_POWER_PAGABLE | DO_POWER_INRUSH);
+        fido->DeviceType = target->DeviceType;
+        fido->Characteristics = target->Characteristics | FILE_DEVICE_SECURE_OPEN;
+        fido->Flags |= target->Flags & (DO_BUFFERED_IO | DO_DIRECT_IO | DO_POWER_PAGABLE | DO_POWER_INRUSH);
 
-	if (!fltr->is_hub) {
-		auto &dev = fltr->device;
-		if (auto err = USBD_CreateHandle(fido, target, USBD_CLIENT_CONTRACT_VERSION_602, unique_ptr::pooltag, &dev.usbd_handle)) {
-			Trace(TRACE_LEVEL_ERROR, "USBD_CreateHandle %!STATUS!", err);
-			destroy(*fltr);
-			return err;
-		}
-	}
+        if (fltr->is_device()) {
+                auto &dev = fltr->device;
+                if (auto err = USBD_CreateHandle(fido, target, USBD_CLIENT_CONTRACT_VERSION_602, unique_ptr::pooltag, &dev.usbd_handle)) {
+                        Trace(TRACE_LEVEL_ERROR, "USBD_CreateHandle %!STATUS!", err);
+                        destroy(*fltr);
+                        return err;
+                }
+        }
 
 	Trace(TRACE_LEVEL_INFORMATION, "FiDO %04x, pdo %04x (DeviceType %#lx), target %04x (DeviceType %#lx)", 
 		ptr04x(fido), ptr04x(pdo), pdo->DeviceType, ptr04x(target), target->DeviceType);
+
+        if (out_fltr) {
+                *out_fltr = fltr;
+        }
 
 	fido->Flags &= ~DO_DEVICE_INITIALIZING;
 	return STATUS_SUCCESS;

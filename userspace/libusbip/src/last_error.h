@@ -11,7 +11,7 @@ namespace usbip
 {
 
 /*
- * libusbip uses SetLastError() regardless of error origin.  
+ * libusbip uses SetLastError() regardless of error origin.
  */
 struct [[nodiscard]] set_last_error
 {
@@ -23,10 +23,10 @@ struct [[nodiscard]] set_last_error
         set_last_error(const set_last_error&) = delete;
         set_last_error& operator=(const set_last_error&) = delete;
 
-        set_last_error(set_last_error&& other) noexcept 
-                : error(other.error), m_active(other.m_active) 
-        { 
-                other.m_active = false; 
+        set_last_error(set_last_error&& other) noexcept
+                : error(other.error), m_active(other.m_active)
+        {
+                other.m_active = false;
         }
 
         set_last_error& operator=(set_last_error&& other) noexcept {
@@ -61,6 +61,20 @@ private:
 [[nodiscard]] inline set_last_error make_wsa_last_error() noexcept
 {
         return set_last_error(static_cast<DWORD>(WSAGetLastError()));
+}
+
+constexpr DWORD win32_from_hresult(_In_ HRESULT hr) noexcept
+{
+        if (SUCCEEDED(hr)) {
+                return ERROR_SUCCESS;
+        }
+
+        if (auto code = HRESULT_CODE(hr); 
+            HRESULT_FACILITY(hr) == FACILITY_WIN32 && code) {
+                return code;
+        }
+
+        return ERROR_CAN_NOT_COMPLETE;
 }
 
 } // namespace usbip

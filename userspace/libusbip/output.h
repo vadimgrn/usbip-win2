@@ -13,7 +13,7 @@ namespace libusbip
 {
 
 /*
- * @param utf-8 encoded message 
+ * @param utf-8 encoded message
  */
 using output_func_type = std::function<void(std::string)>;
 

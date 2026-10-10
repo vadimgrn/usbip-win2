@@ -310,10 +310,10 @@ auto control_transfer(
 
         if (auto idx = get_device_string_descr(pkt); !idx) {
                 // not a string descriptor request or get list of supported languages
-        } else if (idx != dev.ext().hw().iserial) {
+        } else if (idx != dev.attributes().hw.iserial) {
                 // not a iSerialNumber
         } else {
-                return fill_usb_device_serial(request, r, dev.ext().config(), buf_len);
+                return fill_usb_device_serial(request, r, dev.attributes().config, buf_len);
         }
 
         wsk_context_ptr ctx(&dev, request);

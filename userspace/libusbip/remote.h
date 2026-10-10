@@ -1,18 +1,18 @@
 /*
- * Copyright (c) 2021-2026 Vadym Hrynchyshyn
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
-#include "dllspec.h"
 #include "win_handle.h"
 #include "win_socket.h"
 
 #include <usbspec.h>
 
 #include <string>
-#include <vector>
+#include <string_view>
 #include <optional>
+#include <vector>
 
 #if __cplusplus >= 202002L
   #include <stop_token>
@@ -21,21 +21,21 @@
 namespace usbip
 {
 
-struct usb_interface 
+struct usb_interface
 {
         UINT8 bInterfaceClass{};
         UINT8 bInterfaceSubClass{};
         UINT8 bInterfaceProtocol{};
 };
 
-struct usb_device 
+struct usb_device
 {
         std::string path;
         std::string busid;
 
         UINT32 busnum{};
         UINT32 devnum{};
-        USB_DEVICE_SPEED speed = UsbLowSpeed;
+        USB_DEVICE_SPEED speed{}; // UsbLowSpeed
 
         UINT16 idVendor{};
         UINT16 idProduct{};
@@ -57,19 +57,48 @@ struct usb_device
 USBIP_API const char *get_tcp_port() noexcept;
 
 /**
+ * Creates a manual-reset event for cancelling operations.
+ * The event can be passed as cancel_event to connect() or isolate_port_volumes().
+ * @param initial_state whether the event is initially signaled
+ * @return event handle, or an invalid NullableHandle on failure (call GetLastError())
+ * @see connect
+ * @see isolate_port_volumes
+ */
+USBIP_API NullableHandle create_cancel_event(_In_ bool initial_state = false) noexcept;
+
+/**
  * The call is blocking.
  * @param hostname name or IP address of a host to connect to
  * @param service TCP/IP port number or symbolic name
- * @param cancel_event optional event handle to cancel the connection attempt
+ * @param cancel_event optional manual-reset event handle to cancel the connection attempt
+ *        (use create_cancel_event() to create it)
  * @return call GetLastError() if returned handle is invalid
+ * @see create_cancel_event
  */
 USBIP_API Socket connect(
-        _In_ const char *hostname,
-        _In_ const char *service,
+        _In_ std::string_view hostname,
+        _In_ std::string_view service,
         _In_opt_ HANDLE cancel_event = HANDLE{});
+
+/**
+ * Cancel pending synchronous or asynchronous I/O operations on the socket by shutting it down.
+ * The socket cannot be used for further I/O and must be closed after this call.
+ * @param s socket handle
+ * @return call GetLastError() if false is returned
+ */
+USBIP_API bool cancel_io(_In_ SOCKET s) noexcept;
+
+/**
+ * Retrieves exportable devices from an established connection.
+ * The call is blocking.
+ * @param s socket handle
+ * @return devices if the result contains a value, otherwise call GetLastError()
+ */
+USBIP_API std::optional<std::vector<usb_device>> get_exportable_devices(_In_ SOCKET s);
 
 
 #if __cplusplus >= 202002L
+
 /**
  * The call is blocking.
  * @param hostname name or IP address of a host to connect to
@@ -77,40 +106,11 @@ USBIP_API Socket connect(
  * @param stoken stop token to cancel the connection attempt
  * @return call GetLastError() if returned handle is invalid
  */
-inline Socket connect(
-        _In_ const char *hostname,
-        _In_ const char *service,
-        _In_ std::stop_token stoken)
-{
-        Socket sock;
-        if (stoken.stop_requested()) {
-                SetLastError(ERROR_CANCELLED);
-                return sock;
-        }
+USBIP_API Socket connect(
+        _In_ std::string_view hostname,
+        _In_ std::string_view service,
+        _In_ std::stop_token stoken);
 
-        NullableHandle cancel_evt;
-        auto on_stop = [&cancel_evt] { SetEvent(cancel_evt.get()); };
-
-        using stop_cb_t = std::stop_callback<decltype(on_stop)>;
-        std::optional<stop_cb_t> stop_cb;
-
-        if (stoken.stop_possible()) {
-                cancel_evt.reset(CreateEvent(nullptr, true, false, nullptr));
-                if (!cancel_evt) {
-                        return sock;
-                }
-                stop_cb.emplace(stoken, on_stop);
-        }
-
-        sock = connect(hostname, service, cancel_evt.get());
-        return sock;
-}
-#endif // __cplusplus
-
-/**
- * @param s socket handle
- * @return devices if the result contains a value, otherwise call GetLastError()
- */
-USBIP_API std::optional<std::vector<usb_device>> get_exportable_devices(_In_ SOCKET s);
+#endif // __cplusplus >= 202002L
 
 } // namespace usbip

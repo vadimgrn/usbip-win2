@@ -5,6 +5,7 @@
 #include "strconv.h"
 
 #include <windows.h>
+#include <strsafe.h>
 
 #include <memory>
 #include <format>
@@ -15,9 +16,10 @@ std::expected<std::wstring, DWORD> usbip::utf8_to_wchar(_In_ std::string_view s)
                 return std::wstring{};
         }
 
-        auto f = [] (const auto &s, auto buf, auto cch) { 
-                return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, 
-                                           s.data(), static_cast<int>(s.size()), buf, cch); 
+        auto f = [] (const auto &s, auto buf, auto cch) noexcept
+        {
+                return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                           s.data(), static_cast<int>(s.size()), buf, cch);
         };
 
         auto cch = f(s, nullptr, 0);
@@ -33,18 +35,19 @@ std::expected<std::wstring, DWORD> usbip::utf8_to_wchar(_In_ std::string_view s)
                 ws.resize(n);
         }
 
-	return ws;
+        return ws;
 }
- 
+
 std::expected<std::string, DWORD> usbip::wchar_to_utf8(_In_ std::wstring_view ws)
 {
         if (ws.empty()) {
                 return std::string{};
         }
 
-        auto f = [] (const auto &ws, auto buf, auto cb) {
-                return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ws.data(), static_cast<int>(ws.size()), 
-                                           buf, cb, nullptr, nullptr);
+        auto f = [] (const auto &ws, auto buf, auto cb) noexcept
+        {
+                return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ws.data(),
+                                static_cast<int>(ws.size()), buf, cb, nullptr, nullptr);
         };
 
         auto cb = f(ws, nullptr, 0);
@@ -97,9 +100,9 @@ std::vector<std::wstring> usbip::split_multi_sz(_In_ std::wstring_view str)
 {
         std::vector<std::wstring> v;
 
-        while (auto len = wcsnlen_s(str.data(), str.size())) {
-                v.emplace_back(str.data(), len);
-                str.remove_prefix(std::min(len + 1, str.size())); // skip L'\0'
+        while (auto pos = std::min(str.find(L'\0'), str.size())) {
+                v.emplace_back(str.data(), pos);
+                str.remove_prefix(std::min(pos + 1, str.size())); // skip L'\0'
         }
 
         return v;
@@ -110,8 +113,8 @@ std::wstring usbip::make_multi_sz(_In_ const std::vector<std::wstring> &v)
         std::wstring str;
 
         for (auto &s: v) {
-                if (auto data = s.data(); auto len = wcsnlen_s(data, s.size())) {
-                        str.append(data, len);
+                if (auto sub = std::wstring_view(s).substr(0, s.find(L'\0')); !sub.empty()) {
+                        str += sub;
                         str += L'\0';
                 }
         }
@@ -158,4 +161,13 @@ bool usbip::equal_ordinal(_In_ std::wstring_view a, _In_ std::wstring_view b, _I
         return  a.size() == b.size() &&
                 CompareStringOrdinal(a.data(), static_cast<int>(a.size()),
                                      b.data(), static_cast<int>(b.size()), ignore_case) == CSTR_EQUAL;
+}
+
+std::string_view usbip::to_string_view(_In_opt_ const char *s, size_t maxlen) noexcept
+{
+        if (size_t cch; SUCCEEDED(StringCchLengthA(s, maxlen, &cch))) {
+                return {s, cch};
+        }
+
+        return {};
 }

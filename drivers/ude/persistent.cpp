@@ -8,9 +8,11 @@
 
 #include "driver.h"
 #include "context.h"
+#include "ioctl.h"
 #include "vhci.h"
 
 #include <libdrv/strconv.h>
+#include <libdrv/security.h>
 #include <resources/messages.h>
 
 #include <ntstrsafe.h>
@@ -26,8 +28,6 @@ using namespace libdrv;
  */
 struct attach_ctx
 {
-        ULONG location_hash; // hash(host,port,busid)
-
         WDFDEVICE vhci;
         WDFTIMER timer;
 
@@ -36,6 +36,10 @@ struct attach_ctx
 
         unsigned int retry_cnt;
         unsigned int delay;
+
+        ULONG location_hash; // hash(host,port,busid)
+        vhci::device_owner owner; // owner of the device being (re)attached
+        sid_blob caller_user_sid; // attaching user SID for session-isolated retry scoping
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(attach_ctx, get_attach_ctx);
 
@@ -82,12 +86,40 @@ void reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
         }
 }
 
-/**
- * @param location_hash remove unconditionally if zero
+/*
+ * User SID takes precedence over Session ID. When candidate has a SID,
+ * the filter must match that SID; fallback to session matching must not
+ * occur, as that would allow different users sharing a session to match.
+ * Only requests without a SID fall back to session ID matching; for
+ * session-isolated requests, filter SID is also checked against caller_user_sid
+ * when both are present so runas users cannot cancel each other's retries.
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
+auto is_match(_In_ const attach_ctx &r, _In_ const vhci::device_owner &filter)
+{
+        if (r.owner.has_sid()) {
+                return filter.has_sid() && filter.sid == r.owner.sid;
+        }
+
+        if (!(r.owner.has_session() && filter.has_session() &&
+              r.owner.session_id == filter.session_id)) {
+                return false;
+        }
+
+        return !(filter.has_sid() && is_valid(r.caller_user_sid)) ||
+               filter.sid == r.caller_user_sid;
+}
+
+/**
+ * @param location_hash remove unconditionally if zero
+ * @param owner remove unconditionally if nullptr
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto reattach_req_remove(
+        _Inout_ vhci_ctx &vhci, _In_ ULONG location_hash,
+        _In_opt_ const vhci::device_owner *owner = nullptr)
 {
         wdf::ObjectRef ref;
         auto col = vhci.reattach_req;
@@ -97,8 +129,13 @@ auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
         for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
 
                 auto req = WdfCollectionGetItem(col, i);
-                
-                if (!location_hash || location_hash == get_attach_ctx(req)->location_hash) {
+                auto &r = *get_attach_ctx(req);
+
+                if (owner && !is_match(r, *owner)) {
+                        continue;
+                }
+
+                if (!location_hash || location_hash == r.location_hash) {
                         ref.reset(req);
                         WdfCollectionRemoveItem(col, i);
                         break;
@@ -176,6 +213,17 @@ PAGED auto validate(_In_ const device_attributes &r)
                 return st;
         }
 
+        auto &iso = r.config.iso;
+        if (iso.mode == vhci::isolation::user) {
+                if (!is_valid(iso.owner.sid)) {
+                        Trace(TRACE_LEVEL_ERROR, "SID is required for user isolation");
+                        return STATUS_INVALID_PARAMETER;
+                }
+        } else if (iso.owner.has_sid()) {
+                Trace(TRACE_LEVEL_ERROR, "SID specified without user isolation");
+                return STATUS_INVALID_PARAMETER;
+        }
+
         return STATUS_SUCCESS;
 }
 
@@ -222,6 +270,44 @@ PAGED auto parse_recv_mode(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto parse_isolation_mode(_Inout_ vhci::isolation &mode, _In_ const UNICODE_STRING &val)
+{
+        PAGED_CODE();
+
+        if (equal(val, L"none", true)) {
+                mode = vhci::isolation::none;
+                return STATUS_SUCCESS;
+        }
+
+        if (equal(val, L"user", true)) {
+                mode = vhci::isolation::user;
+                return STATUS_SUCCESS;
+        }
+
+        if (equal(val, L"session", true)) {
+                Trace(TRACE_LEVEL_ERROR, "session isolation is not supported for persistent devices");
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        Trace(TRACE_LEVEL_ERROR, "invalid or unsupported isolation '%!USTR!'", &val);
+        return STATUS_INVALID_PARAMETER;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto parse_sid(_Out_ sid_blob &sid, _In_ const UNICODE_STRING &val)
+{
+        PAGED_CODE();
+
+        auto st = sid_from_hex(sid, val);
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "'%!USTR!', %!STATUS!", &val, st);
+        }
+        return st;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto parse_token(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &token)
 {
         PAGED_CODE();
@@ -244,13 +330,17 @@ PAGED auto parse_token(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &
                 return parse_serial(r.config.serial, val);
         } else if (equal(key, L"recv_mode", true)) {
                 return parse_recv_mode(r.config.wsk_events, val);
+        } else if (equal(key, L"isolate", true)) {
+                return parse_isolation_mode(r.config.iso.mode, val);
+        } else if (equal(key, L"user_sid", true)) {
+                return parse_sid(r.config.iso.owner.sid, val);
         }
 
         return STATUS_SUCCESS; // unknown keys are ignored for forward compatibility
 }
 
 /*
- * @param device_str host=<val>;port=<val>;busid=<val>[;serial=<val>][;recv_mode=<val>]
+ * @param device_str host=<val>;port=<val>;busid=<val>[;serial=<val>][;recv_mode=<val>][;isolate=<val>][;user_sid=<val>]
  * @see validate, hash_location
  */
 _IRQL_requires_same_
@@ -290,7 +380,7 @@ PAGED auto parse_device_str(_Out_ device_attributes &r, _In_ const UNICODE_STRIN
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED bool create_inbuf(
-        _Inout_ WDFMEMORY &result, _Inout_ vhci::ioctl::plugin_hardware* &req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
+        _Inout_ WDFMEMORY &result, _Inout_ vhci::ioctl::plugin_hardware_ex* &req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
 {
         PAGED_CODE();
         NT_ASSERT(!result);
@@ -312,7 +402,7 @@ PAGED bool create_outbuf(
         PAGED_CODE();
         NT_ASSERT(!result);
 
-        const auto len = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
+        const auto len = vhci::ioctl::plugin_hardware::output_size();
 
         auto st = WdfMemoryCreatePreallocated(&attr, req, len, &result);
         if (NT_ERROR(st)) {
@@ -450,20 +540,14 @@ PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ c
         r.delay = vhci.reattach_first_delay;
 
         size_t len;
-        auto &req = *static_cast<vhci::ioctl::plugin_hardware*>(WdfMemoryGetBuffer(r.inbuf, &len));
+        auto &req = *static_cast<vhci::ioctl::plugin_hardware_ex*>(WdfMemoryGetBuffer(r.inbuf, &len));
         NT_ASSERT(len == sizeof(req));
 
-        RtlZeroMemory(&req, sizeof(req));
+        req = {};
         req.size = sizeof(req);
-
-        auto &config = attr.config;
-        req.config.wsk_events = config.wsk_events;
-
-        auto st = RtlStringCbCopyNA(req.config.serial, sizeof(req.config.serial), config.serial, sizeof(config.serial));
-        if (!NT_SUCCESS(st)) {
-                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", config.serial, st);
-                return false;
-        }
+        req.config = attr.config;
+        req.caller_user_sid = attr.caller_user_sid;
+        req.caller_logon_sid = attr.caller_logon_sid;
 
         return NT_SUCCESS(fill_location(req.config.location, attr));
 }
@@ -498,13 +582,18 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ c
                 return req;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "%04x, %!USTR!:%!USTR!/%!USTR!, hash %lx",
-                ptr04x(req.get()), &dev.node_name, &dev.service_name, &dev.busid, dev.location_hash);
+        auto &owner = dev.config.iso.owner;
+
+        Trace(TRACE_LEVEL_INFORMATION, "%04x, %!USTR!:%!USTR!/%!USTR!, hash %lx, session %lu",
+                                        ptr04x(req.get()), &dev.node_name, &dev.service_name,
+                                        &dev.busid, dev.location_hash, owner.session_id);
 
         auto &r = *get_attach_ctx(req.get());
         r.vhci = vhci;
+        r.owner = owner; // preserve the owner across (re)attach
+        r.caller_user_sid = dev.caller_user_sid;
 
-        vhci::ioctl::plugin_hardware *buf{};
+        vhci::ioctl::plugin_hardware_ex *buf{};
 
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.ParentObject = req.get();
@@ -702,17 +791,19 @@ PAGED void usbip::start_attach_attempts(
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-int usbip::stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
+int usbip::stop_attach_attempts(
+        _Inout_ vhci_ctx &vhci, _In_ ULONG location_hash,
+        _In_opt_ const vhci::device_owner *owner)
 {
         int cnt = 0;
 
-        while (auto req = reattach_req_remove(vhci, location_hash)) {
+        while (auto req = reattach_req_remove(vhci, location_hash, owner)) {
 
                 ++cnt;
                 auto delivered = WdfRequestCancelSentRequest(req.get<WDFREQUEST>());
 
-                TraceDbg("hash %lx -> req %04x, cancel request was delivered %!BOOLEAN!",
-                          location_hash, ptr04x(req.get()), delivered);
+                TraceDbg("hash %lx, session %lu -> req %04x, cancel request was delivered %!BOOLEAN!",
+                          location_hash, owner ? owner->session_id : session::invalid, ptr04x(req.get()), delivered);
         }
 
         return cnt;

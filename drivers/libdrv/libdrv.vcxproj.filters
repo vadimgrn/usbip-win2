@@ -14,8 +14,12 @@
     <ClCompile Include="wdm_cpp.cpp" />
     <ClCompile Include="lists.cpp" />
     <ClCompile Include="urb_ptr.cpp" />
+    <ClCompile Include="security.cpp" />
+    <ClCompile Include="handle_ptr.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="security.h" />
+    <ClInclude Include="handle_ptr.h" />
     <ClInclude Include="ch11.h" />
     <ClInclude Include="dbgcommon.h" />
     <ClInclude Include="mdl_cpp.h" />
@@ -29,6 +33,9 @@
     <ClInclude Include="..\..\include\usbip\consts.h">
       <Filter>usbip</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\usbip\hex.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\usbip\offsetof_ex.h">
       <Filter>usbip</Filter>
     </ClInclude>
@@ -39,6 +46,7 @@
     <ClInclude Include="ch9.h" />
     <ClInclude Include="unique_ptr.h" />
     <ClInclude Include="remove_lock.h" />
+    <ClInclude Include="rundown.h" />
     <ClInclude Include="ioctl.h" />
     <ClInclude Include="irp.h" />
     <ClInclude Include="select.h" />

@@ -25,7 +25,7 @@ namespace usbip
                 return UsbHighSpeed;
         case USB_SPEED_FULL:
                 return UsbFullSpeed;
-        case USB_SPEED_LOW: 
+        case USB_SPEED_LOW:
                 return UsbLowSpeed;
         case USB_SPEED_UNKNOWN:
                 break;

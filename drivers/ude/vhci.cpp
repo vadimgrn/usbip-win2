@@ -10,15 +10,18 @@
 #include "device.h"
 #include "vhci_ioctl.h"
 #include "persistent.h"
+#include "isolation.h"
+#include "volume_isolation.h"
 
 #include <libdrv/wdm_cpp.h>
 #include <libdrv/utils.h>
+#include <libdrv/security.h>
 
 #include <ntstrsafe.h>
 #include <usbiodef.h>
 
 extern "C" {
-#include <usbdlib.h>
+  #include <usbdlib.h>
 }
 
 namespace
@@ -42,6 +45,8 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
         auto &ctx = *get_vhci_ctx(vhci);
 
         set_flag(ctx.removing); // used to set earlier
+        session::unregister_session_notification(vhci);
+        session::unregister_volume_notification(vhci);
 
         if (auto t = ctx.target_self) {
                 WdfIoTargetClose(t);
@@ -51,6 +56,7 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
         ctx.devices = nullptr;
 
         ctx.devices_cnt = 0;
+        ctx.max_user_ports = 0;
         ctx.usb2_ports = 0;
 }
 
@@ -125,8 +131,8 @@ PAGED auto query_usb_ports_cnt(_In_ int def_cnt)
 }
 
 /*
- * Ports number cannot be zero and total ports number cannot exceed 255.
- * @see userspace/usbip/usbip.cpp, MAX_HUB_PORTS
+ * Ports number cannot be zero and total ports number cannot exceed MAX_HUB_PORTS.
+ * @see include/usbip/consts.h, MAX_HUB_PORTS
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -134,7 +140,7 @@ PAGED void set_usb_ports_cnt(_Inout_ int &usb2_ports, _Inout_ int &usb3_ports)
 {
         PAGED_CODE();
 
-        enum { MIN_PORTS = 1, DEF_PORTS = 30, MAX_PORTS = 254, MAX_TOTAL_PORTS };
+        enum { MIN_PORTS = 1, DEF_PORTS = 30, MAX_PORTS = MAX_HUB_PORTS - 1, MAX_TOTAL_PORTS = MAX_HUB_PORTS };
         auto v = query_usb_ports_cnt(DEF_PORTS);
 
         for (int total = 0; auto &n: v.cnt) {
@@ -158,6 +164,31 @@ PAGED void set_usb_ports_cnt(_Inout_ int &usb2_ports, _Inout_ int &usb3_ports)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto query_max_user_ports(_In_ int devices_cnt)
+{
+        PAGED_CODE();
+        NT_ASSERT(devices_cnt > 0);
+
+        auto def_max = max(1, devices_cnt / 2);
+
+        registry key;
+        auto st = open(key, DriverRegKeyParameters);
+        if (!NT_SUCCESS(st)) {
+                return def_max;
+        }
+
+        DECLARE_CONST_UNICODE_STRING(name, L"MaxPortsPerUser");
+        ULONG val{};
+        st = WdfRegistryQueryULong(key.get(), &name, &val);
+        if (!NT_SUCCESS(st) || !val) {
+                return def_max;
+        }
+
+        return min(devices_cnt, max(1, static_cast<int>(val)));
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto alloc_devices(_Inout_ vhci_ctx &vhci)
 {
         PAGED_CODE();
@@ -177,9 +208,11 @@ PAGED auto alloc_devices(_Inout_ vhci_ctx &vhci)
 
         vhci.usb2_ports = usb2_ports;
         vhci.devices_cnt = n;
+        vhci.max_user_ports = query_max_user_ports(n);
         vhci.devices = ptr.release<UDECXUSBDEVICE>();
 
-        Trace(TRACE_LEVEL_INFORMATION, "usb2 ports %d, UDECXUSBDEVICE[%d]", vhci.usb2_ports, vhci.devices_cnt);
+        Trace(TRACE_LEVEL_INFORMATION, "usb2 ports %d, UDECXUSBDEVICE[%d], max_user_ports %d",
+                                        vhci.usb2_ports, vhci.devices_cnt, vhci.max_user_ports);
         return STATUS_SUCCESS;
 }
 
@@ -333,6 +366,7 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
         }
 
         InitializeListHead(&ctx.fileobjects);
+        ExInitializeRundownProtection(&ctx.volume_rundown);
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
@@ -633,9 +667,11 @@ PAGED auto initialize(_Inout_ WDFDEVICE_INIT *init)
          * - Caller privilege check: Verify caller holds administrative privileges or specific rights
          *   (e.g., SeSinglePrivilegeCheck for SE_LOAD_DRIVER_PRIVILEGE or token membership in Administrators)
          *   in plugin_hardware() before initiating connection.
-         * - Caller impersonation: Use WdfRequestImpersonate() before socket connect so that outbound
-         *   network traffic is attributed to the user's security token and evaluated against user-level
-         *   firewall / Windows Filtering Platform (WFP) rules rather than kernel SYSTEM context.
+         * - Caller impersonation: plugin_hardware captures the caller's security context via
+         *   SeCreateClientSecurity and impersonates via SeImpersonateClientEx around wsk::getaddrinfo
+         *   and socket connect so outbound network traffic is evaluated against user-level
+         *   firewall / Windows Filtering Platform (WFP) rules, alongside per-user port quotas
+         *   (MaxPortsPerUser).
          * - Destination filtering: Validate target host/port in plugin_hardware() (e.g., enforce
          *   standard USB/IP port 3240, block loopback 127.0.0.1 / ::1, link-local, or private subnets).
          */
@@ -742,7 +778,9 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *init)
         }
 
         init_func_t* const functions[] { init_context, configure, create_interfaces, 
-                                         add_usbdevice_emulation, vhci::create_queues };
+                                         add_usbdevice_emulation, vhci::create_queues,
+                                         session::register_volume_notification,
+                                         session::register_session_notification };
 
         for (auto f: functions) {
                 st = f(vhci);
@@ -885,9 +923,14 @@ constexpr ULONG get_max_events(_In_ int devices_cnt)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void process_event(
-        _In_ WDFQUEUE queue, _Inout_ fileobject_ctx &fobj, _In_ WDFMEMORY evt, _In_ ULONG max_events)
+        _In_ WDFQUEUE queue, _Inout_ fileobject_ctx &fobj, _In_ WDFMEMORY evt, _In_ ULONG max_events,
+        _In_ const device_attributes &attr)
 {
         PAGED_CODE();
+
+        if (!fobj.is_admin && session::is_access_denied(attr, fobj)) {
+                return; // a subscriber only sees state changes of devices its own session/user attached
+        }
 
         auto fileobj = get_handle(&fobj);
         WDFREQUEST request{};
@@ -924,7 +967,7 @@ PAGED void process_event(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void process_event(_In_ vhci_ctx &vhci, _In_ WDFMEMORY evt)
+PAGED void process_event(_In_ vhci_ctx &vhci, _In_ WDFMEMORY evt, _In_ const device_attributes &attr)
 {
         PAGED_CODE();
 
@@ -936,7 +979,7 @@ PAGED void process_event(_In_ vhci_ctx &vhci, _In_ WDFMEMORY evt)
         for (auto head = &vhci.fileobjects, entry = head->Flink; entry != head; entry = entry->Flink) {
                 auto &fobj = *CONTAINING_RECORD(entry, fileobject_ctx, entry);
                 if (fobj.process_events) {
-                        process_event(vhci.reads, fobj, evt, max_events);
+                        process_event(vhci.reads, fobj, evt, max_events, attr);
                         ++cnt;
                 }
         }
@@ -1021,7 +1064,7 @@ bool usbip::vhci::has_device(_In_ WDFDEVICE vhci, _In_ ULONG location_hash)
 
                 if (auto hdev = ctx.devices[i]) {
                         auto dev = get_device_ctx(hdev);
-                        if (auto &ext = dev->ext(); ext.location_hash() == location_hash) {
+                        if (dev->attributes().location_hash == location_hash) {
                                 return true;
                         }
                 }
@@ -1032,36 +1075,69 @@ bool usbip::vhci::has_device(_In_ WDFDEVICE vhci, _In_ ULONG location_hash)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
+int usbip::vhci::count_user_devices(_In_ WDFDEVICE vhci, _In_ const sid_blob &user_sid)
 {
-        auto &ctx = *get_vhci_ctx(vhci);
-
-        wdf::ObjectRef ptr;
-        if (!is_valid_port(ctx, port)) {
-                return ptr;
+        if (!libdrv::is_valid(user_sid)) {
+                return 0;
         }
 
-        wdf::spinlock lck(ctx.devices_lock); 
+        auto &ctx = *get_vhci_ctx(vhci);
+        int cnt = 0;
+
+        wdf::spinlock lck(ctx.devices_lock);
+
+        for (int i = 0; i < ctx.devices_cnt; ++i) {
+                if (auto hdev = ctx.devices[i]) {
+                        auto dev = get_device_ctx(hdev);
+                        if (dev->attributes().caller_user_sid == user_sid) {
+                                ++cnt;
+                        }
+                }
+        }
+
+        return cnt;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port, _Out_ wdf::ObjectRef &device)
+{
+        device.reset();
+
+        auto &ctx = *get_vhci_ctx(vhci);
+        if (!is_valid_port(ctx, port)) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        wdf::spinlock lck(ctx.devices_lock);
+
         if (auto handle = ctx.devices[port - 1]) {
                 NT_ASSERT(get_device_ctx(handle)->port == port);
-                ptr.reset(handle); // adds reference
+                device.reset(handle); // adds reference
+                return STATUS_SUCCESS;
         }
 
-        return ptr;
+        return STATUS_DEVICE_NOT_CONNECTED;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool plugout_and_delete)
+PAGED void usbip::vhci::detach_all_devices(
+        _In_ WDFDEVICE vhci, _In_ bool plugout_and_delete, _In_opt_ const device_owner *owner)
 {
         PAGED_CODE();
 
-        TraceDbg("%04x", ptr04x(vhci));
+        TraceDbg("%04x, owner %04x", ptr04x(vhci), ptr04x(owner));
         auto &ctx = *get_vhci_ctx(vhci);
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
+
                 if (auto dev = get_device(vhci, port)) {
-                        device::detach(dev.get<UDECXUSBDEVICE>(), plugout_and_delete);
+
+                        if (auto d = get_device_ctx(dev.get());
+                            !owner || session::is_owner(*d, *owner)) {
+                                device::detach(dev.get<UDECXUSBDEVICE>(), plugout_and_delete);
+                        }
                 }
         }
 }
@@ -1071,6 +1147,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::vhci::fill(_Out_ imported_device &dev, _In_ const device_attributes &r, _In_ int port)
 {
         PAGED_CODE();
+
         dev.port = port;
         dev.location_hash = r.location_hash;
         dev.config = r.config;
@@ -1085,16 +1162,14 @@ PAGED void usbip::vhci::complete_read(_In_ WDFREQUEST request, _In_ WDFMEMORY ev
 {
         PAGED_CODE();
 
-        device_state *dst{};
-        auto dst_sz = sizeof(*dst);
+        device_state *dst;
+        size_t dst_sz;
 
-        auto st = WdfRequestRetrieveOutputBuffer(request, dst_sz, reinterpret_cast<PVOID*>(&dst), nullptr);
-        
+        auto st = wdf::retrieve_output_buffer(request, dst, &dst_sz);
         if (NT_SUCCESS(st)) {
                 *dst = get_device_state(evt);
         } else {
-                Trace(TRACE_LEVEL_ERROR, "WdfRequestRetrieveOutputBuffer %!STATUS!", st);
-                dst_sz = 0;
+                Trace(TRACE_LEVEL_ERROR, "retrieve_output_buffer %!STATUS!", st);
         }
 
         TraceDbg("fobj %04x, req %04x, device_state %04x, %!STATUS!", ptr04x(WdfRequestGetFileObject(request)), 
@@ -1115,9 +1190,16 @@ PAGED void usbip::vhci::replay_plugged_devices(_In_ WDFDEVICE vhci, _Inout_ file
         auto &ctx = *get_vhci_ctx(vhci);
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
+
                 if (auto dev = get_device(vhci, port)) {
-                        auto dc = get_device_ctx(dev.get());
-                        if (auto evt = make_device_state(vhci, dc->attributes(), dc->port, state::plugged)) {
+
+                        auto &d = *get_device_ctx(dev.get());
+
+                        if (!fobj.is_admin && session::is_access_denied(d, fobj)) {
+                                continue;
+                        }
+
+                        if (auto evt = make_device_state(vhci, d.attributes(), d.port, state::plugged)) {
                                 auto st = WdfCollectionAdd(fobj.events, evt.get<WDFMEMORY>());
                                 if (!NT_SUCCESS(st)) {
                                         Trace(TRACE_LEVEL_ERROR, "WdfCollectionAdd %!STATUS!", st);
@@ -1143,11 +1225,13 @@ PAGED void usbip::vhci::device_state_changed(
                 return;
         }
 
-        TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!vhci_state!, subscribers %d",
-                  &attr.node_name, &attr.service_name, &attr.busid, port, int(state), subscribers);
+        auto &owner = attr.config.iso.owner;
+
+        TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!vhci_state!, session %lu, subscribers %d",
+                  &attr.node_name, &attr.service_name, &attr.busid, port, int(state), owner.session_id, subscribers);
 
         if (auto evt = make_device_state(vhci, attr, port, state)) {
-                process_event(ctx, evt.get<WDFMEMORY>());
+                process_event(ctx, evt.get<WDFMEMORY>(), attr);
         } else {
                 Trace(TRACE_LEVEL_ERROR, "Failed to create state '%!vhci_state!'", int(state));
         }

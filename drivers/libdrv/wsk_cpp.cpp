@@ -5,6 +5,7 @@
 #include <ntddk.h>
 #include "wsk_cpp.h"
 #include "irp.h"
+#include "rundown.h"
 
 #include <ntstrsafe.h>
 
@@ -69,34 +70,6 @@ PAGED void ReleaseProviderNPI()
         }
 }
 
-class rundown_guard
-{
-public:
-        _IRQL_requires_same_
-        _IRQL_requires_max_(DISPATCH_LEVEL)
-        explicit rundown_guard(_Inout_ EX_RUNDOWN_REF &ref) :
-                m_ref(&ref),
-                m_acquired(ExAcquireRundownProtection(m_ref)) {}
-
-        _IRQL_requires_same_
-        _IRQL_requires_max_(DISPATCH_LEVEL)
-        ~rundown_guard()
-        {
-                if (m_acquired) {
-                        ExReleaseRundownProtection(m_ref);
-                }
-        }
-
-        rundown_guard(const rundown_guard&) = delete;
-        rundown_guard& operator=(const rundown_guard&) = delete;
-
-        constexpr explicit operator bool() const { return m_acquired; }
-
-private:
-        EX_RUNDOWN_REF *m_ref{};
-        bool m_acquired{};
-};
-
 } // namespace
 
 
@@ -122,7 +95,7 @@ struct wsk::SOCKET
         template<typename F, typename... Args>
         NTSTATUS invoke(F &&f, Args&&... args) 
         {
-                rundown_guard guard(rundown);
+                libdrv::rundown_guard guard(rundown);
 
                 if (!guard) [[unlikely]] {
                         return STATUS_NOT_SUPPORTED;

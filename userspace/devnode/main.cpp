@@ -6,6 +6,7 @@
 #include <shlwapi.h>
 #include <cfgmgr32.h>
 #include <newdev.h>
+#include <strsafe.h>
 
 #include <libusbip/format_message.h>
 
@@ -215,13 +216,14 @@ std::optional<std::wstring> get_device_instance_id(_In_ HDEVINFO di, _In_ SP_DEV
                 return std::nullopt;
         }
 
-        if (type != DEVPROP_TYPE_STRING || buf.size() < sizeof(wchar_t)) {
-                return std::nullopt;
+        assert(type == DEVPROP_TYPE_STRING);
+        auto str = reinterpret_cast<const wchar_t*>(buf.data());
+
+        if (size_t cb; SUCCEEDED(StringCbLength(str, buf.size(), &cb))) {
+                return std::wstring(str, cb/sizeof(*str));
         }
 
-        auto c_str = reinterpret_cast<const wchar_t*>(buf.data());
-        auto len = wcsnlen_s(c_str, buf.size() / sizeof(wchar_t));
-        return std::wstring(c_str, len);
+        return std::nullopt;
 }
 
 /*

@@ -332,46 +332,106 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ bool wsk_events, _In_ const head
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr bool is_maybe_storage_class(_In_ UCHAR cls)
+{
+        return  cls == USB_DEVICE_CLASS_STORAGE ||
+                cls == USB_DEVICE_CLASS_VENDOR_SPECIFIC;
+}
+
+/*
+ * Inspects every interface descriptor in a full configuration descriptor and
+ * latches flag_config_seen (plus flag_maybe_storage if any interface
+ * uses Mass Storage or Vendor-Specific class).
+ * Vendor-Specific (0xFF) is treated conservatively to avoid false positives on
+ * proprietary USB card readers (e.g. Realtek RtsUer).
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void update_storage_flags(_Inout_ UCHAR &storage_flags, _In_ USB_CONFIGURATION_DESCRIPTOR &cd)
+{
+        UCHAR flags = vhci::imported_device_hardware::flag_config_seen;
+        bool has_iface{};
+
+        for (USB_INTERFACE_DESCRIPTOR *cur{};
+             (cur = find_next<USB_INTERFACE_DESCRIPTOR>(&cd, cur)); ) {
+
+                if (has_iface = true; is_maybe_storage_class(cur->bInterfaceClass)) {
+                        flags |= vhci::imported_device_hardware::flag_maybe_storage;
+                        break;
+                }
+        }
+
+        if (has_iface) {
+                storage_flags |= flags;
+        }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void post_process(_In_ const device_ctx &dev, _Inout_ USB_CONFIGURATION_DESCRIPTOR &d)
+{
+        NT_ASSERT(is_valid(d));
+        log(d);
+
+        update_storage_flags(dev.attributes().hw.storage_flags, d);
+
+        if (dev.speed() < USB_SPEED_HIGH) {
+                patch_ls_fs_config(&d);
+        }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void post_process(_In_ const device_ctx &dev, _Inout_ USB_DEVICE_DESCRIPTOR &d)
+{
+        NT_ASSERT(is_valid(d));
+        log(d);
+
+        auto &attr = dev.attributes();
+
+        if (is_maybe_storage_class(d.bDeviceClass)) {
+                attr.hw.storage_flags |= vhci::imported_device_hardware::flag_maybe_storage;
+        }
+
+        if (*attr.config.serial) {
+                if (!d.iSerialNumber) {
+                        d.iSerialNumber = MAXUCHAR; // max possible
+                }
+                attr.hw.iserial = d.iSerialNumber;
+        }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_TRANSFER &r, _In_ void *TransferBuffer)
 {
         NT_ASSERT(is_transfer_dir_in(r));
 
         auto dsc = static_cast<USB_COMMON_DESCRIPTOR*>(TransferBuffer);
-	auto dsc_len = static_cast<UINT16>(r.TransferBufferLength);
+        auto dsc_len = static_cast<UINT16>(r.TransferBufferLength);
 
-	auto ok = (r.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) &&
-		   get_setup_packet(r).bRequest == USB_REQUEST_GET_DESCRIPTOR &&
-		   dsc_len >= sizeof(*dsc);
+        auto ok = (r.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) &&
+                  get_setup_packet(r).bRequest == USB_REQUEST_GET_DESCRIPTOR &&
+                  dsc_len >= sizeof(*dsc);
 
-	if (!ok) {
-		return;
-	}
+        if (!ok) {
+                return;
+        }
 
-	TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", 
-		  dsc->bLength, dsc->bDescriptorType, WppBinary(dsc, dsc_len));
+        TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!",
+                 dsc->bLength, dsc->bDescriptorType, WppBinary(dsc, dsc_len));
 
-	switch (dsc->bDescriptorType) {
-	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-		if (auto &d = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
-		    dsc_len > sizeof(d) && d.bLength == sizeof(d) && d.wTotalLength == dsc_len) {
-                        NT_ASSERT(is_valid(d));
-                        log(d);
-                        if (dev.speed() < USB_SPEED_HIGH) {
-                                patch_ls_fs_config(&d);
-                        }
-		}
-		break;
-	case USB_DEVICE_DESCRIPTOR_TYPE:
-		if (auto &d = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc); 
-		    dsc_len >= sizeof(d) && d.bLength == sizeof(d)) {
-                        NT_ASSERT(is_valid(d));
-                        log(d);
-                        if (*dev.ext().config().serial) {
-                                if (!d.iSerialNumber) {
-                                        d.iSerialNumber = MAXUCHAR; // max possible
-                                }
-                                dev.ext().hw().iserial = d.iSerialNumber;
-                        }
+        switch (dsc->bDescriptorType) {
+        case USB_CONFIGURATION_DESCRIPTOR_TYPE:
+                if (auto &d = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
+                    dsc_len > sizeof(d) && d.bLength == sizeof(d) && d.wTotalLength == dsc_len) {
+                        post_process(dev, d);
+                }
+                break;
+        case USB_DEVICE_DESCRIPTOR_TYPE:
+                if (auto &d = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc);
+                    dsc_len >= sizeof(d) && d.bLength == sizeof(d)) {
+                        post_process(dev, d);
                 }
                 break;
         }

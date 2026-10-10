@@ -74,7 +74,7 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 
 	hdr.command = CMD_SUBMIT;
 	hdr.seqnum = next_seqnum(dev, !dir_out);
-	hdr.devid = dev.devid();
+	hdr.devid = dev.attributes().hw.devid;
 	hdr.direction = dir_out ? direction::out : direction::in;
 	hdr.ep = usb_endpoint_num(epd);
 
@@ -95,7 +95,7 @@ void usbip::set_cmd_unlink_usbip_header(
 	_Out_ header &hdr, _Inout_ device_ctx &dev, _In_ seqnum_t seqnum_unlink)
 {
 	hdr.command = CMD_UNLINK;
-	hdr.devid = dev.devid();
+	hdr.devid = dev.attributes().hw.devid;
 	hdr.direction = direction::out;
 	hdr.seqnum = next_seqnum(dev, hdr.direction);
 	hdr.ep = 0;

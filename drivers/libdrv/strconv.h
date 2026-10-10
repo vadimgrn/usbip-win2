@@ -9,9 +9,26 @@
 namespace libdrv
 {
 
-constexpr auto isdigit(wchar_t ch)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto isdigit(_In_ wchar_t ch)
 {
         return ch <= L'9' && ch >= L'0';
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr wchar_t ascii_toupper(_In_ wchar_t ch)
+{
+        return ch >= L'a' && ch <= L'z' ? ch - L'a' + L'A' : ch;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto is_drive_letter(_In_ wchar_t ch)
+{
+        ch = ascii_toupper(ch);
+        return ch >= L'A' && ch <= L'Z';
 }
 
 _IRQL_requires_same_
@@ -37,9 +54,18 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void FreeUnicodeString(_Inout_ UNICODE_STRING &s, _In_ ULONG pooltag);
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto empty(_In_ const UNICODE_STRING &s)
 {
         return !(s.Length && s.Buffer && *s.Buffer);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto length_cch(_In_ const UNICODE_STRING &s)
+{
+        return static_cast<USHORT>(s.Length/sizeof(*s.Buffer));
 }
 
 /**

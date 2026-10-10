@@ -34,6 +34,15 @@
     <ClCompile Include="src\persistent.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\volume_isolation.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sid.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\stop_event.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="format_message.h" />
@@ -41,6 +50,7 @@
     <ClInclude Include="output.h" />
     <ClInclude Include="remote.h" />
     <ClInclude Include="vhci.h" />
+    <ClInclude Include="volume_isolation.h" />
     <ClInclude Include="win_handle.h" />
     <ClInclude Include="win_socket.h" />
     <ClInclude Include="dllspec.h" />
@@ -68,12 +78,21 @@
     <ClInclude Include="src\setupapi.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="src\stop_event.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\volume_isolation.h">
+      <Filter>src</Filter>
+    </ClInclude>
     <ClInclude Include="persistent.h" />
     <ClInclude Include="generic_handle_ex.h" />
     <ClInclude Include="resource.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\hkey.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sid.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

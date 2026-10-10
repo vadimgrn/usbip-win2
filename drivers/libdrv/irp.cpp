@@ -112,3 +112,40 @@ PAGED NTSTATUS libdrv::sync_irp::wait_for_completion(_Inout_ NTSTATUS &status)
 
         return status;
 }
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS libdrv::device_io_control(
+        _In_ DEVICE_OBJECT *devobj, _In_ ULONG ioctl_code,
+        _In_reads_bytes_opt_(in_len) void *in_buf, _In_ ULONG in_len,
+        _Out_writes_bytes_opt_(out_len) void *out_buf, _In_ ULONG out_len,
+        _In_ bool internal)
+{
+        PAGED_CODE();
+        NT_ASSERT(devobj);
+
+        KEVENT event;
+        KeInitializeEvent(&event, NotificationEvent, false);
+
+        IO_STATUS_BLOCK iost;
+
+        auto irp = IoBuildDeviceIoControlRequest(ioctl_code, devobj,
+                        in_buf, in_len, out_buf, out_len, internal, &event, &iost);
+
+        if (!irp) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        auto st = IoCallDriver(devobj, irp);
+
+        if (st == STATUS_PENDING) {
+                NT_VERIFY(KeWaitForSingleObject(&event, Executive, KernelMode, false, nullptr) == STATUS_SUCCESS);
+                st = iost.Status;
+        }
+
+        if (NT_SUCCESS(st) && iost.Information != out_len) {
+                st = STATUS_INFO_LENGTH_MISMATCH;
+        }
+
+        return st;
+}
