@@ -2,17 +2,17 @@
  * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include <ntifs.h>
-
 #include "device.h"
 #include "trace.h"
 #include "device.tmh"
 
 #include "driver.h"
+
 #include <usbip/consts.h>
+#include <libdrv/timeout.h>
+#include <libdrv/strconv.h>
 
 #include <ntstrsafe.h>
-#include <libdrv/timeout.h>
 
 using namespace usbip;
 using namespace libdrv;
@@ -62,35 +62,6 @@ PAGED void do_destroy(_Inout_ filter_ext &f)
 }
 
 /*
- * DRIVER_OBJECT.DriverName is an undocumented member and can't be used.
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED bool driver_name_equal(
-	_In_ DRIVER_OBJECT *driver, _In_ const UNICODE_STRING &expected, _In_ bool CaseInSensitive)
-{
-	PAGED_CODE();
-
-	const auto buf_sz = 1024UL;
-	unique_ptr buf(uninitialized, PagedPool, buf_sz);
-	if (!buf) {
-		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %lu bytes", buf_sz);
-		return false;
-	}
-
-	auto info = buf.get<OBJECT_NAME_INFORMATION>();
-
-	ULONG actual_sz;
-	if (auto err = ObQueryNameString(driver, info, buf_sz, &actual_sz)) {
-		Trace(TRACE_LEVEL_ERROR, "ObQueryNameString %!STATUS!", err);
-		return false;
-	}
-
-	TraceDbg("'%!USTR!'", &info->Name);
-	return RtlEqualUnicodeString(&info->Name, &expected, CaseInSensitive);
-}
-
-/*
  * Do not check that HardwareID is "USB\ROOT_HUB30" because above usbip2_ude can be nothing else.
  * 
  * for (auto cur = IoGetAttachedDeviceReference(pdo); cur; ) { // @see IoGetDeviceAttachmentBaseRef
@@ -101,9 +72,15 @@ PAGED bool driver_name_equal(
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto is_above_vhci(_In_ DEVICE_OBJECT *pdo)
+PAGED bool is_above_vhci(_In_ DRIVER_OBJECT *driver)
 {
 	PAGED_CODE();
+
+        if (!driver || empty(driver->DriverName)) {
+                return false;
+        }
+
+        TraceDbg("'%!USTR!'", &driver->DriverName);
 
 	DECLARE_CONST_UNICODE_STRING(prefix, L"\\Driver\\");
 
@@ -114,7 +91,7 @@ PAGED auto is_above_vhci(_In_ DEVICE_OBJECT *pdo)
 	NT_VERIFY(NT_SUCCESS(RtlUnicodeStringCopy(&driver_name, &prefix)));
 	NT_VERIFY(NT_SUCCESS(RtlUnicodeStringCat(&driver_name, &fname)));
 
-	return driver_name_equal(pdo->DriverObject, driver_name, true);
+        return RtlEqualUnicodeString(&driver->DriverName, &driver_name, true);
 }
 
 } // namespace
@@ -312,7 +289,7 @@ PAGED NTSTATUS usbip::add_device(_In_ DRIVER_OBJECT *drvobj, _In_ DEVICE_OBJECT 
 	PAGED_CODE();
 	Trace(TRACE_LEVEL_INFORMATION, "drv %04x, pdo %04x", ptr04x(drvobj), ptr04x(hub_or_hci_pdo));
 
-	if (!is_above_vhci(hub_or_hci_pdo)) {
+	if (!is_above_vhci(hub_or_hci_pdo->DriverObject)) {
 		TraceDbg("Skip this device");
 		return STATUS_SUCCESS;
 	}
