@@ -28,7 +28,8 @@ void print(_In_ const imported_device &d)
            -> usbip://{}:{}/{}
            -> remote bus/dev: {:03}/{:03}
            -> serial: {}
-           -> mode: {})";
+           -> mode: {}
+           -> isolation: {})";
 
         auto &loc = d.config.location;
 
@@ -37,7 +38,8 @@ void print(_In_ const imported_device &d)
                         loc.hostname, loc.service, loc.busid,
                         bus, dev,
                         d.config.serial,
-                        to_string(d.config.recv_mode));
+                        to_string(d.config.recv_mode),
+                        to_string(d.config.iso_mode));
 }
 
 } // namespace

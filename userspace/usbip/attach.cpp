@@ -9,6 +9,7 @@
 
 #include <libusbip/vhci.h>
 #include <libusbip/persistent.h>
+#include <libusbip/volume_isolation.h>
 
 #include <print>
 
@@ -89,6 +90,7 @@ bool usbip::cmd_attach(const attach_args &args)
                         .location = std::move(loc),
                         .serial = args.serial,
                         .recv_mode = args.recv_mode,
+                        .iso_mode = args.iso_mode,
                 },
                 .once = args.once,
         };
@@ -103,6 +105,22 @@ bool usbip::cmd_attach(const attach_args &args)
                 std::println("{}", port);
         } else {
                 std::println("successfully attached to port {}", port);
+        }
+
+        if (args.iso_mode == isolation::session || args.iso_mode == isolation::user) {
+                if (auto vols = isolate_port_volumes(port); vols && !vols->empty()) {
+                        for (const auto &v: *vols) {
+                                if (v.drive_letter) {
+                                        if (!v.dacl_error) {
+                                                std::println("storage volume {}: isolated to current session (DACL restricted)",
+                                                             static_cast<char>(v.drive_letter));
+                                        } else {
+                                                std::println("storage volume {}: isolated to current session (DACL error: {})",
+                                                             static_cast<char>(v.drive_letter), get_last_error_msg(v.dacl_error));
+                                        }
+                                }
+                        }
+                }
         }
 
         return true;

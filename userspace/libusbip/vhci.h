@@ -19,6 +19,14 @@
 namespace usbip::vhci
 {
 
+/*
+ * A virtual device isolation can be session/user based.
+ */ 
+#ifndef USBIP_VHCI_ISOLATION_DEFINED
+#define USBIP_VHCI_ISOLATION_DEFINED
+  enum class isolation : unsigned char { none, session, user };
+#endif
+
 /**
  * How to optimize data reception over the network
  * - zero_copy - use a dedicated thread which executes a loop with two blocking calls
@@ -40,6 +48,7 @@ enum class receive_mode : unsigned char { zero_copy, low_latency };
 namespace usbip
 {
 
+using vhci::isolation;
 using vhci::receive_mode;
 
 struct device_location
@@ -50,6 +59,13 @@ struct device_location
 };
 
 /**
+ * Possible values for user (used only when iso_mode is isolation::user):
+ * - Empty string (""): automatically resolves to the calling process's current User SID (TokenUser).
+ * - Standard string SID: e.g. "S-1-5-21-XXXXXXXXXX-XXXXXXXXXX-XXXXXXXXXX-XXXX"
+ *   (parsed via ConvertStringSidToSid).
+ * - Windows account name: e.g. "DOMAIN\\Username" or "Username"
+ *   (resolved via LookupAccountName).
+ *
  * @see generate_device_serial
  * @see validate_device_serial
  * @see get_device_serial_maxlen
@@ -59,6 +75,8 @@ struct device_config
         device_location location;
         std::string serial; ///< optional device serial number if you want to set/override it
         receive_mode recv_mode = receive_mode::zero_copy; ///< how to optimize data reception over the network
+        isolation iso_mode = isolation::none; ///< device isolation mode
+        std::string user; ///< optional user identity (account name or SID) for isolation::user
 };
 
 struct imported_device

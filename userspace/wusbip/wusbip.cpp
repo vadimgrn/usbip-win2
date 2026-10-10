@@ -14,6 +14,7 @@
 
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
+#include <libusbip/volume_isolation.h>
 #include <libusbip/src/file_ver.h>
 
 #include <wx/event.h>
@@ -1010,10 +1011,13 @@ DWORD MainFrame::attach(
         };
 
         DWORD err{};
-        auto f = [&err, args = std::move(args), vhci = get_vhci().get()] (std::stop_token)
+        auto f = [&err, args = std::move(args), vhci = get_vhci().get()] (std::stop_token stoken)
         { 
                 auto port = vhci::attach(vhci, args); 
                 err = port > 0 ? ERROR_SUCCESS : GetLastError();
+                if (port > 0 && args.config.iso_mode != isolation::none) {
+                        isolate_port_volumes(port, 4000, stoken);
+                }
         };
 
         auto msg = wxString::Format(L"%s/%s", url, busid);
@@ -1094,6 +1098,10 @@ DWORD MainFrame::detach(_In_ int port)
 {
         wxLogVerbose(_("Detach port %d"), port);
         wxBusyCursor wait;
+
+        if (port > 0) {
+                cleanup_port_volumes(port);
+        }
 
         if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), port)) {
                 return GetLastError();

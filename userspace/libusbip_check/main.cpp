@@ -11,6 +11,7 @@
 #include <libusbip/remote.h>
 #include <libusbip/vhci.h>
 #include <libusbip/persistent.h>
+#include <libusbip/volume_isolation.h>
 #include <libusbip/src/setupapi.h>
 #include <libusbip/src/hkey.h>
 
@@ -33,6 +34,7 @@ int main()
         Handle h;
         NullableHandle nh;
         HModule module;
+        HLocal hl;
 
         // win_socket.h
         InitWinSock2 ws2;
@@ -74,6 +76,9 @@ int main()
         args.config.serial = "test";
         args.config.recv_mode = receive_mode::zero_copy;
         args.once = true;
+        args.config.iso_mode = isolation::session;
+        args.config.iso_mode = isolation::user;
+        args.config.user = "S-1-5-21-test";
 
         [[maybe_unused]] auto attached_port = vhci::attach(dev.get(), args);
         [[maybe_unused]] auto attached_config = vhci::attach(dev.get(), args.config);
@@ -92,5 +97,14 @@ int main()
         std::vector<device_config> pdevs{ args.config };
         [[maybe_unused]] auto set_pers = vhci::set_persistent(dev.get(), pdevs);
         [[maybe_unused]] auto get_pers = vhci::get_persistent(dev.get());
+
+        // volume_isolation.h
+        if (auto vols = isolate_port_volumes(1, 100, nullptr); vols && !vols->empty()) {
+                [[maybe_unused]] auto &nt_dev = vols->front().nt_device;
+        }
+        [[maybe_unused]] auto async_ok1 = isolate_port_volumes_async(1, [](int, auto) {});
+        [[maybe_unused]] auto async_ok2 = isolate_port_volumes_async(1, 100, [](int, auto) {});
+        [[maybe_unused]] auto async_ok3 = isolate_port_volumes_async(1, [](int, auto) {}, 100, nullptr);
+        [[maybe_unused]] auto clean_ok = cleanup_port_volumes(1);
 }
 
