@@ -12,6 +12,7 @@
 #include "network.h"
 #include "ioctl.h"
 #include "persistent.h"
+#include "isolation.h"
 #include "wsk_receive_irp.h"
 #include "wsk_receive_events.h"
 
@@ -27,9 +28,10 @@
 namespace
 {
 
+using namespace wdf;
 using namespace usbip;
 using namespace libdrv;
-using namespace wdf;
+using namespace session;
 
 static_assert(sizeof(vhci::imported_device_location::service) == NI_MAXSERV);
 static_assert(sizeof(vhci::imported_device_location::host) == NI_MAXHOST);
@@ -51,6 +53,7 @@ struct workitem_ctx
 
         ADDRINFOEXW *addrinfo; // list head
         irp_args args;
+        vhci::device_owner owner; // Terminal Server session and User SID that requested the attach
         bool one_attempt;
 
         workitem_ctx& operator=(const workitem_ctx&) = delete;
@@ -68,6 +71,7 @@ workitem_ctx& workitem_ctx::operator=(workitem_ctx &&src)
         if (this != &src) {
                 vhci = src.vhci;
                 args = src.args;
+                owner = src.owner;
                 one_attempt = src.one_attempt;
 
                 NT_ASSERT(!request);
@@ -331,7 +335,7 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
         vhci::ioctl::plugin_hardware *r{};
         NT_VERIFY(NT_SUCCESS(WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)));
 
-        device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::connected);
+        device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::connected, ctx.owner);
 
         auto st = import_remote_device(ext);
         if (NT_ERROR(st)) {
@@ -339,7 +343,7 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
         }
 
         UDECXUSBDEVICE dev{};
-        st = device::create(dev, ctx.vhci, ctx.ctx_ext);
+        st = device::create(dev, ctx.vhci, ctx.ctx_ext, ctx.owner);
         if (NT_ERROR(st)) {
                 return st;
         }
@@ -548,13 +552,14 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         TraceDbg("req %04x, %!STATUS!", ptr04x(request), st);
         WdfRequestComplete(request, st);
 
-        if (ctx.one_attempt) {
-                //
-        } else if (auto hash = ext.location_hash(); NT_SUCCESS(st)) {
-                stop_attach_attempts(vhci, hash);
-        } else if (!NT_SUCCESS(st) && can_reattach(ctx.vhci, hash, st)) {
-                stop_attach_attempts(vhci, hash);
-                start_attach_attempts(ctx.vhci, vhci, ext.attr, true);
+        if (!ctx.one_attempt) {
+                auto hash = ext.location_hash();
+                if (NT_SUCCESS(st)) {
+                        stop_attach_attempts(vhci, hash, &ctx.owner);
+                } else if (can_reattach(ctx.vhci, hash, st)) {
+                        stop_attach_attempts(vhci, hash, &ctx.owner);
+                        start_attach_attempts(ctx.vhci, vhci, ext.attr, ctx.owner, true);
+                }
         }
 }
 
@@ -581,7 +586,7 @@ PAGED void workitem_cleanup(_In_ WDFOBJECT object)
                 auto &ext = get_device_ctx_ext(mem); // or ctx.ext()
 
                 close_socket(ext.sock);
-                device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::disconnected);
+                device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::disconnected, ctx.owner);
 
                 WdfObjectDelete(mem);
                 mem = WDF_NO_HANDLE;
@@ -653,49 +658,187 @@ PAGED void getaddrinfo(
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto init_requestor_isolation(
+        _In_ WDFREQUEST request, _In_ vhci::isolation mode, _Out_ vhci::device_owner &owner)
+{
+        PAGED_CODE();
+        using vhci::isolation;
+
+        owner = {};
+
+        if (mode == isolation::none || WdfRequestGetRequestorMode(request) == KernelMode) {
+                return STATUS_SUCCESS;
+        }
+
+        if (mode == isolation::session) {
+                owner.session_id = get_requestor_session_id(request);
+                if (!owner.has_session()) {
+                        Trace(TRACE_LEVEL_ERROR, "get_requestor_session_id");
+                        return STATUS_ACCESS_DENIED;
+                }
+        } else if (mode == isolation::user) {
+                auto st = get_requestor_owner(request, owner);
+                if (!NT_SUCCESS(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "get_requestor_owner %!STATUS!", st);
+                        return STATUS_ACCESS_DENIED;
+                }
+        }
+
+        return STATUS_SUCCESS;
+}
+
+/*
+ * A driver-initiated (re)attach reaches this handler through target_self, which erased the
+ * original requestor's session/user. Recover the owning session/user from the pending attach request.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto recover_attach_isolation(
+        _In_ WDFDEVICE vhci, _In_ ULONG location_hash, _In_ vhci::isolation mode,
+        _Inout_ vhci::device_owner &owner)
+{
+        PAGED_CODE();
+        using vhci::isolation;
+
+        auto &ctx = *get_vhci_ctx(vhci);
+
+        if (mode == isolation::session && !owner.has_session()) {
+
+                if (!(find_attach_device_owner(ctx, location_hash, owner) && owner.has_session())) {
+                        Trace(TRACE_LEVEL_ERROR, "failed to recover session for session-isolated device");
+                        return STATUS_ACCESS_DENIED;
+                }
+
+        } else if (mode == isolation::user && !owner.has_sid()) {
+
+                if (!(find_attach_device_owner(ctx, location_hash, owner) && owner.has_sid())) {
+                        Trace(TRACE_LEVEL_ERROR, "failed to recover owner SID for user-isolated device");
+                        return STATUS_ACCESS_DENIED;
+                }
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto plugin_hardware(
         _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r, _In_ bool once)
 {
         PAGED_CODE();
+        auto &cfg = r.config;
 
-        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, serial '%s', once %d, wsk events %d",
-                                        r.config.location.host, r.config.location.service,
-                                        r.config.location.busid, r.config.serial, once, r.config.wsk_events);
+        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, serial '%s', once %d, wsk events %d, %!vhci_isolation!",
+                                        cfg.location.host, cfg.location.service, cfg.location.busid,
+                                        cfg.serial, once, cfg.wsk_events, int(cfg.iso_mode));
+
+        if (!is_valid(cfg.iso_mode)) {
+                Trace(TRACE_LEVEL_ERROR, "invalid isolation mode %d", int(cfg.iso_mode));
+                return STATUS_INVALID_PARAMETER;
+        }
 
         auto vhci = get_vhci(request);
 
         WDFWORKITEM wi{};
         auto st = create_workitem(wi, vhci);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", st);
                 return st;
         }
-        auto &ctx = *get_workitem_ctx(wi);
+        wdf::object_delete del(wi);
 
+        auto &ctx = *get_workitem_ctx(wi);
         ctx.vhci = vhci;
         ctx.request = request;
         ctx.one_attempt = once;
 
-        st = create_device_ctx_ext(ctx.ctx_ext, vhci, r);
-        if (NT_ERROR(st)) {
-                WdfObjectDelete(wi);
+        st = init_requestor_isolation(request, cfg.iso_mode, ctx.owner);
+        if (!NT_SUCCESS(st)) {
                 return st;
         }
 
+        st = create_device_ctx_ext(ctx.ctx_ext, vhci, r);
+        if (!NT_SUCCESS(st)) {
+                return st;
+        }
         auto &ext = ctx.ext();
-        device_state_changed(vhci, ext.attr, 0, vhci::state::connecting);
+
+        st = recover_attach_isolation(vhci, ext.location_hash(), cfg.iso_mode, ctx.owner);
+        if (!NT_SUCCESS(st)) {
+                return st;
+        }
+
+        device_state_changed(vhci, ext.attr, 0, vhci::state::connecting, ctx.owner);
 
         getaddrinfo(request, wi, ctx, ext); // completion handler will be called anyway
+
+        del.release();
         return STATUS_PENDING;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
+PAGED auto get_location_hash(_In_ const vhci::imported_device_location &loc, _Out_ ULONG &hash)
+{
+        PAGED_CODE();
+        hash = 0;
+
+        if (loc.empty()) {
+                return STATUS_SUCCESS;
+        }
+
+        device_attributes attr;
+        auto st = init_device_attributes(attr, loc);
+
+        if (NT_SUCCESS(st)) {
+                hash = attr.location_hash;
+                NT_ASSERT(hash);
+                free(attr);
+        }
+
+        return st;
+}
+
+/*
+ * Resolves caller ownership and privilege.
+ * For administrators (including KernelMode callers), only the session ID is recorded;
+ * extracting a User SID is unnecessary because administrators bypass user isolation
+ * restrictions, and would fail with STATUS_NO_TOKEN for KernelMode threads lacking tokens.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto get_caller_owner(
+        _In_ WDFREQUEST request, _Out_ bool &is_admin, _Out_ vhci::device_owner &owner)
+{
+        PAGED_CODE();
+        owner = {};
+
+        is_admin = is_admin_request(request);
+        if (is_admin) {
+                owner.session_id = get_requestor_session_id(request);
+                return STATUS_SUCCESS;
+        }
+
+        auto st = get_requestor_owner(request, owner);
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "get_requestor_owner %!STATUS!", st);
+        }
+        return st;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS stop_attach_attempts(
+        _In_ WDFREQUEST request, _In_ size_t output_len, _In_ size_t /*input_len*/)
 {
         PAGED_CODE();
 
         vhci::ioctl::stop_attach_attempts *r{};
+
+        if (output_len < sizeof(*r)) { // WdfRequestRetrieveInputBuffer checks input length
+                return STATUS_BUFFER_TOO_SMALL;
+        }
+
         size_t length;
         auto st = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length);
 
@@ -712,32 +855,31 @@ PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
 
         TraceDbg("host '%s', service '%s', busid '%s'", r->location.host, r->location.service, r->location.busid);
 
-        ULONG location_hash{};
-
-        if (auto cnt = bool(*r->location.host) + bool(*r->location.service) + bool(*r->location.busid); !cnt) {
-                st = STATUS_SUCCESS; // stop all
-        } else if (cnt != 3) {
-                st = STATUS_INVALID_PARAMETER;
-        } else if (device_attributes attr{}; NT_SUCCESS(st = init_device_attributes(attr, r->location))) {
-                location_hash = attr.location_hash;
-                free(attr);
+        ULONG location_hash;
+        st = get_location_hash(r->location, location_hash);
+        if (!NT_SUCCESS(st)) {
+                return st;
         }
 
-        if (NT_SUCCESS(st)) {
-                auto vhci = get_vhci(request);
-                auto ctx = get_vhci_ctx(vhci);
-
-                r->count = stop_attach_attempts(*ctx, location_hash);
-
-                WdfRequestSetInformation(request, sizeof(*r));
+        bool is_admin;
+        vhci::device_owner owner;
+        st = get_caller_owner(request, is_admin, owner);
+        if (!NT_SUCCESS(st)) {
+                return st;
         }
+
+        auto vhci = get_vhci(request);
+        auto ctx = get_vhci_ctx(vhci);
+
+        r->count = stop_attach_attempts(*ctx, location_hash, is_admin ? nullptr : &owner);
+        WdfRequestSetInformation(request, sizeof(*r));
 
         return st;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
+PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ size_t output_len, _In_ bool once)
 {
         PAGED_CODE();
         WdfRequestSetInformation(request, 0);
@@ -753,17 +895,58 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
         } else if (r->size != length) {
                 Trace(TRACE_LEVEL_ERROR, "struct.size %lu != sizeof(struct) %Iu", r->size, length);
                 return USBIP_ERROR_ABI;
-        } else if (st = validate_serial_number(r->config.serial); !NT_SUCCESS(st)) {
+        }
+
+        const auto written = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
+
+        if (output_len < written) { // WdfRequestRetrieveInputBuffer checks input length
+                return STATUS_BUFFER_TOO_SMALL;
+        }
+
+        st = validate_serial_number(r->config.serial);
+        if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "bad serial '%s'", r->config.serial);
                 return st;
         }
 
         r->port = 0;
-
-        const auto written = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
         WdfRequestSetInformation(request, written);
 
         return plugin_hardware(request, *r, once);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto detach_all(
+        _In_ WDFDEVICE vhci, _In_ int port, _In_opt_ const vhci::device_owner *owner)
+{
+        PAGED_CODE();
+        auto plugout_and_delete = port != vhci::ioctl::PORT_ALL_CLOSEONLY;
+        vhci::detach_all_devices(vhci, plugout_and_delete, owner);
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto detach_device(
+        _In_ WDFDEVICE vhci, _In_ int port,
+        _In_ bool is_admin, _In_ const vhci::device_owner &owner, _In_ bool reattach)
+{
+        PAGED_CODE();
+
+        wdf::ObjectRef dev;
+        auto st = vhci::get_device(vhci, port, dev);
+        if (!NT_SUCCESS(st)) {
+                return st;
+        }
+        
+        if (auto d = get_device_ctx(dev.get());
+            !is_admin && is_access_denied(*d, owner)) {
+                return STATUS_ACCESS_DENIED;
+        }
+
+        device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), reattach);
+        return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_
@@ -785,32 +968,36 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request, _In_ bool reattach)
                 return USBIP_ERROR_ABI;
         }
 
-        TraceDbg("port %d, reattach %!bool!", r->port, reattach);
-        st = STATUS_SUCCESS;
-
-        if (auto vhci = get_vhci(request); r->port <= 0) {
-                auto plugout_and_delete = r->port != vhci::ioctl::PORT_ALL_CLOSEONLY;
-                vhci::detach_all_devices(vhci, plugout_and_delete);
-        } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
-                st = STATUS_INVALID_PARAMETER;
-        } else if (auto dev = vhci::get_device(vhci, r->port)) {
-                device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), reattach);
-        } else {
-                st = STATUS_DEVICE_NOT_CONNECTED;
+        bool is_admin;
+        vhci::device_owner owner;
+        st = get_caller_owner(request, is_admin, owner);
+        if (!NT_SUCCESS(st)) {
+                return st;
         }
 
-        return st;
+        TraceDbg("port %d, reattach %!bool!, session %lu, admin %!bool!", r->port, reattach, owner.session_id, is_admin);
+        auto vhci = get_vhci(request);
+
+        return  r->port > 0 ?
+                detach_device(vhci, r->port, is_admin, owner, reattach) :
+                detach_all(vhci, r->port, is_admin ? nullptr : &owner);
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
+PAGED NTSTATUS get_imported_devices(
+        _In_ WDFREQUEST request, _In_ size_t /*output_len*/, _In_ size_t input_len)
 {
         PAGED_CODE();
         WdfRequestSetInformation(request, 0);
 
-        size_t outlen;
         vhci::ioctl::get_imported_devices *r;
+
+        if (input_len < sizeof(r->size)) { // WdfRequestRetrieveOutputBuffer checks output length
+                return STATUS_BUFFER_TOO_SMALL;
+        }
+
+        size_t outlen;
         auto st = WdfRequestRetrieveOutputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &outlen);
 
         if (NT_ERROR(st)) {
@@ -827,22 +1014,36 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
         auto max_cnt = devices_size/sizeof(*r->devices);
         NT_ASSERT(max_cnt);
 
+        bool is_admin;
+        vhci::device_owner owner;
+        st = get_caller_owner(request, is_admin, owner);
+        if (!NT_SUCCESS(st)) {
+                return st;
+        }
+
         auto vhci = get_vhci(request);
         auto &ctx = *get_vhci_ctx(vhci);
-        
         ULONG cnt = 0;
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
-                if (auto dev = vhci::get_device(vhci, port); !dev) {
-                        //
-                } else if (cnt == max_cnt) {
+
+                auto device = vhci::get_device(vhci, port);
+                if (!device) {
+                        continue;
+                }
+                auto &dev = *get_device_ctx(device.get());
+
+                if (!is_admin && is_access_denied(dev, owner)) {
+                        continue; // owned by another session or user with isolation enabled, hide it from this non-admin caller
+                }
+
+                if (cnt == max_cnt) {
                         return STATUS_BUFFER_TOO_SMALL;
-                } else {
-                        auto dc = get_device_ctx(dev.get());
-                        st = fill(r->devices[cnt++], *dc);
-                        if (NT_ERROR(st)) {
-                                return st;
-                        }
+                }
+
+                auto res = fill(r->devices[cnt++], dev);
+                if (!NT_SUCCESS(res)) {
+                        return res;
                 }
         }
 
@@ -881,9 +1082,14 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto set_persistent(_In_ WDFREQUEST request)
+PAGED auto set_persistent(
+        _In_ WDFREQUEST request, _In_ size_t /*output_len*/, _In_ size_t /*input_len*/)
 {
         PAGED_CODE();
+
+        if (!is_admin_request(request)) {
+                return STATUS_ACCESS_DENIED;
+        }
 
         wchar_t *buf{};
         size_t bytes{};
@@ -922,7 +1128,8 @@ PAGED auto set_persistent(_In_ WDFREQUEST request)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto get_persistent(_In_ WDFREQUEST request)
+PAGED auto get_persistent(
+        _In_ WDFREQUEST request, _In_ size_t /*output_len*/, _In_ size_t /*input_len*/)
 {
         PAGED_CODE();
         WdfRequestSetInformation(request, 0);
@@ -975,10 +1182,8 @@ _Function_class_(EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 PAGED void device_control(
-        _In_ WDFQUEUE Queue,
-        _In_ WDFREQUEST Request,
-        _In_ size_t OutputBufferLength,
-        _In_ size_t InputBufferLength,
+        _In_ WDFQUEUE Queue, _In_ WDFREQUEST Request, 
+        _In_ size_t OutputBufferLength, _In_ size_t InputBufferLength,
         _In_ ULONG IoControlCode)
 {
         PAGED_CODE();
@@ -997,7 +1202,7 @@ PAGED void device_control(
                 once = true;
                 [[fallthrough]];
         case vhci::ioctl::PLUGIN_HARDWARE:
-                st = plugin_hardware(Request, once);
+                st = plugin_hardware(Request, OutputBufferLength, once);
                 break;
         case vhci::ioctl::PLUGOUT_HARDWARE_AND_REATTACH:
                 reattach = true;
@@ -1007,11 +1212,13 @@ PAGED void device_control(
                 break;
         case IOCTL_USB_USER_REQUEST:
                 NT_ASSERT(!has_urb(Request));
-                if (USBUSER_REQUEST_HEADER *hdr; 
-                    NT_SUCCESS(WdfRequestRetrieveInputBuffer(Request, sizeof(*hdr), 
-                                                             reinterpret_cast<PVOID*>(&hdr), nullptr))) {
-                        TraceDbg("USB_USER_REQUEST -> %s(%#08lX)", usbuser_request_name(hdr->UsbUserRequest), 
-                                  hdr->UsbUserRequest);
+                {
+                        USBUSER_REQUEST_HEADER *hdr;
+                        auto ret = WdfRequestRetrieveInputBuffer(Request, sizeof(*hdr), reinterpret_cast<PVOID*>(&hdr), nullptr);
+                        if (NT_SUCCESS(ret)) {
+                                TraceDbg("USB_USER_REQUEST -> %s(%#08lX)", usbuser_request_name(hdr->UsbUserRequest), 
+                                          hdr->UsbUserRequest);
+                        }
                 }
                 [[fallthrough]];
         default:
@@ -1074,7 +1281,7 @@ PAGED void device_control_parallel(
                           ptr04x(Request), device_control_name(IoControlCode), IoControlCode, 
                           OutputBufferLength, InputBufferLength);
 
-                st = handler(Request);
+                st = handler(Request, OutputBufferLength, InputBufferLength);
         } else {
                 auto vhci = WdfIoQueueGetDevice(Queue);
                 auto def_queue = WdfDeviceGetDefaultQueue(vhci);
@@ -1092,6 +1299,32 @@ PAGED void device_control_parallel(
                 TraceDbg("%!STATUS!, Information %Ix", st, WdfRequestGetInformation(Request));
                 WdfRequestComplete(Request, st);
         }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto register_subscriber(
+        _In_ WDFDEVICE device, _In_ WDFREQUEST request, _Inout_ fileobject_ctx &fobj, _Inout_ vhci_ctx &vhci)
+{
+        PAGED_CODE();
+
+        if (fobj.process_events) {
+                if (session::is_access_denied(fobj, request)) {
+                        return STATUS_ACCESS_DENIED; // a handle opened by one session/user must not be read from another
+                }
+                return STATUS_SUCCESS;
+        }
+
+        auto st = get_caller_owner(request, fobj.is_admin, fobj.owner);
+        if (!NT_SUCCESS(st)) {
+                return STATUS_ACCESS_DENIED;
+        }
+
+        fobj.process_events = true;
+        ++vhci.events_subscribers;
+
+        vhci::replay_plugged_devices(device, fobj);
+        return STATUS_SUCCESS;
 }
 
 _Function_class_(EVT_WDF_IO_QUEUE_IO_READ)
@@ -1113,13 +1346,13 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
 
         auto device = WdfIoQueueGetDevice(queue);
         auto &vhci = *get_vhci_ctx(device);
-        
+
         waitlock lck(vhci.events_lock);
 
-        if (auto &val = fobj.process_events; !val) {
-                ++vhci.events_subscribers;
-                val = true;
-                vhci::replay_plugged_devices(device, fobj);
+        auto st = register_subscriber(device, request, fobj, vhci);
+        if (!NT_SUCCESS(st)) {
+                WdfRequestCompleteWithInformation(request, st, 0);
+                return;
         }
 
         if (auto evt = static_cast<WDFMEMORY>(WdfCollectionGetFirstItem(fobj.events))) {
@@ -1128,13 +1361,81 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
                 return;
         }
 
-        auto st = WdfRequestForwardToIoQueue(request, vhci.reads);
+        st = WdfRequestForwardToIoQueue(request, vhci.reads);
         if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", st);
                 if (st == STATUS_WDF_BUSY) { // the queue is not accepting new requests, purged
                         st = STATUS_END_OF_FILE; // ReadFile will return TRUE and set lpNumberOfBytesRead to zero
                 }
                 WdfRequestCompleteWithInformation(request, st, 0);
+        }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto get_port_isolation(
+        _In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t output_len) 
+{
+        vhci::ioctl::get_port_isolation *iso{};
+
+        if (output_len < sizeof(*iso)) { // WdfRequestRetrieveInputBuffer checks input length
+                return STATUS_BUFFER_TOO_SMALL;
+        }
+
+        auto st = WdfRequestRetrieveInputBuffer(request, sizeof(*iso), reinterpret_cast<PVOID*>(&iso), nullptr);
+        if (!NT_SUCCESS(st)) {
+                return st;
+        }
+
+        if (iso->size != sizeof(*iso)) {
+                Trace(TRACE_LEVEL_ERROR, "iso.size %lu != sizeof(iso) %Iu", iso->size, sizeof(*iso));
+                return as_ntstatus(USBIP_ERROR_ABI);
+        }
+
+        auto vhci = WdfIoQueueGetDevice(queue);
+
+        wdf::ObjectRef device;
+        st = vhci::get_device(vhci, iso->port, device);
+        if (!NT_SUCCESS(st)) {
+                return st;
+        }
+
+        auto &dev = *get_device_ctx(device.get());
+
+        iso->data = {
+                .owner = dev.owner,
+                .mode = dev.iso_mode()
+        };
+
+        TraceDbg("dev %04x, port %d, session %lu, %!vhci_isolation!",
+                  ptr04x(device.get()), iso->port, dev.owner.session_id, int(iso->data.mode));
+
+        WdfRequestSetInformation(request, sizeof(*iso));
+        return STATUS_SUCCESS;
+}
+
+_Function_class_(EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void internal_device_control(
+        _In_ WDFQUEUE queue, _In_ WDFREQUEST request,
+        _In_ size_t output_len, _In_ size_t input_len,
+        _In_ ULONG ioctl)
+{
+        TraceDbg("%s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
+                  device_control_name(ioctl), ioctl, output_len, input_len);
+
+        NTSTATUS st;
+
+        if (ioctl == vhci::ioctl::INTERNAL_GET_PORT_ISOLATION) {
+                st = get_port_isolation(queue, request, output_len);
+        } else {
+                st = STATUS_INVALID_DEVICE_REQUEST;
+        }
+
+        if (st != STATUS_PENDING) {
+                TraceDbg("%!STATUS!, Information %Iu", st, WdfRequestGetInformation(request));
+                WdfRequestComplete(request, st);
         }
 }
 
@@ -1157,6 +1458,7 @@ PAGED NTSTATUS usbip::vhci::create_queues(_In_ WDFDEVICE vhci)
         WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential); // WdfDeviceGetDefaultQueue
         cfg.PowerManaged = PowerManaged;
         cfg.EvtIoDeviceControl = device_control;
+        cfg.EvtIoInternalDeviceControl = internal_device_control;
         cfg.EvtIoRead = device_read;
 
         auto st = WdfIoQueueCreate(vhci, &cfg, &attr, nullptr);

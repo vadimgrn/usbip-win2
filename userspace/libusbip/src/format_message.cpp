@@ -2,9 +2,9 @@
  * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 #include "../format_message.h"
+#include "../win_handle.h"
 #include "strconv.h"
 
-#include <memory>
 #include <format>
 
 
@@ -21,7 +21,7 @@ std::wstring usbip::wformat_message(
                  FORMAT_MESSAGE_MAX_WIDTH_MASK; // do not append '\n'
 
         if (LPWSTR buf{}; auto cch = FormatMessage(flags, module, msg_id, lang_id, (LPWSTR)&buf, 0, nullptr)) {
-                std::unique_ptr<void, decltype(LocalFree)&> buf_ptr(buf, LocalFree);
+                HLocal del(buf);
                 msg.assign(buf, cch);
                 trim_right(msg);
         } else {

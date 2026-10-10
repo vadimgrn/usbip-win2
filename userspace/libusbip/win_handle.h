@@ -27,6 +27,11 @@ struct hmodule_traits
         static HMODULE invalid() noexcept { return nullptr; }
 };
 
+struct hlocal_traits 
+{
+        static HLOCAL invalid() noexcept { return nullptr; }
+};
+
 
 using Handle = generic_handle<invalid_handle_traits>;
 
@@ -54,6 +59,16 @@ template<>
 inline void close_handle(_In_ HModule::type h, _In_ HModule::tag_type) noexcept
 {
         [[maybe_unused]] auto ok = FreeLibrary(h);
+        assert(ok);
+}
+
+
+using HLocal = generic_handle<hlocal_traits>;
+
+template<>
+inline void close_handle(_In_ HLocal::type h, _In_ HLocal::tag_type) noexcept
+{
+        [[maybe_unused]] auto ok = !LocalFree(h);
         assert(ok);
 }
 
