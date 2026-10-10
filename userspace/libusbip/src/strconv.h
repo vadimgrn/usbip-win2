@@ -34,6 +34,8 @@ USBIP_API std::expected<std::string,  unsigned long> wchar_to_utf8(_In_ std::wst
 USBIP_API std::wstring utf8_to_wchar_or(_In_ std::string_view s, _In_ std::optional<std::wstring_view> val = std::nullopt);
 USBIP_API std::string  wchar_to_utf8_or(_In_ std::wstring_view ws, _In_ std::optional<std::string_view> val = std::nullopt);
 
+USBIP_API bool equal_ordinal(_In_ std::wstring_view a, _In_ std::wstring_view b, _In_ bool ignore_case = false) noexcept;
+
 /**
  * Empty strings or strings beginning with L'\0' will be skipped.
  * If string has L'\0', characters after it will not be included.

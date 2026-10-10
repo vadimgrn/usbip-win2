@@ -42,7 +42,7 @@ PAGED auto save_device_location(_Inout_ device_attributes &attr, _In_ const vhci
                 }
 
                 auto st = utf8_to_unicode(*dst, src, maxlen, PagedPool, unique_ptr::pooltag);
-                if (NT_ERROR(st)) {
+                if (!NT_SUCCESS(st)) {
                         Trace(TRACE_LEVEL_ERROR, "utf8_to_unicode('%s') %!STATUS!", src, st);
                         return st;
                 }
@@ -128,7 +128,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
         ctx_ext = mem;
 
         auto st = alloc_device_ctx_ext(mem, parent); 
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 return st;
         }
 
@@ -136,7 +136,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
         auto &ext = get_device_ctx_ext(mem);
 
         st = init_device_attributes(ext.attr, r.config.location);
-        if (NT_ERROR(st)) {
+        if (!NT_SUCCESS(st)) {
                 return st;
         }
 
