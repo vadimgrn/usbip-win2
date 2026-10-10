@@ -37,7 +37,10 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void FreeUnicodeString(_Inout_ UNICODE_STRING &s, _In_ ULONG pooltag);
 
-constexpr auto empty(_In_ const UNICODE_STRING &s) { return !s.Length; }
+constexpr auto empty(_In_ const UNICODE_STRING &s)
+{
+        return !(s.Length && s.Buffer && *s.Buffer);
+}
 
 /**
  * head and str OR tail and str can be the same object.
@@ -61,6 +64,10 @@ PAGED void split(
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED int strchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch);
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED bool equal(_In_ const UNICODE_STRING &u, _In_z_ const wchar_t *s, _In_ bool case_insensitive = false);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

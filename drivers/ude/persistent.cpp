@@ -40,14 +40,6 @@ struct attach_ctx
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(attach_ctx, get_attach_ctx);
 
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto empty(_In_ const UNICODE_STRING &s)
-{
-        PAGED_CODE();
-        return libdrv::empty(s) || !*s.Buffer;
-}
-
-_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto reattach_req_count(_Inout_ vhci_ctx &vhci)
 {
@@ -169,78 +161,127 @@ PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto parse_flags(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &str)
+PAGED auto validate(_In_ const device_attributes &r)
 {
         PAGED_CODE();
 
-        if (empty(str)) {
+        if (empty(r.node_name) || empty(r.service_name) || empty(r.busid)) {
+                Trace(TRACE_LEVEL_ERROR, "missing required location attributes");
                 return STATUS_INVALID_PARAMETER;
         }
 
-        for (USHORT i = 0; i < str.Length/sizeof(*str.Buffer); ++i) {
-                if (!isdigit(str.Buffer[i])) {
-                        return STATUS_INVALID_PARAMETER;
-                }
-        }
-
-        ULONG val{};
-        auto st = RtlUnicodeStringToInteger(&str, 10, &val);
+        auto st = validate_serial_number(r.config.serial);
         if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "bad serial '%s'", r.config.serial);
                 return st;
         }
-
-        bool once; // ignore, does not make sense for persistent
-        unpack_attach_flags(once, wsk_events, val);
 
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto parse_serial(_Out_ char (&serial)[SERIAL_BUFSZ], _In_ const UNICODE_STRING &val)
+{
+        PAGED_CODE();
+
+        auto st = unicode_to_utf8(serial, sizeof(serial), val);
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &val, st);
+                return st;
+        }
+
+        st = validate_serial_number(serial);
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "bad serial '%!USTR!'", &val);
+                return st;
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto parse_recv_mode(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &val)
+{
+        PAGED_CODE();
+
+        if (equal(val, L"low-latency", true)) {
+                wsk_events = true;
+                return STATUS_SUCCESS;
+        }
+
+        if (equal(val, L"zero-copy", true)) {
+                wsk_events = false;
+                return STATUS_SUCCESS;
+        }
+
+        Trace(TRACE_LEVEL_ERROR, "invalid receive mode '%!USTR!'", &val);
+        return STATUS_INVALID_PARAMETER;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto parse_token(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &token)
+{
+        PAGED_CODE();
+
+        UNICODE_STRING key, val;
+        split(key, val, token, L'=');
+
+        if (empty(key) || empty(val)) {
+                Trace(TRACE_LEVEL_ERROR, "malformed key-value token in '%!USTR!'", &token);
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        if (equal(key, L"host", true)) {
+                r.node_name = val;
+        } else if (equal(key, L"port", true)) {
+                r.service_name = val;
+        } else if (equal(key, L"busid", true)) {
+                r.busid = val;
+        } else if (equal(key, L"serial", true)) {
+                return parse_serial(r.config.serial, val);
+        } else if (equal(key, L"recv_mode", true)) {
+                return parse_recv_mode(r.config.wsk_events, val);
+        }
+
+        return STATUS_SUCCESS; // unknown keys are ignored for forward compatibility
+}
+
 /*
- * @param r must be zeroed
- * @param device_str host,port,busid,serial,flags
- * @see hash_location
+ * @param device_str host=<val>;port=<val>;busid=<val>[;serial=<val>][;recv_mode=<val>]
+ * @see validate, hash_location
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &device_str)
+PAGED auto parse_device_str(_Out_ device_attributes &r, _In_ const UNICODE_STRING &device_str)
 {
         PAGED_CODE();
+        r = {};
 
         if (empty(device_str)) {
                 return STATUS_INVALID_PARAMETER;
         }
 
-        UNICODE_STRING serial;
-        auto tail = device_str;
-        UNICODE_STRING* v[] { &r.node_name, &r.service_name, &r.busid, &serial, &tail };
+        for (auto tail = device_str; !empty(tail); ) {
 
-        for (int i = 0; i < ARRAYSIZE(v) - 1; ++i) {
-                split(*v[i], tail, tail, L',');
-        }
+                UNICODE_STRING token;
+                split(token, tail, tail, L';');
 
-        if (empty(r.node_name) || empty(r.service_name) || empty(r.busid)) {
-                return STATUS_INVALID_PARAMETER;
-        }
+                if (empty(token)) {
+                        continue;
+                }
 
-        auto &u8_serial = r.config.serial;
-
-        auto st = unicode_to_utf8(u8_serial, sizeof(u8_serial), serial);
-        if (!NT_SUCCESS(st)) {
-                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &serial, st);
-                return st;
-        }
-
-        st = validate_serial_number(u8_serial);
-        if (!NT_SUCCESS(st)) {
-                Trace(TRACE_LEVEL_ERROR, "bad serial '%!USTR!'", &serial);
-                return st;
-        }
-
-        if (!empty(tail)) {
-                st = parse_flags(r.config.wsk_events, tail);
+                auto st = parse_token(r, token);
                 if (!NT_SUCCESS(st)) {
                         return st;
                 }
+        }
+
+        auto st = validate(r);
+        if (!NT_SUCCESS(st)) {
+                return st;
         }
 
         return hash_location(r.location_hash, r);
@@ -504,6 +545,116 @@ PAGED decltype(WdfDriverOpenParametersRegistryKey) *get_function(_In_ DRIVER_REG
         }
 }
 
+/*
+ * Zero length buffer is OK.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto validate_persistent_devices_buffer(
+        _In_reads_bytes_opt_(bytes) const wchar_t *buf, _In_ size_t bytes)
+{
+        PAGED_CODE();
+
+        if (bytes && !buf) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        if (bytes % sizeof(*buf)) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        if (constexpr size_t maxlen = 64*1024; // arbitrary
+            bytes > maxlen) {
+                Trace(TRACE_LEVEL_ERROR, "bytes %Iu exceeds max %Iu", bytes, maxlen);
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        if (!bytes) {
+                return STATUS_SUCCESS;
+        }
+
+        if (buf[bytes/sizeof(*buf) - 1] != L'\0') {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto next_string(_Out_ UNICODE_STRING &str, _Inout_ const wchar_t* &p, _In_ const wchar_t *end)
+{
+        PAGED_CODE();
+
+        auto start = p;
+        while (p < end && *p) {
+                ++p;
+        }
+
+        if (p >= end) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        auto cch = p - start;
+        auto len = cch*sizeof(*p);
+
+        if (!(cch && len <= UNICODE_STRING_MAX_BYTES)) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        str = {
+                .Length = static_cast<USHORT>(len),
+                .MaximumLength = static_cast<USHORT>(len),
+                .Buffer = const_cast<wchar_t*>(start)
+        };
+
+        ++p; // skip the null terminator
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto validate_device_entry(_In_ const UNICODE_STRING &device_str)
+{
+        PAGED_CODE();
+
+        device_attributes attr;
+        auto st = parse_device_str(attr, device_str);
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "invalid device '%!USTR!', %!STATUS!", &device_str, st);
+                return st;
+        }
+
+        vhci::imported_device_location loc{};
+        st = fill_location(loc, attr);
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "fill_location '%!USTR!', %!STATUS!", &device_str, st);
+                return st;
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto validate_trailing_nulls(_In_ const wchar_t *p, _In_ const wchar_t *end, _In_ ULONG count)
+{
+        PAGED_CODE();
+
+        if (p == end && count > 0) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        while (p < end) {
+                if (*p) {
+                        return STATUS_INVALID_PARAMETER;
+                }
+                ++p;
+        }
+
+        return STATUS_SUCCESS;
+}
+
 } // namespace 
 
 
@@ -584,7 +735,7 @@ PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
                 UNICODE_STRING device_str;
                 WdfStringGetUnicodeString(str, &device_str);
 
-                device_attributes attr{};
+                device_attributes attr;
                 auto st = parse_device_str(attr, device_str);
 
                 if (!NT_SUCCESS(st)) {
@@ -630,99 +781,46 @@ PAGED NTSTATUS usbip::fill_location(
  * - Parses every entry via parse_device_str() and fill_location() to verify syntax,
  *   serial number format, attach flags, and location hash.
  * - Ensures total device count does not exceed max_devices (controller port count).
+ * - Zero length buffer is OK.
  *
  * @see set_persistent
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::validate_persistent_devices(
-        _In_reads_bytes_(length) const void *buf, _In_ size_t length, _In_ ULONG max_devices)
+        _In_reads_bytes_opt_(bytes) const wchar_t *buf, _In_ size_t bytes, _In_ ULONG max_devices)
 {
         PAGED_CODE();
 
-        if (length && !buf) {
-                return STATUS_INVALID_PARAMETER;
+        auto st = validate_persistent_devices_buffer(buf, bytes);
+        if (!(NT_SUCCESS(st) && bytes)) { // zero length is OK
+                return st;
         }
 
-        if (length % sizeof(wchar_t)) {
-                return STATUS_INVALID_PARAMETER;
-        }
-
-        if (constexpr size_t max_persistent_size = 64*1024; // arbitrary
-            length > max_persistent_size) {
-                Trace(TRACE_LEVEL_ERROR, "length %Iu exceeds max %Iu", length, max_persistent_size);
-                return STATUS_INVALID_PARAMETER;
-        }
-
-        if (!length) {
-                return STATUS_SUCCESS;
-        }
-
-        auto p = static_cast<const wchar_t*>(buf);
-        auto end = p + length/sizeof(wchar_t);
-
-        if (end[-1] != L'\0') {
-                return STATUS_INVALID_PARAMETER;
-        }
-
+        auto p = buf;
+        auto end = p + bytes/sizeof(*buf);
         ULONG count = 0;
 
-        while (p < end && *p != L'\0') {
-                auto str_start = p;
-                while (p < end && *p != L'\0') {
-                        ++p;
-                }
+        while (p < end && *p) {
 
-                if (p >= end) {
-                        return STATUS_INVALID_PARAMETER;
-                }
-
-                auto cch = p - str_start;
-                if (!cch || cch*sizeof(wchar_t) > UNICODE_STRING_MAX_BYTES) {
-                        return STATUS_INVALID_PARAMETER;
-                }
-
-                UNICODE_STRING device_str {
-                        .Length = static_cast<USHORT>(cch*sizeof(wchar_t)),
-                        .MaximumLength = static_cast<USHORT>(cch*sizeof(wchar_t)),
-                        .Buffer = const_cast<wchar_t*>(str_start)
-                };
-
-                device_attributes attr{};
-                auto st = parse_device_str(attr, device_str);
+                UNICODE_STRING device_str;
+                st = next_string(device_str, p, end);
                 if (!NT_SUCCESS(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "invalid device '%!USTR!' %!STATUS!", &device_str, st);
                         return st;
                 }
 
-                vhci::imported_device_location loc{};
-                st = fill_location(loc, attr);
+                st = validate_device_entry(device_str);
                 if (!NT_SUCCESS(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "fill_location '%!USTR!' %!STATUS!", &device_str, st);
                         return st;
                 }
 
-                ++count;
-                if (count > max_devices) {
+                if (++count > max_devices) {
                         Trace(TRACE_LEVEL_ERROR, "count %u exceeds max %u", count, max_devices);
                         return STATUS_INVALID_PARAMETER;
                 }
-
-                ++p; // skip the null terminator
         }
 
-        if (p == end && count > 0) {
-                return STATUS_INVALID_PARAMETER;
-        }
-
-        while (p < end) {
-                if (*p != L'\0') {
-                        return STATUS_INVALID_PARAMETER;
-                }
-                ++p;
-        }
-
-        return STATUS_SUCCESS;
+        return validate_trailing_nulls(p, end, count);
 }
 
 /*
@@ -799,6 +897,10 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
 {
         PAGED_CODE();
         hash = 0;
+
+        if (empty(r.node_name) || empty(r.service_name) || empty(r.busid)) {
+                return STATUS_INVALID_PARAMETER;
+        }
 
         static_assert(sizeof(L",,") == 3*sizeof(wchar_t)); // must have space for null terminator
 

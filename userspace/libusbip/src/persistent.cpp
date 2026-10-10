@@ -5,10 +5,10 @@
 #include "../persistent.h"
 #include "../vhci.h"
 #include "output.h"
+#include "strconv.h"
 
 #include <usbip/vhci.h>
 
-#include <charconv>
 #include <ranges>
 #include <span>
 
@@ -36,17 +36,24 @@ std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<de
                 auto wsk_events = d.recv_mode == receive_mode::low_latency;
 
                 if (is_malformed(d)) {
-                        libusbip::output("malformed device_config( hostname='{}', service='{}', "
+                        libusbip::output("malformed device_config( hostname='{}', port='{}', "
                                          "busid='{}', serial='{}', wsk_events={} )",
                                          dl.hostname, dl.service, dl.busid, d.serial, wsk_events);
 
                         return std::unexpected(ERROR_INVALID_PARAMETER);
                 }
 
-                auto flags = pack_attach_flags(/*once=*/false, wsk_events);
+                auto s = std::format("host={};port={};busid={}", dl.hostname, dl.service, dl.busid);
 
-                if (auto s = std::format("{},{},{},{},{}", dl.hostname, dl.service, dl.busid, d.serial, flags);
-                    auto ws = utf8_to_wchar(s)) {
+                if (!d.serial.empty()) {
+                        s += std::format(";serial={}", d.serial);
+                }
+
+                if (wsk_events) {
+                        s += ";recv_mode=low-latency";
+                }
+
+                if (auto ws = utf8_to_wchar(s)) {
                         *ws += L'\0';
                         multi_sz += *ws;
                 } else {
@@ -63,58 +70,82 @@ std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<de
         return multi_sz;
 }
 
+auto parse_recv_mode(_Inout_ receive_mode &mode, _In_ std::wstring_view val) noexcept
+{
+        if (equal_ordinal(val, L"low-latency", true)) {
+                mode = receive_mode::low_latency;
+                return true;
+        }
+
+        if (equal_ordinal(val, L"zero-copy", true)) {
+                mode = receive_mode::zero_copy;
+                return true;
+        }
+
+        return false;
+}
+
+auto assign(_Inout_ std::string &dst, _In_ std::wstring_view src)
+{
+        if (auto s = wchar_to_utf8(src)) {
+                dst = std::move(*s);
+                return true;
+        }
+        return false;
+}
+
+auto parse_token(_Inout_ device_config &dev, _In_ std::wstring_view token)
+{
+        auto eq = token.find(L'=');
+        if (eq == std::wstring_view::npos) {
+                return false;
+        }
+
+        auto key = token.substr(0, eq);
+        auto val = token.substr(eq + 1);
+
+        if (key.empty() || val.empty()) {
+                return false;
+        }
+
+        if (equal_ordinal(key, L"host", true)) {
+                return assign(dev.location.hostname, val);
+        } else if (equal_ordinal(key, L"port", true)) {
+                return assign(dev.location.service, val);
+        } else if (equal_ordinal(key, L"busid", true)) {
+                return assign(dev.location.busid, val);
+        } else if (equal_ordinal(key, L"serial", true)) {
+                return assign(dev.serial, val);
+        } else if (equal_ordinal(key, L"recv_mode", true)) {
+                return parse_recv_mode(dev.recv_mode, val);
+        }
+
+        return true; // unknown keys are ignored for forward compatibility
+}
+
 /*
- * Format: hostname,service,busid,serial[,flags[,...]]
- * Designed for forward and backward compatibility:
- * - Backward compatibility: older entries with fewer fields (e.g. omitting flags)
- *   retain default values; is_malformed() validates that required fields are present.
- * - Forward compatibility: future entries with extra trailing comma-separated fields
- *   are accepted; only known fields are parsed and remaining tokens are ignored.
+ * Format: host=<val>;port=<val>;busid=<val>[;serial=<val>][;recv_mode=<val>]
+ * Designed for forward compatibility:
+ * - Keys can appear in any order.
+ * - Future entries with unknown keys are accepted; only known keys are parsed and unknown keys are ignored.
  */
-auto parse_device_config(_In_ const std::string &str)
+auto parse_device_config(_In_ std::wstring_view str) -> std::optional<device_config>
 {
         std::optional<device_config> result(std::in_place);
 
-        auto &dev = *result;
-        auto &loc = dev.location;
+        for (const auto part : str | std::views::split(L';')) {
 
-        auto v = str | std::views::split(',');
-        auto it = v.begin();
+                std::wstring_view token(part.begin(), part.end());
+                if (token.empty()) {
+                        continue;
+                }
 
-        if (it != v.end()) {
-                loc.hostname = std::string_view(*it++);
-        }
-
-        if (it != v.end()) {
-                loc.service = std::string_view(*it++);
-        }
-
-        if (it != v.end()) {
-                loc.busid = std::string_view(*it++);
-        }
-
-        if (it != v.end()) {
-                dev.serial = std::string_view(*it++);
-        }
-
-        if (it != v.end()) {
-                std::string_view s(*it++);
-
-                ULONG flags{};
-                auto [end, ec] = std::from_chars(s.data(), s.data() + s.size(), flags);
-
-                if (ec == std::errc{} && end == s.data() + s.size()) {
-                        bool once;
-                        bool wsk_events;
-                        unpack_attach_flags(once, wsk_events, flags);
-
-                        dev.recv_mode = wsk_events ? receive_mode::low_latency : receive_mode::zero_copy;
-                } else {
-                        result.reset();
+                if (!parse_token(*result, token)) {
+                        return std::nullopt;
                 }
         }
 
-        return result;
+        return is_malformed(*result) ? std::nullopt : result;
 }
 
 auto get_persistent_devices(_In_ HANDLE dev)
@@ -187,12 +218,10 @@ auto usbip::vhci::get_persistent(_In_ HANDLE dev) -> std::optional<std::vector<d
         devs->reserve(strings.size());
 
         for (auto &ws: strings) {
-                if (auto s = wchar_to_utf8(ws); !s) {
-                        libusbip::output("wchar_to_utf8 error {}", s.error());
-                } else if (auto d = parse_device_config(*s); d && !is_malformed(*d)) {
+                if (auto d = parse_device_config(ws); d && !is_malformed(*d)) {
                         devs->push_back(std::move(*d));
                 } else {
-                        libusbip::output("invalid '{}'", *s);
+                        libusbip::output("invalid '{}'", wchar_to_utf8_or(ws));
                 }
         }
 

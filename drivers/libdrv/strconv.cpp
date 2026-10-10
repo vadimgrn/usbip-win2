@@ -191,3 +191,14 @@ bool libdrv::equal_strings(
                 RtlCompareMemory(a, b, len_a) == len_a;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED bool libdrv::equal(_In_ const UNICODE_STRING &u, _In_z_ const wchar_t *s, _In_ bool case_insensitive)
+{
+        PAGED_CODE();
+
+        UNICODE_STRING u2;
+        RtlInitUnicodeString(&u2, s);
+
+        return RtlEqualUnicodeString(&u, &u2, case_insensitive);
+}

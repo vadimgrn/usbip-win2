@@ -147,3 +147,15 @@ std::string& usbip::trim_right(_Inout_ std::string &s, _In_ std::string_view cha
         s.resize(trim_right(std::string_view(s), chars).size());
         return s;
 }
+
+/*
+ * Microsoft explicitly recommends CompareStringOrdinal over CompareStringW, lstrcmpiW,
+ * or CRT functions for non-linguistic comparisons (file system paths, registry values,
+ * internal wire protocol tokens, XML/JSON tags).
+ */
+bool usbip::equal_ordinal(_In_ std::wstring_view a, _In_ std::wstring_view b, _In_ bool ignore_case) noexcept
+{
+        return  a.size() == b.size() &&
+                CompareStringOrdinal(a.data(), static_cast<int>(a.size()),
+                                     b.data(), static_cast<int>(b.size()), ignore_case) == CSTR_EQUAL;
+}

@@ -753,7 +753,7 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
         } else if (r->size != length) {
                 Trace(TRACE_LEVEL_ERROR, "struct.size %lu != sizeof(struct) %Iu", r->size, length);
                 return USBIP_ERROR_ABI;
-        } else if (st = validate_serial_number(r->config.serial); NT_ERROR(st)) {
+        } else if (st = validate_serial_number(r->config.serial); !NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "bad serial '%s'", r->config.serial);
                 return st;
         }
@@ -885,9 +885,9 @@ PAGED auto set_persistent(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
 
-        void *buf{};
-        size_t length{};
-        auto st = WdfRequestRetrieveInputBuffer(request, 0, &buf, &length);
+        wchar_t *buf{};
+        size_t bytes{};
+        auto st = WdfRequestRetrieveInputBuffer(request, 0, reinterpret_cast<PVOID*>(&buf), &bytes);
         if (!NT_SUCCESS(st)) {
                 return st;
         }
@@ -895,9 +895,9 @@ PAGED auto set_persistent(_In_ WDFREQUEST request)
         auto vhci = get_vhci(request);
         auto &ctx = *get_vhci_ctx(vhci);
 
-        st = validate_persistent_devices(buf, length, ctx.devices_cnt);
+        st = validate_persistent_devices(buf, bytes, ctx.devices_cnt);
         if (!NT_SUCCESS(st)) {
-                Trace(TRACE_LEVEL_ERROR, "validate_persistent_devices %!STATUS!, length %Iu", st, length);
+                Trace(TRACE_LEVEL_ERROR, "validate_persistent_devices %!STATUS!, bytes %Iu", st, bytes);
                 return st;
         }
 
@@ -910,9 +910,9 @@ PAGED auto set_persistent(_In_ WDFREQUEST request)
         UNICODE_STRING val_name;
         RtlUnicodeStringInit(&val_name, persistent_devices_value_name);
 
-        st = WdfRegistryAssignValue(key.get(), &val_name, REG_MULTI_SZ, ULONG(length), buf);
+        st = WdfRegistryAssignValue(key.get(), &val_name, REG_MULTI_SZ, ULONG(bytes), buf);
         if (!NT_SUCCESS(st)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRegistryAssignValue(%!USTR!) %!STATUS!, length %Iu", &val_name, st, length);
+                Trace(TRACE_LEVEL_ERROR, "WdfRegistryAssignValue(%!USTR!) %!STATUS!, bytes %Iu", &val_name, st, bytes);
         }
         return st;
 }
