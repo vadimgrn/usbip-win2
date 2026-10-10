@@ -592,10 +592,10 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugout_and_delete(
         _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE device,
-        _In_ const device_attributes &attr, _In_ int port, _In_ bool force_delete)
+        _In_ const device_attributes &attr, _In_ int port, _In_ bool force_delete, _In_ const vhci::device_owner &owner)
 {
         PAGED_CODE();
-        device_state_changed(vhci, attr, port, vhci::state::unplugging);
+        device_state_changed(vhci, attr, port, vhci::state::unplugging, owner);
 
         auto st = UdecxUsbDevicePlugOutAndDelete(device);
         if (NT_ERROR(st)) {
@@ -605,7 +605,7 @@ PAGED void plugout_and_delete(
         // device and device_ctx may already be destroyed, do not use
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, done, force delete %d", ptr04x(device), force_delete);
-        device_state_changed(vhci, attr, port, vhci::state::unplugged);
+        device_state_changed(vhci, attr, port, vhci::state::unplugged, owner);
 
         if (force_delete) { // FIXME: may cause BSOD if something changes in future UDE releases
                 WdfObjectDelete(device);
@@ -699,6 +699,7 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         auto &ctx = *get_device_ctx(device);
 
         ctx.vhci = vhci;
+        ctx.owner = {}; // owner is assigned by the attach path; deny access until then
         ctx.ctx_ext = ctx_ext;
         ext.ctx = &ctx;
 
@@ -787,15 +788,17 @@ PAGED wdm::object_reference usbip::device::detach(
         wdf::ObjectRef ref(dev.ctx_ext); // prevent its destruction after UdecxUsbDevicePlugOutAndDelete
         auto &ext = get_device_ctx_ext(dev.ctx_ext);
 
+        auto owner = dev.owner; // capture before the device_ctx may be destroyed
+
         if (plugout_and_delete) {
                 auto force_delete = !dev.ep0_added;
-                ::plugout_and_delete(vhci, device, ext.attr, port, force_delete);
+                ::plugout_and_delete(vhci, device, ext.attr, port, force_delete, owner);
         }
 
         if (reattach) {
                 auto ctx = get_vhci_ctx(vhci);
                 auto delayed = plugout_and_delete;
-                start_attach_attempts(vhci, *ctx, ext.attr, delayed);
+                start_attach_attempts(vhci, *ctx, ext.attr, owner, delayed); // keep the same owner across reattach
         }
 
         return thread;

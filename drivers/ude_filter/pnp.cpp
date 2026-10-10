@@ -12,6 +12,7 @@
 
 #include <libdrv/remove_lock.h>
 #include <libdrv/unique_ptr.h>
+#include <libdrv/dbgcommon.h>
 #include <libdrv/ioctl.h>
 
 #include <usbbusif.h>
@@ -23,6 +24,7 @@
 #include <strmini.h>
 #include <initguid.h>
 #include <usbcamdi.h>
+#include <devpkey.h>
 
 using namespace usbip;
 using namespace libdrv;
@@ -74,7 +76,7 @@ PAGED void query_bus_relations(_Inout_ filter_ext &fltr, _In_ const DEVICE_RELAT
                         TraceDbg("Creating a FiDO for PDO %04x", ptr04x(pdo));
 
                         auto st = do_add_device(fltr.self->DriverObject, pdo, &fltr);
-                        if (NT_ERROR(st)) {
+                        if (!NT_SUCCESS(st)) {
 				Trace(TRACE_LEVEL_ERROR, 
 				      "Failed to add a FiDO for PDO %04x (%lu of %lu), %!STATUS! - device will lack URB fixup", 
 				      ptr04x(pdo), i + 1, r.Count, st);
@@ -206,6 +208,76 @@ PAGED auto query_interface(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const Q
 	return CompleteRequest(irp, st);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto get_port_number(_In_ DEVICE_OBJECT *pdo)
+{
+	PAGED_CODE();
+
+	ULONG port{};
+	ULONG req_sz{};
+	DEVPROPTYPE type{};
+
+        auto st = IoGetDevicePropertyData(pdo, &DEVPKEY_Device_Address,
+                        LOCALE_NEUTRAL, 0, sizeof(port), &port, &req_sz, &type);
+
+        if (!(NT_SUCCESS(st) && port)) {
+                Trace(TRACE_LEVEL_ERROR, "IoGetDevicePropertyData(DEVPKEY_Device_Address) %!STATUS!, port %lu", st, port);
+                return 0UL;
+        }
+
+        NT_ASSERT(req_sz == sizeof(port));
+        NT_ASSERT(type == DEVPROP_TYPE_UINT32);
+        return port;
+}
+
+
+/*
+ * Only stamp DEVPKEY_Device_SessionId for session-isolated devices in interactive sessions.
+ * User-isolated devices must not be bound to a specific session ID so that their ownership
+ * persists across RDS session reconnects and Fast User Switching.
+ * session::system is excluded because it is a non-interactive service session.
+ */
+_IRQL_requires_max_(APC_LEVEL)
+PAGED void apply_session_isolation(_Inout_ filter_ext &fltr)
+{
+        PAGED_CODE();
+
+        NT_ASSERT(!fltr.is_hub);
+        auto &dev = fltr.device;
+        NT_ASSERT(dev.parent);
+
+        auto port = get_port_number(fltr.pdo);
+        if (!port) {
+                return;
+        }
+
+        auto st = query_port_isolation(*dev.parent, static_cast<int>(port), dev.iso);
+        if (!NT_SUCCESS(st)) {
+                return;
+        }
+
+        auto session_id = dev.iso.session_id;
+
+        auto stamp = dev.iso.mode == vhci::isolation::session &&
+                     session_id != session::invalid &&
+                     session_id != session::system;
+
+        if (!stamp) {
+                return;
+        }
+
+        st = IoSetDevicePropertyData(fltr.pdo, &DEVPKEY_Device_SessionId, LOCALE_NEUTRAL, 0,
+                                     DEVPROP_TYPE_UINT32, sizeof(session_id), &session_id);
+
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "IoSetDevicePropertyData(SessionId=%lu) %!STATUS!", st, session_id);
+        } else {
+                Trace(TRACE_LEVEL_INFORMATION, "PDO %04x, stamped SessionId=%lu, port %lu", 
+                        ptr04x(fltr.pdo), session_id, port);
+        }
+}
+
 } // namespace
 
 
@@ -245,6 +317,9 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
 	case IRP_MN_START_DEVICE: { // must be started after lower device objects
 		auto st = ForwardIrpSynchronously(fltr, irp);
+		if (NT_SUCCESS(st) && !fltr.is_hub) {
+                        apply_session_isolation(fltr);
+		}
 		return CompleteRequest(irp, st);
 	}
 	case IRP_MN_REMOVE_DEVICE:

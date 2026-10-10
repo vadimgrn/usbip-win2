@@ -4,10 +4,13 @@
 
 #include "../persistent.h"
 #include "../vhci.h"
+#include "../win_handle.h"
 #include "output.h"
 #include "strconv.h"
 
 #include <usbip/vhci.h>
+#include <usbip/hex.h>
+#include <sddl.h>
 
 #include <ranges>
 #include <span>
@@ -24,33 +27,138 @@ auto is_malformed(_In_ const device_location &d) noexcept
 
 auto is_malformed(_In_ const device_config &d) noexcept
 {
-        return is_malformed(d.location) || !validate_device_serial(d.serial);
+        return  is_malformed(d.location) ||
+                !validate_device_serial(d.serial) ||
+                d.iso_mode == isolation::session ||
+                (d.iso_mode == isolation::user && d.owner_sid.empty()) ||
+                (d.iso_mode != isolation::user && !d.owner_sid.empty());
+}
+
+std::string get_current_user_sid()
+{
+        HANDLE token_raw{};
+        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token_raw)) {
+                return {};
+        }
+        Handle token(token_raw);
+
+        DWORD user_sz{};
+        GetTokenInformation(token.get(), TokenUser, nullptr, 0, &user_sz);
+        if (user_sz) {
+                std::vector<BYTE> user_buf(user_sz);
+                if (GetTokenInformation(token.get(), TokenUser, user_buf.data(), user_sz, &user_sz)) {
+                        auto tu = reinterpret_cast<TOKEN_USER*>(user_buf.data());
+                        PSTR sid_str{};
+                        if (ConvertSidToStringSidA(tu->User.Sid, &sid_str)) {
+                                std::string res = sid_str;
+                                LocalFree(sid_str);
+                                return res;
+                        }
+                }
+        }
+        return {};
+}
+
+std::string sid_bytes_to_hex(_In_ PSID sid)
+{
+        auto len = GetLengthSid(sid);
+        auto bytes = static_cast<const unsigned char*>(sid);
+        std::string hex;
+        hex.reserve(len * 2);
+        for (DWORD i = 0; i < len; ++i) {
+                std::format_to(std::back_inserter(hex), "{:02x}", bytes[i]);
+        }
+        return hex;
+}
+
+std::optional<std::string> hex_to_sddl(_In_ std::wstring_view hex)
+{
+        if (hex.size() % 2 || hex.size() < 2*(sizeof(SID) - sizeof(ULONG)) || 
+            hex.size() > 2*SECURITY_MAX_SID_SIZE) {
+                return std::nullopt;
+        }
+
+        std::vector<unsigned char> bytes;
+        bytes.resize(hex.size()/2);
+
+        for (size_t i = 0; i < hex.size(); i += 2) {
+                auto hi = from_hex(hex[i]);
+                auto lo = from_hex(hex[i + 1]);
+                if (hi < 0 || lo < 0) {
+                        return std::nullopt;
+                }
+                bytes[i] = static_cast<unsigned char>((hi << 4) | lo);
+        }
+
+        auto sid = reinterpret_cast<PSID>(bytes.data());
+        if (!(IsValidSid(sid) && GetLengthSid(sid) == bytes.size())) {
+                return std::nullopt;
+        }
+
+        if (PSTR sid_str{}; ConvertSidToStringSidA(sid, &sid_str)) {
+                std::string res = sid_str;
+                LocalFree(sid_str);
+                return res;
+        }
+
+        return std::nullopt;
+}
+
+std::optional<std::string> sid_to_hex(_In_ const std::string &owner_sid)
+{
+        if (owner_sid.starts_with("S-") || owner_sid.starts_with("s-")) {
+                PSID sid{};
+                if (ConvertStringSidToSidA(owner_sid.c_str(), &sid)) {
+                        auto hex = sid_bytes_to_hex(sid);
+                        LocalFree(sid);
+                        return hex;
+                }
+                return std::nullopt;
+        }
+
+        if (auto ws = utf8_to_wchar(owner_sid); ws && hex_to_sddl(*ws)) {
+                return owner_sid;
+        }
+        return std::nullopt;
 }
 
 std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<device_config> &devices)
 {
         std::wstring multi_sz;
 
-        for (auto &d: devices) {
-                auto &dl = d.location;
-                auto wsk_events = d.recv_mode == receive_mode::low_latency;
+        for (auto dev_copy: devices) {
+                if (dev_copy.iso_mode == isolation::user && dev_copy.owner_sid.empty()) {
+                        dev_copy.owner_sid = get_current_user_sid();
+                }
 
-                if (is_malformed(d)) {
+                auto &dl = dev_copy.location;
+                auto wsk_events = dev_copy.recv_mode == receive_mode::low_latency;
+
+                if (is_malformed(dev_copy)) {
                         libusbip::output("malformed device_config( hostname='{}', port='{}', "
-                                         "busid='{}', serial='{}', wsk_events={} )",
-                                         dl.hostname, dl.service, dl.busid, d.serial, wsk_events);
+                                         "busid='{}', serial='{}', wsk_events={}, iso_mode={}, owner_sid='{}' )",
+                                         dl.hostname, dl.service, dl.busid, dev_copy.serial, wsk_events,
+                                         static_cast<int>(dev_copy.iso_mode), dev_copy.owner_sid);
 
                         return std::unexpected(ERROR_INVALID_PARAMETER);
                 }
 
                 auto s = std::format("host={};port={};busid={}", dl.hostname, dl.service, dl.busid);
 
-                if (!d.serial.empty()) {
-                        s += std::format(";serial={}", d.serial);
+                if (!dev_copy.serial.empty()) {
+                        s += std::format(";serial={}", dev_copy.serial);
                 }
 
                 if (wsk_events) {
                         s += ";recv_mode=low-latency";
+                }
+                if (dev_copy.iso_mode == isolation::user) {
+                        auto hex = sid_to_hex(dev_copy.owner_sid);
+                        if (!hex) {
+                                libusbip::output("failed to convert owner SID '{}' to hex", dev_copy.owner_sid);
+                                return std::unexpected(ERROR_INVALID_PARAMETER);
+                        }
+                        s += std::format(";isolate=user;owner={}", *hex);
                 }
 
                 if (auto ws = utf8_to_wchar(s)) {
@@ -85,10 +193,37 @@ auto parse_recv_mode(_Inout_ receive_mode &mode, _In_ std::wstring_view val) noe
         return false;
 }
 
+auto parse_isolation_mode(_Inout_ isolation &mode, _In_ std::wstring_view val) noexcept
+{
+        if (equal_ordinal(val, L"none", true)) {
+                mode = isolation::none;
+                return true;
+        }
+
+        if (equal_ordinal(val, L"user", true)) {
+                mode = isolation::user;
+                return true;
+        }
+
+        return false;
+}
+
 auto assign(_Inout_ std::string &dst, _In_ std::wstring_view src)
 {
         if (auto s = wchar_to_utf8(src)) {
                 dst = std::move(*s);
+                return true;
+        }
+        return false;
+}
+
+auto parse_owner_sid(_Inout_ std::string &owner_sid, _In_ std::wstring_view val)
+{
+        if (val.starts_with(L"S-") || val.starts_with(L"s-")) {
+                return assign(owner_sid, val);
+        }
+        if (auto sddl = hex_to_sddl(val)) {
+                owner_sid = std::move(*sddl);
                 return true;
         }
         return false;
@@ -118,13 +253,17 @@ auto parse_token(_Inout_ device_config &dev, _In_ std::wstring_view token)
                 return assign(dev.serial, val);
         } else if (equal_ordinal(key, L"recv_mode", true)) {
                 return parse_recv_mode(dev.recv_mode, val);
+        } else if (equal_ordinal(key, L"isolate", true)) {
+                return parse_isolation_mode(dev.iso_mode, val);
+        } else if (equal_ordinal(key, L"owner", true)) {
+                return parse_owner_sid(dev.owner_sid, val);
         }
 
         return true; // unknown keys are ignored for forward compatibility
 }
 
 /*
- * Format: host=<val>;port=<val>;busid=<val>[;serial=<val>][;recv_mode=<val>]
+ * Format: host=<val>;port=<val>;busid=<val>[;serial=<val>][;recv_mode=<val>][;isolate=<val>][;owner=<val>]
  * Designed for forward compatibility:
  * - Keys can appear in any order.
  * - Future entries with unknown keys are accepted; only known keys are parsed and unknown keys are ignored.

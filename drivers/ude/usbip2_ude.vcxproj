@@ -47,6 +47,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip\ch9.h" />
     <ClInclude Include="..\..\include\usbip\consts.h" />
+    <ClInclude Include="..\..\include\usbip\hex.h" />
     <ClInclude Include="..\..\include\usbip\offsetof_ex.h" />
     <ClInclude Include="..\..\include\usbip\proto.h" />
     <ClInclude Include="..\..\include\usbip\proto_op.h" />
@@ -61,6 +62,7 @@
     <ClInclude Include="network.h" />
     <ClInclude Include="proto.h" />
     <ClInclude Include="persistent.h" />
+    <ClInclude Include="isolation.h" />
     <ClInclude Include="urbtransfer.h" />
     <ClInclude Include="device.h" />
     <ClInclude Include="vhci.h" />

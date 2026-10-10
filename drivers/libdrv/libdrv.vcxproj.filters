@@ -14,8 +14,10 @@
     <ClCompile Include="wdm_cpp.cpp" />
     <ClCompile Include="lists.cpp" />
     <ClCompile Include="urb_ptr.cpp" />
+    <ClCompile Include="security.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="security.h" />
     <ClInclude Include="ch11.h" />
     <ClInclude Include="dbgcommon.h" />
     <ClInclude Include="mdl_cpp.h" />
@@ -27,6 +29,9 @@
     <ClInclude Include="usb_util.h" />
     <ClInclude Include="wsk_cpp.h" />
     <ClInclude Include="..\..\include\usbip\consts.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\usbip\hex.h">
       <Filter>usbip</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\usbip\offsetof_ex.h">

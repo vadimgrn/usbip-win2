@@ -142,6 +142,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
 
         auto &config = ext.config();
         config.wsk_events = r.config.wsk_events;
+        config.iso_mode = r.config.iso_mode;
 
         st = RtlStringCbCopyNA(config.serial, sizeof(config.serial), r.config.serial, sizeof(r.config.serial));
         if (!NT_SUCCESS(st)) {
@@ -205,4 +206,19 @@ void usbip::free(_Inout_ device_attributes &r)
         FreeUnicodeString(r.node_name, unique_ptr::pooltag); // @see RtlFreeUnicodeString
         FreeUnicodeString(r.service_name, unique_ptr::pooltag);
         FreeUnicodeString(r.busid, unique_ptr::pooltag);
+}
+
+bool usbip::device_ctx::is_session_isolated() const
+{
+        return owner.has_session() && iso_mode() == vhci::isolation::session;
+}
+
+bool usbip::device_ctx::is_user_isolated() const
+{
+        return owner.has_user() && iso_mode() == vhci::isolation::user;
+}
+
+bool usbip::device_ctx::is_isolated() const
+{
+        return is_session_isolated() || is_user_isolated();
 }

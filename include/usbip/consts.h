@@ -33,4 +33,10 @@ enum {
         SERIAL_BUFSZ = 16,
 };
 
+namespace session
+{
+        constexpr auto system = 0UL;
+        constexpr auto invalid = ~system;
+}
+
 } // namespace usbip

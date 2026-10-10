@@ -33,6 +33,9 @@ const auto MAX_HUB_PORTS = 255; // @see drivers/usbip_ude/vhci.cpp, set_usb_port
 
 constexpr auto &str_zero_copy = "zero-copy";
 constexpr auto &str_low_latency = "low-latency";
+constexpr auto &str_isolation_none = "none";
+constexpr auto &str_isolation_session = "session";
+constexpr auto &str_isolation_user = "user";
 
 auto get_ids_data()
 {
@@ -100,6 +103,22 @@ void add_cmd_attach(CLI::App &app)
         rem->add_option_function<std::string>("--receive-mode", receive, "How to receive data from the network")
                 ->check(CLI::IsMember({str_zero_copy, str_low_latency}))
                 ->default_str(str_zero_copy)
+                ->excludes(stop);
+
+        auto isolate = [&mode = r->iso_mode] (const auto &choice)
+        {
+                if (choice == str_isolation_session) {
+                        mode = isolation::session;
+                } else if (choice == str_isolation_user) {
+                        mode = isolation::user;
+                } else {
+                        mode = isolation::none;
+                }
+        };
+
+        rem->add_option_function<std::string>("-i,--isolate", isolate, "Device isolation mode (none, session, user)")
+                ->check(CLI::IsMember({str_isolation_none, str_isolation_session, str_isolation_user}))
+                ->default_str(str_isolation_none)
                 ->excludes(stop);
 
         auto stop_all = cmd->add_option_group("Stop")

@@ -5,7 +5,7 @@
 #pragma once
 
 #include <libdrv/codeseg.h>
-#include <libdrv/dbgcommon.h>
+#include <usbip/vhci.h>
 
 #include <usb.h>
 
@@ -30,11 +30,14 @@ struct filter_ext
 	union {
 		struct {
                         DEVICE_RELATIONS *previous; // children
+                        DEVICE_OBJECT *vhci_device; // pointer to UDE host controller
+                        FILE_OBJECT *vhci_file; // referenced file object for vhci_device
 		} hub; // is_hub == true
 
 		struct {
-			IO_REMOVE_LOCK *parent_remove_lock; // -> hub filter_ext.remove_lock
-			USBD_HANDLE usbd_handle;
+                        filter_ext *parent; // parent->is_hub -> true
+                        USBD_HANDLE usbd_handle;
+                        vhci::isolation_data iso;
 		} device; // is_hub == false
 	};
 	bool is_hub;
@@ -66,7 +69,17 @@ PAGED NTSTATUS add_device(_In_ DRIVER_OBJECT *drvobj, _In_ DEVICE_OBJECT *pdo);
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-PAGED NTSTATUS do_add_device(_In_ DRIVER_OBJECT *drvobj, _In_ DEVICE_OBJECT *pdo, _In_opt_ filter_ext *parent);
+PAGED NTSTATUS do_add_device(
+        _In_ DRIVER_OBJECT *drvobj, 
+        _In_ DEVICE_OBJECT *pdo, 
+        _In_opt_ filter_ext *parent,
+        _Out_opt_ filter_ext **out_fltr = nullptr);
+
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS query_port_isolation(
+        _Inout_ filter_ext &fltr, _In_ int port, _Out_ vhci::isolation_data &data);
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_

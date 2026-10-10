@@ -11,6 +11,7 @@
 #include "vhci.h"
 
 #include <libdrv/strconv.h>
+#include <libdrv/security.h>
 #include <resources/messages.h>
 
 #include <ntstrsafe.h>
@@ -27,6 +28,8 @@ using namespace libdrv;
 struct attach_ctx
 {
         ULONG location_hash; // hash(host,port,busid)
+
+        vhci::device_owner owner; // owner of the device being (re)attached
 
         WDFDEVICE vhci;
         WDFTIMER timer;
@@ -84,10 +87,13 @@ void reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
 
 /**
  * @param location_hash remove unconditionally if zero
+ * @param owner remove unconditionally if nullptr
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
+auto reattach_req_remove(
+        _Inout_ vhci_ctx &vhci, _In_ ULONG location_hash,
+        _In_opt_ const vhci::device_owner *owner = nullptr)
 {
         wdf::ObjectRef ref;
         auto col = vhci.reattach_req;
@@ -97,8 +103,17 @@ auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
         for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
 
                 auto req = WdfCollectionGetItem(col, i);
-                
-                if (!location_hash || location_hash == get_attach_ctx(req)->location_hash) {
+                auto &r = *get_attach_ctx(req);
+
+                if (owner && owner->has_session() && r.owner.session_id != owner->session_id) {
+                        continue;
+                }
+
+                if (owner && owner->has_user() && !equal_sid(r.owner.sid, owner->sid)) {
+                        continue;
+                }
+
+                if (!location_hash || location_hash == r.location_hash) {
                         ref.reset(req);
                         WdfCollectionRemoveItem(col, i);
                         break;
@@ -176,6 +191,16 @@ PAGED auto validate(_In_ const device_attributes &r)
                 return st;
         }
 
+        if (r.config.iso_mode == vhci::isolation::user) {
+                if (!is_valid_sid(r.owner_sid)) {
+                        Trace(TRACE_LEVEL_ERROR, "owner SID is required for user isolation");
+                        return STATUS_INVALID_PARAMETER;
+                }
+        } else if (r.owner_sid.length) {
+                Trace(TRACE_LEVEL_ERROR, "owner SID specified without user isolation");
+                return STATUS_INVALID_PARAMETER;
+        }
+
         return STATUS_SUCCESS;
 }
 
@@ -222,6 +247,44 @@ PAGED auto parse_recv_mode(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto parse_isolation_mode(_Inout_ vhci::isolation &mode, _In_ const UNICODE_STRING &val)
+{
+        PAGED_CODE();
+
+        if (equal(val, L"none", true)) {
+                mode = vhci::isolation::none;
+                return STATUS_SUCCESS;
+        }
+
+        if (equal(val, L"user", true)) {
+                mode = vhci::isolation::user;
+                return STATUS_SUCCESS;
+        }
+
+        if (equal(val, L"session", true)) {
+                Trace(TRACE_LEVEL_ERROR, "session isolation is unsupported for persistent devices");
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        Trace(TRACE_LEVEL_ERROR, "invalid or unsupported isolation '%!USTR!'", &val);
+        return STATUS_INVALID_PARAMETER;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto parse_owner_sid(_Out_ vhci::sid_data &owner_sid, _In_ const UNICODE_STRING &val)
+{
+        PAGED_CODE();
+
+        auto st = sid_from_hex(owner_sid, val);
+        if (!NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_ERROR, "'%!USTR!', %!STATUS!", &val, st);
+        }
+        return st;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto parse_token(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &token)
 {
         PAGED_CODE();
@@ -244,13 +307,17 @@ PAGED auto parse_token(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &
                 return parse_serial(r.config.serial, val);
         } else if (equal(key, L"recv_mode", true)) {
                 return parse_recv_mode(r.config.wsk_events, val);
+        } else if (equal(key, L"isolate", true)) {
+                return parse_isolation_mode(r.config.iso_mode, val);
+        } else if (equal(key, L"owner", true)) {
+                return parse_owner_sid(r.owner_sid, val);
         }
 
         return STATUS_SUCCESS; // unknown keys are ignored for forward compatibility
 }
 
 /*
- * @param device_str host=<val>;port=<val>;busid=<val>[;serial=<val>][;recv_mode=<val>]
+ * @param device_str host=<val>;port=<val>;busid=<val>[;serial=<val>][;recv_mode=<val>][;isolate=<val>][;owner=<val>]
  * @see validate, hash_location
  */
 _IRQL_requires_same_
@@ -458,6 +525,7 @@ PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ c
 
         auto &config = attr.config;
         req.config.wsk_events = config.wsk_events;
+        req.config.iso_mode = config.iso_mode;
 
         auto st = RtlStringCbCopyNA(req.config.serial, sizeof(req.config.serial), config.serial, sizeof(config.serial));
         if (!NT_SUCCESS(st)) {
@@ -484,7 +552,9 @@ PAGED void cleanup_attach_request(_In_ WDFOBJECT obj)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ const device_attributes &dev)
+PAGED auto create_attach_request(
+        _In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ const device_attributes &dev,
+        _In_ const vhci::device_owner &owner)
 {
         PAGED_CODE();
 
@@ -498,11 +568,12 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ c
                 return req;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "%04x, %!USTR!:%!USTR!/%!USTR!, hash %lx",
-                ptr04x(req.get()), &dev.node_name, &dev.service_name, &dev.busid, dev.location_hash);
+        Trace(TRACE_LEVEL_INFORMATION, "%04x, %!USTR!:%!USTR!/%!USTR!, hash %lx, session %lu",
+                ptr04x(req.get()), &dev.node_name, &dev.service_name, &dev.busid, dev.location_hash, owner.session_id);
 
         auto &r = *get_attach_ctx(req.get());
         r.vhci = vhci;
+        r.owner = owner; // preserve the owner across (re)attach
 
         vhci::ioctl::plugin_hardware *buf{};
 
@@ -666,7 +737,8 @@ PAGED auto validate_trailing_nulls(_In_ const wchar_t *p, _In_ const wchar_t *en
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::start_attach_attempts(
-        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ const device_attributes &attr, _In_ bool delayed)
+        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ const device_attributes &attr,
+        _In_ const vhci::device_owner &owner, _In_ bool delayed)
 {
         PAGED_CODE();
 
@@ -674,7 +746,7 @@ PAGED void usbip::start_attach_attempts(
                 TraceDbg("vhci is being removing");
         } else if (auto cnt = reattach_req_count(ctx); cnt >= 4*static_cast<ULONG>(ctx.devices_cnt)) {
                 Trace(TRACE_LEVEL_WARNING, "too many active attach requests, %lu", cnt);
-        } else if (auto req = create_attach_request(vhci, ctx, attr); !req) {
+        } else if (auto req = create_attach_request(vhci, ctx, attr, owner); !req) {
                 //
         } else if (auto &r = *get_attach_ctx(req.get()); !delayed) {
                 send_plugin_hardware(ctx.target_self, r.inbuf, r.outbuf, req);
@@ -702,20 +774,56 @@ PAGED void usbip::start_attach_attempts(
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-int usbip::stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
+int usbip::stop_attach_attempts(
+        _Inout_ vhci_ctx &vhci, _In_ ULONG location_hash,
+        _In_opt_ const vhci::device_owner *owner)
 {
         int cnt = 0;
 
-        while (auto req = reattach_req_remove(vhci, location_hash)) {
+        while (auto req = reattach_req_remove(vhci, location_hash, owner)) {
 
                 ++cnt;
-                auto delivered = WdfRequestCancelSentRequest(req.get<WDFREQUEST>());
+                bool delivered = WdfRequestCancelSentRequest(req.get<WDFREQUEST>());
 
-                TraceDbg("hash %lx -> req %04x, cancel request was delivered %!BOOLEAN!",
-                          location_hash, ptr04x(req.get()), delivered);
+                TraceDbg("hash %lx, session %lu -> req %04x, cancel request was delivered %!bool!",
+                          location_hash, owner ? owner->session_id : session::invalid, ptr04x(req.get()), delivered);
         }
 
         return cnt;
+}
+
+/*
+ * A device (re)attach travels to the driver through an IOCTL to target_self, which erases the
+ * original requestor's session/user. The owning session/user is preserved in the pending attach request's
+ * context, so the inbound attach handler can recover them by location_hash.
+ * @see start_attach_attempts, plugin_hardware
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool usbip::find_attach_isolation_ids(
+        _Inout_ vhci_ctx &vhci, _In_ ULONG location_hash,
+        _Out_ vhci::device_owner &owner)
+{
+        owner = {};
+
+        if (!location_hash) {
+                return false;
+        }
+
+        auto col = vhci.reattach_req;
+        wdf::spinlock lck(vhci.reattach_req_lock);
+
+        for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
+
+                if (auto &r = *get_attach_ctx(WdfCollectionGetItem(col, i));
+                    r.location_hash == location_hash) {
+
+                        owner = r.owner;
+                        return true;
+                }
+        }
+
+        return false;
 }
 
 _IRQL_requires_same_
@@ -741,7 +849,7 @@ PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
                 if (!NT_SUCCESS(st)) {
                         Trace(TRACE_LEVEL_ERROR, "parse_device_str(%!USTR!) %!STATUS!", &device_str, st);
                 } else {
-                        start_attach_attempts(vhci, ctx, attr);
+                        start_attach_attempts(vhci, ctx, attr, vhci::device_owner{ .sid = attr.owner_sid });
                 }
         }
 }
