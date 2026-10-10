@@ -5,6 +5,7 @@
 #include "usbip.h"
 #include "log.h"
 #include <libusbip/vhci.h>
+#include <libusbip/volume_isolation.h>
 
 #include <print>
 
@@ -14,6 +15,10 @@ bool usbip::cmd_detach(const detach_args &args)
         if (!dev) {
                 log::error(get_last_error_msg());
                 return false;
+        }
+
+        if (args.port > 0) {
+                cleanup_port_volumes(args.port);
         }
 
         auto ok = vhci::detach(dev.get(), args.port);

@@ -37,21 +37,6 @@ constexpr SSIZE_T is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen);
 
 constexpr auto is_ascii(unsigned char ch) { return ch < 0x80; }
 
-constexpr auto pack_attach_flags(bool once, bool wsk_events)
-{
-        return (static_cast<ULONG>(once) << 1) |
-                static_cast<ULONG>(wsk_events);
-}
-
-/*
- * Unknown flags are ignored.
- */
-constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, ULONG flags)
-{
-        once = flags & 2;
-        wsk_events = flags & 1;
-}
-
 } // namespace usbip
 
 
@@ -60,6 +45,48 @@ namespace usbip::vhci
 
 DEFINE_GUID(GUID_DEVINTERFACE_USBIP_VHCI,
         0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);
+
+#ifndef USBIP_VHCI_ISOLATION_DEFINED
+#define USBIP_VHCI_ISOLATION_DEFINED
+  enum class isolation : unsigned char { none, session, user }; // see libusbip/vhci.h
+#endif
+
+/*
+ * @see ntifs.h, struct SID
+ */
+struct sid_blob
+{
+        ULONG length; // data[length]
+        UCHAR data[68]; // SECURITY_MAX_SID_SIZE, ntifs.h
+};
+
+static_assert(sizeof(session::system) == sizeof(ULONG)); // session id type
+
+/*
+ * An owner may possess both an active Terminal Server Session ID and a User SID
+ * (e.g., interactive user-mode callers and user-isolated devices).
+ * When evaluating ownership or access permissions, User SID (has_sid()) takes
+ * precedence over Session ID (has_session()) because user identity is persistent
+ * across logon sessions. Session ID serves as a fallback for session-only isolation.
+ */
+struct device_owner
+{
+        ULONG session_id;
+        sid_blob sid;
+
+        constexpr auto has_session() const noexcept
+        {
+                return session_id != session::invalid && session_id != session::system;
+        }
+
+        constexpr bool has_sid() const noexcept { return sid.length; }
+};
+
+struct isolation_data
+{
+        device_owner owner;
+        isolation mode;
+};
 
 struct base
 {
@@ -71,6 +98,8 @@ struct imported_device_location
         char busid[BUS_ID_SIZE];
         char service[32]; // NI_MAXSERV
         char host[1025];  // NI_MAXHOST in ws2def.h
+
+        constexpr auto empty() const noexcept { return !(*host || *service || *busid); }
 };
 
 struct imported_device_config
@@ -78,6 +107,7 @@ struct imported_device_config
         imported_device_location location;
         char serial[SERIAL_BUFSZ];
         bool wsk_events;
+        isolation iso_mode;
 };
 
 struct imported_device_hardware
@@ -118,6 +148,42 @@ struct device_state : base
         imported_device device;
 };
 
+constexpr auto is_valid(isolation mode)
+{
+        switch (mode) {
+        case isolation::none:
+        case isolation::session:
+        case isolation::user:
+                return true;
+        }
+
+        return false;
+}
+
+constexpr auto pack_attach_flags(bool once, bool wsk_events, isolation iso = isolation::none)
+{
+        return  (static_cast<ULONG>(iso)  << 2) |
+                (static_cast<ULONG>(once) << 1) |
+                 static_cast<ULONG>(wsk_events);
+}
+
+/*
+ * Unknown flags are ignored.
+ */
+constexpr void unpack_attach_flags(
+        _Inout_ bool &once, _Inout_ bool &wsk_events, _Inout_ isolation &iso, ULONG flags)
+{
+        wsk_events = flags & 1;
+        once = flags & 2;
+        iso = static_cast<isolation>((flags >> 2) & 0x3);
+}
+
+constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, ULONG flags)
+{
+        isolation iso;
+        unpack_attach_flags(once, wsk_events, iso, flags);
+}
+
 } // namespace usbip::vhci
 
 
@@ -133,11 +199,12 @@ enum class function { // 12 bit
         stop_attach_attempts,
         plugin_hardware_once,
         plugout_hardware_and_reattach,
+        internal_get_port_isolation,
 };
 
-constexpr auto make(function id)
+constexpr auto make(function id, ULONG access = FILE_READ_DATA | FILE_WRITE_DATA)
 {
-        return CTL_CODE(FILE_DEVICE_UNKNOWN, static_cast<int>(id), METHOD_BUFFERED, FILE_READ_DATA | FILE_WRITE_DATA);
+        return CTL_CODE(FILE_DEVICE_UNKNOWN, static_cast<int>(id), METHOD_BUFFERED, access);
 }
 
 enum {
@@ -149,6 +216,7 @@ enum {
         STOP_ATTACH_ATTEMPTS = make(function::stop_attach_attempts),
         PLUGIN_HARDWARE_ONCE = make(function::plugin_hardware_once),
         PLUGOUT_HARDWARE_AND_REATTACH = make(function::plugout_hardware_and_reattach), // for internal use only
+        INTERNAL_GET_PORT_ISOLATION = make(function::internal_get_port_isolation, FILE_ANY_ACCESS),
 };
 
 struct plugin_hardware : base
@@ -185,6 +253,12 @@ inline auto get_imported_devices_size(_In_ ULONG n)
 {
         return offsetof_ex(get_imported_devices, devices) + n*sizeof(*get_imported_devices::devices);
 }
+
+struct get_port_isolation : base
+{
+        int port; // IN/OUT, >= 1 or zero if an error
+        isolation_data data; // OUT
+};
 
 } // namespace usbip::vhci::ioctl
 

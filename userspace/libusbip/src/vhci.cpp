@@ -85,6 +85,7 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
 DWORD assign(_Inout_ vhci::imported_device_config &dst, _In_ const device_config &src)
 {
         dst.wsk_events = src.recv_mode == receive_mode::low_latency;
+        dst.iso_mode = src.iso_mode;
 
         if (auto err = assign(dst.serial, src.serial)) {
                 return err;
@@ -118,6 +119,7 @@ auto make_device_config(_In_ const vhci::imported_device_config &c)
                 .location = make_device_location(c.location),
                 .serial{ c.serial, strnlen(c.serial, std::size(c.serial)) },
                 .recv_mode = c.wsk_events ? receive_mode::low_latency : receive_mode::zero_copy,
+                .iso_mode = c.iso_mode,
         };
 }
 
