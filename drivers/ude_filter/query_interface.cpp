@@ -14,6 +14,13 @@ namespace
 
 /*
  * @return the current 32-bit USB frame number
+ *
+ * A counter, not a clock. An isochronous class driver does not read this value on its
+ * own, it subtracts URB.StartFrame of a transfer it has already got back. StartFrame is
+ * copied from usbip_header_ret_submit.start_frame, @see isoch_transfer in
+ * drivers/ude/wsk_receive.cpp, so it belongs to the server's host controller and a server
+ * is free to report zero for every transfer. Do not return a real time value here while
+ * the other operand comes from a server.
  */
 _Function_class_(PUSB_BUSIFFN_QUERY_BUS_TIME)
 _IRQL_requires_same_
@@ -23,8 +30,9 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTime(
 	_Out_opt_ ULONG *CurrentUsbFrame)
 {
 	if (CurrentUsbFrame) {
-		// 1 frame = 1ms = 10,000 * 100ns units
-		*CurrentUsbFrame = static_cast<ULONG>(KeQueryInterruptTime() / 10'000);
+		static ULONG dummy;
+		*CurrentUsbFrame = ++dummy; // zero is OK too
+		// TraceDbg("%lu", *CurrentUsbFrame); // too often
 	}
 
 	return STATUS_SUCCESS;
@@ -36,20 +44,23 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTime(
  *
  * The lowest 3 bits of the returned micro-frame value will contain the current 125us
  * micro-frame, while the upper 29 bits will contain the current 1ms USB frame number.
+ *
+ * Micro-frame bits are always zero, the frame number is a counter, @see QueryBusTime.
  */
 _Function_class_(PUSB_BUSIFFN_QUERY_BUS_TIME_EX)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTimeEx(
-	_In_opt_ void *,
+	_In_opt_ void *BusContext,
 	_Out_opt_ ULONG *HighSpeedFrameCounter)
 {
-	if (HighSpeedFrameCounter) {
-		// 1 micro-frame = 125us = 1,250 * 100ns units (8 micro-frames per 1ms frame)
-		*HighSpeedFrameCounter = static_cast<ULONG>(KeQueryInterruptTime() / 1'250);
+	auto st = QueryBusTime(BusContext, HighSpeedFrameCounter);
+
+	if (NT_SUCCESS(st) && HighSpeedFrameCounter) {
+		*HighSpeedFrameCounter <<= 3; // 8 micro-frames per 1ms frame
 	}
 
-	return STATUS_SUCCESS;
+	return st;
 }
 
 } // namespace
