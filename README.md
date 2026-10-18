@@ -263,6 +263,4 @@ verifier /reset
 - To run Static Driver Verifier (SDV), set "Treat Warnings As Errors" to "No" for the `libdrv`, `usbip2_filter`, and `usbip2_ude` projects.
 
 ### If you like this project
-[![paypal](whlk/jpg/paypal_donate_qrcode.png)](https://www.paypal.com/donate/?hosted_button_id=YNZ9GUFWFYHFW)
-
-[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=YNZ9GUFWFYHFW)
+<a href="https://www.buymeacoffee.com/usbip" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
