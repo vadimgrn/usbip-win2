@@ -19,3 +19,5 @@
 #else // MSVC natively processes offsetof on non-standard layout types in constexpr
   #define offsetof_ex(Type, Member) (__builtin_offsetof(Type, Member))
 #endif
+
+#define offset_plus_size(Type, Member) (offsetof_ex(Type, Member) + sizeof(((Type*)nullptr)->Member))

@@ -182,4 +182,72 @@ inline void close_handle(_In_ WDFKEY key, _In_ wdfkey_traits)
 using object_delete = usbip::generic_handle<wdfobject_traits>;
 using registry = usbip::generic_handle<wdfkey_traits>;
 
+template <typename T>
+struct type_size
+{
+        static constexpr size_t value = sizeof(T);
+};
+
+template <>
+struct type_size<void>
+{
+        static constexpr size_t value = 0;
+};
+
+/*
+ * @return if an error is returned, buffer and length will be set to nullptr
+ */
+template <typename T>
+_Must_inspect_result_
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto retrieve_input_buffer(
+        _In_ WDFREQUEST request,
+        _Out_ const T* &buffer,
+        _In_ size_t min_size = type_size<T>::value,
+        _Out_opt_ size_t *length = nullptr)
+{
+        void *buf;
+        auto st = WdfRequestRetrieveInputBuffer(request, min_size, &buf, length);
+        buffer = static_cast<const T*>(buf);
+        return st;
+}
+
+template <typename T>
+_Must_inspect_result_
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto retrieve_input_buffer(_In_ WDFREQUEST request, _Out_ const T* &buffer, _Out_ size_t *length)
+{
+        return retrieve_input_buffer(request, buffer, type_size<T>::value, length);
+}
+
+/*
+ * @return if an error is returned, buffer and length will be set to nullptr
+ */
+template <typename T>
+_Must_inspect_result_
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto retrieve_output_buffer(
+        _In_ WDFREQUEST request,
+        _Out_ T* &buffer,
+        _In_ size_t min_size = type_size<T>::value,
+        _Out_opt_ size_t *length = nullptr)
+{
+        void *buf;
+        auto st = WdfRequestRetrieveOutputBuffer(request, min_size, &buf, length);
+        buffer = static_cast<T*>(buf);
+        return st;
+}
+
+template <typename T>
+_Must_inspect_result_
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto retrieve_output_buffer(_In_ WDFREQUEST request, _Out_ T* &buffer, _Out_ size_t *length)
+{
+        return retrieve_output_buffer(request, buffer, type_size<T>::value, length);
+}
+
 } // namespace wdf
