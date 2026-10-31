@@ -1,6 +1,12 @@
 <Project>
  <Import Project="$(MSBuildThisFileDirectory)vcpkg\scripts\buildsystems\msbuild\vcpkg.targets" />
 
+  <ItemDefinitionGroup Condition="'$(PlatformToolset)' == 'ClangCL'">
+    <ClCompile>
+      <AdditionalOptions>-Wno-missing-designated-field-initializers %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
   <!-- Ensure driver projects never use LLVM/ClangCL or any non-WDK toolset -->
   <Target Name="ValidateDriverPlatformToolset"
           BeforeTargets="PrepareForBuild;Build"

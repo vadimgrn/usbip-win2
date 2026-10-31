@@ -10,13 +10,13 @@
 
 #include <usbspec.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 #include <optional>
+#include <functional>
 
-#if __cplusplus >= 202002L
-  #include <stop_token>
-#endif
+#include <stop_token>
 
 namespace usbip
 {
@@ -69,7 +69,6 @@ USBIP_API Socket connect(
         _In_opt_ HANDLE cancel_event = HANDLE{});
 
 
-#if __cplusplus >= 202002L
 /**
  * The call is blocking.
  * @param hostname name or IP address of a host to connect to
@@ -77,40 +76,121 @@ USBIP_API Socket connect(
  * @param stoken stop token to cancel the connection attempt
  * @return call GetLastError() if returned handle is invalid
  */
-inline Socket connect(
+USBIP_API Socket connect(
         _In_ const char *hostname,
         _In_ const char *service,
-        _In_ std::stop_token stoken)
-{
-        Socket sock;
-        if (stoken.stop_requested()) {
-                SetLastError(ERROR_CANCELLED);
-                return sock;
-        }
+        _In_ std::stop_token stoken);
 
-        NullableHandle cancel_evt;
-        auto on_stop = [&cancel_evt] { SetEvent(cancel_evt.get()); };
-
-        using stop_cb_t = std::stop_callback<decltype(on_stop)>;
-        std::optional<stop_cb_t> stop_cb;
-
-        if (stoken.stop_possible()) {
-                cancel_evt.reset(CreateEvent(nullptr, true, false, nullptr));
-                if (!cancel_evt) {
-                        return sock;
-                }
-                stop_cb.emplace(stoken, on_stop);
-        }
-
-        sock = connect(hostname, service, cancel_evt.get());
-        return sock;
-}
-#endif // __cplusplus
+using connect_callback = std::function<void(Socket sock, DWORD error)>;
 
 /**
+ * Connects to a remote host asynchronously on the Windows Threadpool.
+ * @param hostname name or IP address of a host to connect to
+ * @param service TCP/IP port number or symbolic name
+ * @param callback invoked with connected socket or error code on completion
+ * @param cancel_event optional event handle to cancel the connection attempt
+ * @return true if successfully queued to threadpool, false otherwise
+ */
+USBIP_API bool connect_async(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_ connect_callback callback,
+        _In_opt_ HANDLE cancel_event = HANDLE{});
+
+/**
+ * Connects to a remote host asynchronously on the Windows Threadpool.
+ * @param hostname name or IP address of a host to connect to
+ * @param service TCP/IP port number or symbolic name
+ * @param callback invoked with connected socket or error code on completion
+ * @param stoken stop token to cancel the connection attempt
+ * @return true if successfully queued to threadpool, false otherwise
+ */
+USBIP_API bool connect_async(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_ connect_callback callback,
+        _In_ std::stop_token stoken);
+
+/**
+ * Retrieves exportable devices from an established connection.
+ * The call is blocking.
  * @param s socket handle
+ * @param cancel_event optional event handle to cancel the operation
  * @return devices if the result contains a value, otherwise call GetLastError()
  */
-USBIP_API std::optional<std::vector<usb_device>> get_exportable_devices(_In_ SOCKET s);
+USBIP_API std::optional<std::vector<usb_device>> get_exportable_devices(
+        _In_ SOCKET s,
+        _In_opt_ HANDLE cancel_event = HANDLE{});
+
+/**
+ * Retrieves exportable devices from an established connection.
+ * The call is blocking.
+ * @param s socket handle
+ * @param stoken stop token to cancel the operation
+ * @return devices if the result contains a value, otherwise call GetLastError()
+ */
+USBIP_API std::optional<std::vector<usb_device>> get_exportable_devices(
+        _In_ SOCKET s,
+        _In_ std::stop_token stoken);
+
+/**
+ * Connects to the remote host, retrieves exportable devices, and closes the connection.
+ * The call is blocking.
+ * @param hostname name or IP address of a host to connect to
+ * @param service TCP/IP port number or symbolic name
+ * @param cancel_event optional event handle to cancel the operation
+ * @return devices if the result contains a value, otherwise call GetLastError()
+ */
+USBIP_API std::optional<std::vector<usb_device>> query_exportable_devices(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_opt_ HANDLE cancel_event = HANDLE{});
+
+/**
+ * Connects to the remote host, retrieves exportable devices, and closes the connection.
+ * The call is blocking.
+ * @param hostname name or IP address of a host to connect to
+ * @param service TCP/IP port number or symbolic name
+ * @param stoken stop token to cancel the operation
+ * @return devices if the result contains a value, otherwise call GetLastError()
+ */
+USBIP_API std::optional<std::vector<usb_device>> query_exportable_devices(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_ std::stop_token stoken);
+
+using query_devices_callback = std::function<void(
+        std::optional<std::vector<usb_device>> devices,
+        DWORD error)>;
+
+/**
+ * Queries exportable devices asynchronously on the Windows Threadpool.
+ * Handles DNS resolution, connection, protocol query, and socket teardown.
+ * @param hostname name or IP address of a host to connect to
+ * @param service TCP/IP port number or symbolic name
+ * @param callback invoked with query results on completion
+ * @param cancel_event optional event handle to cancel the operation
+ * @return true if successfully queued to threadpool, false otherwise
+ */
+USBIP_API bool query_exportable_devices_async(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_ query_devices_callback callback,
+        _In_opt_ HANDLE cancel_event = HANDLE{});
+
+/**
+ * Queries exportable devices asynchronously on the Windows Threadpool.
+ * Handles DNS resolution, connection, protocol query, and socket teardown.
+ * @param hostname name or IP address of a host to connect to
+ * @param service TCP/IP port number or symbolic name
+ * @param callback invoked with query results on completion
+ * @param stoken stop token to cancel the operation
+ * @return true if successfully queued to threadpool, false otherwise
+ */
+USBIP_API bool query_exportable_devices_async(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_ query_devices_callback callback,
+        _In_ std::stop_token stoken);
 
 } // namespace usbip

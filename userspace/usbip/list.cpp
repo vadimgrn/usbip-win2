@@ -62,13 +62,7 @@ void print_exportable_devices(const std::vector<usb_device> &devices)
 
 bool list_persistent_devices()
 {
-        auto dev = vhci::open();
-        if (!dev) {
-                log::error(get_last_error_msg());
-                return false;
-        }
-
-        auto v = vhci::get_persistent(dev.get());
+        auto v = vhci::get_persistent();
         if (!v) {
                 log::error(get_last_error_msg());
                 return false;
@@ -91,21 +85,14 @@ bool usbip::cmd_list(const list_args &args)
         }
 
         ctrl_c_guard guard;
-        auto sock = connect(args.remote.c_str(), global_args.tcp_port.c_str(), guard.token());
-        if (!sock) {
+        auto devices = query_exportable_devices(
+                args.remote.c_str(), global_args.tcp_port.c_str(), guard.token());
+
+        if (!devices) {
                 log::error(get_last_error_msg());
                 return false;
         }
 
-        log::debug("connected to {}:{}", args.remote, global_args.tcp_port);
-
-        auto devices = get_exportable_devices(sock.get());
-
-        if (!devices) {
-                log::error(get_last_error_msg());
-        } else {
-                print_exportable_devices(*devices);
-        }
-
-        return devices.has_value();
+        print_exportable_devices(*devices);
+        return true;
 }

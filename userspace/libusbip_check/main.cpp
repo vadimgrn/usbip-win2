@@ -2,7 +2,7 @@
  * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-// Test libusbip API for C++17 compatibility.
+// Test libusbip API for C++20 compatibility.
 
 #include <libusbip/format_message.h>
 #include <libusbip/win_handle.h>
@@ -51,12 +51,21 @@ int main()
         [[maybe_unused]] auto port = get_tcp_port();
         auto s1 = connect("", "1234");
         auto s2 = connect("", "1234", HANDLE());
-#if __cplusplus >= 202002L
+        [[maybe_unused]] auto ca1 = connect_async("", "1234", [](Socket, DWORD) {});
+        [[maybe_unused]] auto ca2 = connect_async("", "1234", [](Socket, DWORD) {}, HANDLE());
+        [[maybe_unused]] auto q1 = query_exportable_devices("", "1234");
+        [[maybe_unused]] auto q2 = query_exportable_devices("", "1234", HANDLE());
+        [[maybe_unused]] auto qa1 = query_exportable_devices_async("", "1234", [](std::optional<std::vector<usb_device>>, DWORD) {});
+        [[maybe_unused]] auto qa2 = query_exportable_devices_async("", "1234", [](std::optional<std::vector<usb_device>>, DWORD) {}, HANDLE());
         std::stop_source ssrc;
         auto s3 = connect("", "1234", ssrc.get_token());
-#endif
+        [[maybe_unused]] auto ca3 = connect_async("", "1234", [](Socket, DWORD) {}, ssrc.get_token());
+        [[maybe_unused]] auto q3 = query_exportable_devices("", "1234", ssrc.get_token());
+        [[maybe_unused]] auto qa3 = query_exportable_devices_async("", "1234", [](std::optional<std::vector<usb_device>>, DWORD) {}, ssrc.get_token());
         if (s1) {
                 [[maybe_unused]] auto devices = get_exportable_devices(s1.get());
+                [[maybe_unused]] auto devices2 = get_exportable_devices(s1.get(), HANDLE());
+                [[maybe_unused]] auto devices3 = get_exportable_devices(s1.get(), ssrc.get_token());
         }
 
         // vhci.h
@@ -80,13 +89,37 @@ int main()
         args.config.iso_mode = isolation::user;
         args.config.user = "S-1-5-21-test";
 
+        [[maybe_unused]] auto imported_auto = vhci::get_imported_devices();
         [[maybe_unused]] auto attached_port = vhci::attach(dev.get(), args);
         [[maybe_unused]] auto attached_config = vhci::attach(dev.get(), args.config);
+        [[maybe_unused]] auto attached_port_auto = vhci::attach(args);
+        [[maybe_unused]] auto attached_config_auto = vhci::attach(args.config);
         [[maybe_unused]] auto stopped_cnt = vhci::stop_attach_attempts(dev.get(), &args.config.location);
         [[maybe_unused]] auto stopped_all = vhci::stop_attach_attempts(dev.get(), nullptr);
+        [[maybe_unused]] auto stopped_auto1 = vhci::stop_attach_attempts(&args.config.location);
+        [[maybe_unused]] auto stopped_auto2 = vhci::stop_attach_attempts();
         [[maybe_unused]] auto detached = vhci::detach(dev.get(), 1);
+        [[maybe_unused]] auto detached_auto = vhci::detach(1);
+        [[maybe_unused]] auto detached_all1 = vhci::detach_all(dev.get());
+        [[maybe_unused]] auto detached_all2 = vhci::detach_all();
+        [[maybe_unused]] auto detached_async1 = vhci::detach_async(1, [](bool, DWORD) {});
+        [[maybe_unused]] auto detached_async2 = vhci::detach_async(1, [](bool, DWORD) {}, dev.get());
+        [[maybe_unused]] auto detached_all_async1 = vhci::detach_all_async([](bool, DWORD) {});
         [[maybe_unused]] auto cancelled = vhci::cancel_io(dev.get());
         [[maybe_unused]] auto cancelled_ovl = vhci::cancel_io(dev.get(), nullptr);
+        [[maybe_unused]] auto async_att1 = vhci::attach_async(dev.get(), args, [](int, DWORD) {});
+        [[maybe_unused]] auto async_att2 = vhci::attach_async(dev.get(), args.config, [](int, DWORD) {});
+        [[maybe_unused]] auto async_att3 = vhci::attach_async(args, [](int, DWORD) {});
+        [[maybe_unused]] auto async_att4 = vhci::attach_async(args.config, [](int, DWORD) {});
+        [[maybe_unused]] auto async_att5 = vhci::attach_async(dev.get(), args, [](int, DWORD) {}, ssrc.get_token());
+        [[maybe_unused]] auto async_att6 = vhci::attach_async(dev.get(), args.config, [](int, DWORD) {}, ssrc.get_token());
+        [[maybe_unused]] auto async_att7 = vhci::attach_async(args, [](int, DWORD) {}, ssrc.get_token());
+        [[maybe_unused]] auto async_att8 = vhci::attach_async(args.config, [](int, DWORD) {}, ssrc.get_token());
+        [[maybe_unused]] auto monitor = vhci::watch_device_states(dev.get(), [](const device_state&, DWORD) {});
+        [[maybe_unused]] auto monitor_auto = vhci::watch_device_states([](const device_state&, DWORD) {});
+        if (monitor) {
+                monitor->cancel();
+        }
 
         [[maybe_unused]] auto state_str = vhci::get_state_str(state::plugged);
         [[maybe_unused]] auto state_size = vhci::get_device_state_size();
@@ -97,14 +130,44 @@ int main()
         std::vector<device_config> pdevs{ args.config };
         [[maybe_unused]] auto set_pers = vhci::set_persistent(dev.get(), pdevs);
         [[maybe_unused]] auto get_pers = vhci::get_persistent(dev.get());
+        [[maybe_unused]] auto set_pers_auto = vhci::set_persistent(pdevs);
+        [[maybe_unused]] auto get_pers_auto = vhci::get_persistent();
+
+        // vhci::client
+        vhci::client client;
+        vhci::client client_ovl(true);
+        if (client) {
+                [[maybe_unused]] auto ch = client.handle();
+                [[maybe_unused]] auto c_imp = client.get_imported_devices();
+                [[maybe_unused]] auto c_pers = client.get_persistent();
+                [[maybe_unused]] auto c_set_pers = client.set_persistent(pdevs);
+                [[maybe_unused]] auto c_att = client.attach(args);
+                [[maybe_unused]] auto c_att_cfg = client.attach(args.config);
+                [[maybe_unused]] auto c_att_async = client.attach_async(args, [](int, DWORD) {});
+                [[maybe_unused]] auto c_att_cfg_async = client.attach_async(args.config, [](int, DWORD) {});
+                [[maybe_unused]] auto c_att_async_tok = client.attach_async(args, [](int, DWORD) {}, ssrc.get_token());
+                [[maybe_unused]] auto c_att_cfg_async_tok = client.attach_async(args.config, [](int, DWORD) {}, ssrc.get_token());
+                [[maybe_unused]] auto c_stop = client.stop_attach_attempts();
+                [[maybe_unused]] auto c_det = client.detach(1);
+                [[maybe_unused]] auto c_det_all = client.detach_all();
+                [[maybe_unused]] auto c_det_async = client.detach_async(1, [](bool, DWORD) {});
+                [[maybe_unused]] auto c_det_all_async = client.detach_all_async([](bool, DWORD) {});
+                [[maybe_unused]] auto c_mon = client.watch_device_states([](const device_state&, DWORD) {});
+                client.close();
+        }
 
         // volume_isolation.h
         if (auto vols = isolate_port_volumes(1, 100, nullptr); vols && !vols->empty()) {
                 [[maybe_unused]] auto &nt_dev = vols->front().nt_device;
         }
         [[maybe_unused]] auto async_ok1 = isolate_port_volumes_async(1, [](int, auto) {});
-        [[maybe_unused]] auto async_ok2 = isolate_port_volumes_async(1, 100, [](int, auto) {});
+        [[maybe_unused]] auto async_ok2 = isolate_port_volumes_async(1, [](int, auto) {}, 100);
+        [[maybe_unused]] auto cleaned = cleanup_port_volumes(1);
         [[maybe_unused]] auto async_ok3 = isolate_port_volumes_async(1, [](int, auto) {}, 100, nullptr);
+        if (auto vols = isolate_port_volumes(1, 100, ssrc.get_token()); vols && !vols->empty()) {
+                [[maybe_unused]] auto &nt_dev = vols->front().nt_device;
+        }
+        [[maybe_unused]] auto async_ok4 = isolate_port_volumes_async(1, [](int, auto) {}, 100, ssrc.get_token());
         [[maybe_unused]] auto clean_ok = cleanup_port_volumes(1);
 }
 

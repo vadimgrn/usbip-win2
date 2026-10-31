@@ -12,6 +12,7 @@
 #include "output.h"
 
 #include <usbip/proto_op.h>
+
 #include <chrono>
 #include <expected>
 
@@ -517,6 +518,78 @@ auto recv_usb_device(_In_ SOCKET s, _Inout_ usb_device &dev)
         return true;
 }
 
+struct cancel_wait_guard
+{
+        HANDLE wait_handle = nullptr;
+
+        cancel_wait_guard(_In_opt_ HANDLE cancel_event, _In_ SOCKET s)
+        {
+                if (cancel_event) {
+                        RegisterWaitForSingleObject(&wait_handle, cancel_event,
+                                [](PVOID param, BOOLEAN) noexcept {
+                                        auto sock = reinterpret_cast<SOCKET>(param);
+                                        shutdown(sock, SD_BOTH);
+                                }, reinterpret_cast<PVOID>(s), INFINITE, WT_EXECUTEONLYONCE);
+                }
+        }
+
+        ~cancel_wait_guard()
+        {
+                if (wait_handle) {
+                        UnregisterWait(wait_handle);
+                }
+        }
+
+        cancel_wait_guard(const cancel_wait_guard&) = delete;
+        cancel_wait_guard& operator=(const cancel_wait_guard&) = delete;
+};
+
+struct async_connect_context
+{
+        std::string hostname;
+        std::string service;
+        HANDLE cancel_event = nullptr;
+        connect_callback callback;
+};
+
+struct async_query_devices_context
+{
+        std::string hostname;
+        std::string service;
+        HANDLE cancel_event = nullptr;
+        query_devices_callback callback;
+};
+
+struct stop_token_event
+{
+        NullableHandle event;
+        std::optional<std::stop_callback<std::function<void()>>> callback;
+
+        bool init(const std::stop_token &stoken)
+        {
+                if (stoken.stop_requested()) {
+                        SetLastError(ERROR_CANCELLED);
+                        return false;
+                }
+                if (stoken.stop_possible()) {
+                        event.reset(CreateEvent(nullptr, true, false, nullptr));
+                        if (!event) {
+                                return false;
+                        }
+                        callback.emplace(stoken, [h = event.get()] { SetEvent(h); });
+                }
+                return true;
+        }
+
+        HANDLE get() const noexcept { return event.get(); }
+};
+
+struct async_stop_guard
+{
+        NullableHandle evt;
+        std::optional<std::stop_callback<std::function<void()>>> stop_cb;
+};
+
 } // namespace
 
 
@@ -536,39 +609,263 @@ auto usbip::connect(
 	return std::move(*res);
 }
 
-std::optional<std::vector<usb_device>> usbip::get_exportable_devices(_In_ SOCKET s)
+Socket usbip::connect(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_ std::stop_token stoken)
 {
-	assert(s != INVALID_SOCKET);
-	
-	if (!send_op_common(s, OP_REQ_DEVLIST)) {
-		return std::nullopt;
-	}
+        stop_token_event cancel_evt;
+        if (!cancel_evt.init(stoken)) {
+                return {};
+        }
+        return connect(hostname, service, cancel_evt.get());
+}
 
-	if (auto err = recv_op_common(s, OP_REP_DEVLIST)) {
-		SetLastError(err);
-		return std::nullopt;
-	}
+std::optional<std::vector<usb_device>> usbip::get_exportable_devices(
+        _In_ SOCKET s, _In_opt_ HANDLE cancel_event)
+{
+        assert(s != INVALID_SOCKET);
+        if (s == INVALID_SOCKET) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return std::nullopt;
+        }
+
+        if (cancel_event && WaitForSingleObject(cancel_event, 0) == WAIT_OBJECT_0) {
+                SetLastError(ERROR_CANCELLED);
+                return std::nullopt;
+        }
+
+        cancel_wait_guard guard(cancel_event, s);
+
+        auto check_err = [cancel_event](DWORD default_err = ERROR_SUCCESS) {
+                if (cancel_event && WaitForSingleObject(cancel_event, 0) == WAIT_OBJECT_0) {
+                        SetLastError(ERROR_CANCELLED);
+                } else if (default_err != ERROR_SUCCESS) {
+                        SetLastError(default_err);
+                }
+        };
+
+        if (!send_op_common(s, OP_REQ_DEVLIST)) {
+                check_err();
+                return std::nullopt;
+        }
+
+        if (auto err = recv_op_common(s, OP_REP_DEVLIST)) {
+                check_err(err);
+                return std::nullopt;
+        }
 
         op_devlist_reply reply;
         if (!recv(s, &reply, sizeof(reply))) {
+                check_err();
                 return std::nullopt;
         }
         byteswap(reply);
 
-	if (reply.ndev > INT_MAX) {
-		libusbip::output("the number of exportable devices {} is too large", reply.ndev);
-		SetLastError(ERROR_INVALID_DATA);
-		return std::nullopt;
-	}
+        if (reply.ndev > INT_MAX) {
+                libusbip::output("the number of exportable devices {} is too large", reply.ndev);
+                SetLastError(ERROR_INVALID_DATA);
+                return std::nullopt;
+        }
 
         libusbip::output("{} exportable device(s)", reply.ndev);
         std::vector<usb_device> devices(reply.ndev);
 
-	for (auto &dev: devices) {
+        for (auto &dev: devices) {
                 if (!recv_usb_device(s, dev)) {
-			return std::nullopt;
-		}
-	}
+                        check_err();
+                        return std::nullopt;
+                }
+        }
 
-	return devices;
+        if (cancel_event && WaitForSingleObject(cancel_event, 0) == WAIT_OBJECT_0) {
+                SetLastError(ERROR_CANCELLED);
+                return std::nullopt;
+        }
+
+        return devices;
+}
+
+std::optional<std::vector<usb_device>> usbip::get_exportable_devices(
+        _In_ SOCKET s,
+        _In_ std::stop_token stoken)
+{
+        stop_token_event cancel_evt;
+        if (!cancel_evt.init(stoken)) {
+                return std::nullopt;
+        }
+        return get_exportable_devices(s, cancel_evt.get());
+}
+
+std::optional<std::vector<usb_device>> usbip::query_exportable_devices(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_opt_ HANDLE cancel_event)
+{
+        auto sock = connect(hostname, service, cancel_event);
+        if (!sock) {
+                return std::nullopt;
+        }
+
+        return get_exportable_devices(sock.get(), cancel_event);
+}
+
+std::optional<std::vector<usb_device>> usbip::query_exportable_devices(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_ std::stop_token stoken)
+{
+        stop_token_event cancel_evt;
+        if (!cancel_evt.init(stoken)) {
+                return std::nullopt;
+        }
+        return query_exportable_devices(hostname, service, cancel_evt.get());
+}
+
+bool usbip::connect_async(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_ connect_callback callback,
+        _In_opt_ HANDLE cancel_event)
+{
+        if (!(hostname && service && callback)) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return false;
+        }
+
+        if (cancel_event && WaitForSingleObject(cancel_event, 0) == WAIT_OBJECT_0) {
+                SetLastError(ERROR_CANCELLED);
+                return false;
+        }
+
+        auto ctx = std::make_unique<async_connect_context>(async_connect_context {
+                .hostname = hostname,
+                .service = service,
+                .cancel_event = cancel_event,
+                .callback = std::move(callback)
+        });
+
+        auto ok = TrySubmitThreadpoolCallback([](PTP_CALLBACK_INSTANCE, PVOID param) noexcept {
+                auto ctx = std::unique_ptr<async_connect_context>(
+                        static_cast<async_connect_context*>(param));
+
+                auto sock = connect(ctx->hostname.c_str(), ctx->service.c_str(), ctx->cancel_event);
+                auto err = sock ? ERROR_SUCCESS : GetLastError();
+
+                try {
+                        ctx->callback(std::move(sock), err);
+                } catch (...) {
+                }
+        }, ctx.get(), nullptr);
+
+        if (ok) {
+                ctx.release();
+        }
+        return ok;
+}
+
+bool usbip::connect_async(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_ connect_callback callback,
+        _In_ std::stop_token stoken)
+{
+        if (stoken.stop_requested()) {
+                SetLastError(ERROR_CANCELLED);
+                return false;
+        }
+
+        if (!stoken.stop_possible()) {
+                return connect_async(hostname, service, std::move(callback), HANDLE{});
+        }
+
+        NullableHandle cancel_evt(CreateEvent(nullptr, true, false, nullptr));
+        if (!cancel_evt) {
+                return false;
+        }
+
+        auto guard = std::make_shared<async_stop_guard>();
+        guard->evt = std::move(cancel_evt);
+        guard->stop_cb.emplace(stoken, [h = guard->evt.get()] { SetEvent(h); });
+
+        auto wrapped_cb = [callback = std::move(callback), guard](Socket sock, DWORD err) {
+                callback(std::move(sock), err);
+        };
+
+        return connect_async(hostname, service, std::move(wrapped_cb), guard->evt.get());
+}
+
+bool usbip::query_exportable_devices_async(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_ query_devices_callback callback,
+        _In_opt_ HANDLE cancel_event)
+{
+        if (!(hostname && service && callback)) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return false;
+        }
+
+        if (cancel_event && WaitForSingleObject(cancel_event, 0) == WAIT_OBJECT_0) {
+                SetLastError(ERROR_CANCELLED);
+                return false;
+        }
+
+        auto ctx = std::make_unique<async_query_devices_context>(async_query_devices_context {
+                .hostname = hostname,
+                .service = service,
+                .cancel_event = cancel_event,
+                .callback = std::move(callback)
+        });
+
+        auto ok = TrySubmitThreadpoolCallback([](PTP_CALLBACK_INSTANCE, PVOID param) noexcept {
+                auto ctx = std::unique_ptr<async_query_devices_context>(
+                        static_cast<async_query_devices_context*>(param));
+
+                auto devices = query_exportable_devices(
+                        ctx->hostname.c_str(), ctx->service.c_str(), ctx->cancel_event);
+                auto err = devices ? ERROR_SUCCESS : GetLastError();
+
+                try {
+                        ctx->callback(std::move(devices), err);
+                } catch (...) {
+                }
+        }, ctx.get(), nullptr);
+
+        if (ok) {
+                ctx.release();
+        }
+        return ok;
+}
+
+bool usbip::query_exportable_devices_async(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_ query_devices_callback callback,
+        _In_ std::stop_token stoken)
+{
+        if (stoken.stop_requested()) {
+                SetLastError(ERROR_CANCELLED);
+                return false;
+        }
+
+        if (!stoken.stop_possible()) {
+                return query_exportable_devices_async(hostname, service, std::move(callback), HANDLE{});
+        }
+
+        NullableHandle cancel_evt(CreateEvent(nullptr, true, false, nullptr));
+        if (!cancel_evt) {
+                return false;
+        }
+
+        auto guard = std::make_shared<async_stop_guard>();
+        guard->evt = std::move(cancel_evt);
+        guard->stop_cb.emplace(stoken, [h = guard->evt.get()] { SetEvent(h); });
+
+        auto wrapped_cb = [callback = std::move(callback), guard](
+                std::optional<std::vector<usb_device>> devices, DWORD err) {
+                callback(std::move(devices), err);
+        };
+
+        return query_exportable_devices_async(hostname, service, std::move(wrapped_cb), guard->evt.get());
 }

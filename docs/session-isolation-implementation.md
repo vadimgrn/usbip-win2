@@ -6,7 +6,7 @@ Implements complete, multi-layered device and storage volume isolation for Windo
 1. **Session-Based (`-i session`, `isolation::session`)**: Binds the device to the attaching Terminal Server `SessionId`. Scopes device visibility, PnP devnode enumeration, driver handle access, and drive letters to the interactive logon session.
 2. **User-Based (`-i user`, `isolation::user`)**: Binds the device to the caller's immutable Windows Security Identifier (SID from `TokenUser`). Persists ownership across session reconnects, Fast User Switching, and Terminal Services session reassignments. Denies access to foreign users and foreign administrators.
 
-**Status:** Compiles clean and test-signs across both **x64** and **ARM64** platforms (`usbip2_ude.sys` + `usbip2_filter.sys` + `libusbip.dll` + `usbip.exe` + `wusbip.exe` + Inno Setup installers). Compile-time compatibility verified via `libusbip_check` under C++17.
+**Status:** Compiles clean and test-signs across both **x64** and **ARM64** platforms (`usbip2_ude.sys` + `usbip2_filter.sys` + `libusbip.dll` + `usbip.exe` + `wusbip.exe` + Inno Setup installers). Compile-time compatibility verified via `libusbip_check` under C++20.
 
 ---
 
@@ -144,7 +144,7 @@ For storage class devices:
 | Volume Isolation | `userspace/libusbip/src/volume_isolation.cpp` | Hardened DACL with User SID, Logon SID, and `OICI` flags; redirected drive letters; added FAT32/exFAT capability checks; added non-storage fast path |
 | CLI Attach & Detach | `userspace/usbip/usbip.cpp`, `attach.cpp`, `detach.cpp` | Added `-i, --isolate <none\|session\|user>`; invoked volume isolation for session and user modes; cleaned up session drive letters on detach |
 | GUI Integration | `userspace/wusbip/wusbip.cpp` | Handled volume isolation on attach; added session drive letter cleanup on detach |
-| SDK Verification | `userspace/libusbip_check/main.cpp` | Verified C++17 compatibility with `isolation::user` |
+| SDK Verification | `userspace/libusbip_check/main.cpp` | Verified C++20 compatibility with `isolation::user` |
 
 ---
 

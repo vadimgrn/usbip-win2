@@ -11,14 +11,14 @@
 - **package/**: Driver packaging and signing project
 
 ### Userspace Layer (`userspace/`)
-- **libusbip/**: Public SDK/DLL for USB/IP client functionality (public API uses C++17, implementation uses C++23); includes networking, USB device management, and helper utilities
+- **libusbip/**: Public SDK/DLL for USB/IP client functionality (public API uses C++20, implementation uses C++23); includes networking, USB device management, and helper utilities
 - **usbip/**: Command-line utility for attaching/detaching remote USB devices
 - **wusbip/**: wxWidgets-based GUI application for device management
 - **devnode/**: Device node utility for driver management
 - **resources/**: Shared resource DLL for messages and strings
 
 ### Testing & Build
-- **libusbip_check/**: Compile-time test ensuring C++17 API compatibility
+- **libusbip_check/**: Compile-time test ensuring C++20 API compatibility
 - **vcpkg/**: Dependency management (wxWidgets, pcre2, etc.)
 
 ## Build System
@@ -39,7 +39,7 @@ Build artifacts go to:
 - `ARM64/Debug/` and `ARM64/Release/` for ARM64 builds
 
 ### No Traditional Unit Tests
-The project uses `libusbip_check` as a **compile-time validation** tool (not a runtime test suite). It verifies the C++17 API compatibility by attempting to link against the public API headers.
+The project uses `libusbip_check` as a **compile-time validation** tool (not a runtime test suite). It verifies the C++20 API compatibility by attempting to link against the public API headers.
 
 ## Code Conventions
 
@@ -74,7 +74,7 @@ The project uses `libusbip_check` as a **compile-time validation** tool (not a r
 
 ### Modern C++ Features
 - `constexpr`, `noexcept`, and `explicit` used liberally for optimization and type safety
-- `libusbip` public API uses C++17, the implementation uses C++23
+- `libusbip` public API uses C++20, the implementation uses C++23
 - Range-based for loops, move semantics (use `static_cast<T&&>()` in drivers; `std::move` is userspace only), lambda functions where applicable
 - Indent should be eight spaces (per .editorconfig)
 - Do not inherit from concrete types like `std::array`, `std::string`, etc.
@@ -143,7 +143,7 @@ Enables running build and validation commands:
   - **Whitespace and newlines (`trim_trailing_whitespace = true`, `insert_final_newline = true`)**: Always strip trailing whitespace from all lines and ensure every file terminates with a final newline (`\r\n`).
   - **Character set (`charset = utf-8`)**: Ensure files are encoded in UTF-8 without BOM.
 - **Driver Frameworks**: `drivers/ude` is a **KMDF driver**; `drivers/ude_filter` is a **WDM driver**
-- **C++ Standards**: `libusbip` public API uses C++17, while the implementation uses C++23 (compile-time verified by `libusbip_check`)
+- **C++ Standards**: `libusbip` public API uses C++20, while the implementation uses C++23 (compile-time verified by `libusbip_check`)
 - **Kernel vs. Userspace**: Code in `drivers/` uses kernel APIs and must follow driver safety rules (no heap allocation without lookaside lists, proper IRQL handling, etc.)
 - **ARM64 Support**: Project supports both x64 and ARM64; always test on both architectures when possible
 - **Test-signed Drivers**: End users must enable test signing mode (`bcdedit /set testsigning on`) after installation
