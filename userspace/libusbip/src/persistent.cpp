@@ -8,7 +8,6 @@
 #include "sid.h"
 #include "output.h"
 
-#include <usbip/vhci.h>
 #include <ranges>
 
 namespace
@@ -303,4 +302,18 @@ auto usbip::vhci::get_persistent(_In_ HANDLE dev) -> std::optional<std::vector<d
         }
 
         return devs;
+}
+
+bool usbip::vhci::set_persistent(_In_ const std::vector<device_config> &devices)
+{
+        auto dev = open();
+        return dev && set_persistent(dev.get(), devices);
+}
+
+auto usbip::vhci::get_persistent() -> std::optional<std::vector<device_config>>
+{
+        if (auto dev = open()) {
+                return get_persistent(dev.get());
+        }
+        return std::nullopt;
 }

@@ -151,16 +151,16 @@ std::expected<sid_blob, DWORD> get_user_sid(_In_ HANDLE token) noexcept
 std::optional<std::vector<char>> get_token_info(
         _In_ HANDLE token, _In_ TOKEN_INFORMATION_CLASS cls) noexcept
 {
-        DWORD actual;
-        [[maybe_unused]] auto ok = GetTokenInformation(token, cls, nullptr, 0, &actual);
+        DWORD req_sz;
+        [[maybe_unused]] auto ok = GetTokenInformation(token, cls, nullptr, 0, &req_sz);
         assert(!ok);
 
         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
                 return std::nullopt;
         }
 
-        if (std::vector<char> v(actual);
-            GetTokenInformation(token, cls, v.data(), actual, &actual)) {
+        if (std::vector<char> v(req_sz);
+            GetTokenInformation(token, cls, v.data(), req_sz, &req_sz)) {
                 return v;
         }
 
@@ -268,9 +268,9 @@ std::expected<std::wstring, DWORD> usbip::make_caller_aces(_In_ std::wstring_vie
 {
         auto token = GetCurrentProcessToken();
 
-        auto usr = ::get_user_sid(token);
-        if (!usr) {
-                return std::unexpected(usr.error());
+        auto user_sid = ::get_user_sid(token);
+        if (!user_sid) {
+                return std::unexpected(user_sid.error());
         }
 
         auto buf = get_token_info(token, TokenGroups);
@@ -280,7 +280,7 @@ std::expected<std::wstring, DWORD> usbip::make_caller_aces(_In_ std::wstring_vie
         auto &groups = *reinterpret_cast<TOKEN_GROUPS*>(buf->data());
 
         constexpr auto &fmt = L"(A;{};GA;;;{})";
-        auto aces = std::format(fmt, ace_flags, to_wstring(*usr));
+        auto aces = std::format(fmt, ace_flags, to_wstring(*user_sid));
 
         if (auto sid = find_group(groups, SE_GROUP_LOGON_ID)) {
                 aces += std::format(fmt, ace_flags, ::to_wstring(sid));

@@ -3,12 +3,20 @@
  */
 
 #include "../vhci.h"
+#include "../persistent.h"
+#include "../volume_isolation.h"
+
+#include "strconv.h"
+#include "output.h"
+#include "last_error.h"
+#include "stop_event.h"
+#include "device_speed.h"
+#include "cancel_wait_guard.h"
+#include "threadpool.h"
 
 #include <usbip/offsetof_ex.h>
-#include "device_speed.h"
-#include "output.h"
-
 #include <resources/messages.h>
+
 #include <cfgmgr32.h>
 
 #include <initguid.h>
@@ -16,6 +24,8 @@
 
 #include <span>
 #include <random>
+#include <chrono>
+#include <semaphore>
 
 namespace
 {
@@ -72,7 +82,7 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
 
         for (auto &i: v) {
                 if (auto err = strncpy_s(i.dst, i.len, i.src.data(), i.src.size())) {
-                        libusbip::output("strncpy_s('{}') error #{} {}", i.src, err, 
+                        libusbip::output("strncpy_s('{}') error #{} {}", i.src, err,
                                           std::generic_category().message(err));
 
                         return ERROR_INVALID_PARAMETER;
@@ -101,15 +111,10 @@ DWORD assign(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const vhci::attach_ar
 
 auto make_device_location(_In_ const vhci::imported_device_location &src)
 {
-        auto str = [] (const char *str, size_t maxlen)
-        {
-                return std::string(str, strnlen(str, maxlen));
-        };
-
         return device_location {
-                .hostname = str(src.host, std::size(src.host)),
-                .service = str(src.service, std::size(src.service)),
-                .busid = str(src.busid, std::size(src.busid)),
+                .hostname{ to_string_view(src.host) },
+                .service{ to_string_view(src.service) },
+                .busid{ to_string_view(src.busid) }
         };
 }
 
@@ -117,7 +122,7 @@ auto make_device_config(_In_ const vhci::imported_device_config &c)
 {
         return device_config {
                 .location = make_device_location(c.location),
-                .serial{ c.serial, strnlen(c.serial, std::size(c.serial)) },
+                .serial{ to_string_view(c.serial) },
                 .recv_mode = c.wsk_events ? receive_mode::low_latency : receive_mode::zero_copy,
                 .iso_mode = c.iso_mode,
         };
@@ -169,7 +174,7 @@ auto get_path()
                         auto code = CM_MapCrToWin32Err(err, ERROR_INVALID_PARAMETER);
                         SetLastError(code);
                         return path;
-                } 
+                }
 
                 multi_sz.resize(cch); // "path1\0path2\0pathn\0\0"
 
@@ -278,11 +283,11 @@ auto usbip::vhci::open(_In_ bool overlapped) -> Handle
         Handle h;
 
         if (auto path = get_path(); !path.empty()) {
-                h.reset(CreateFile(path.c_str(), 
-                                GENERIC_READ | GENERIC_WRITE, 
-                                FILE_SHARE_READ | FILE_SHARE_WRITE, 
+                h.reset(CreateFile(path.c_str(),
+                                GENERIC_READ | GENERIC_WRITE,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE,
                                 nullptr, // lpSecurityAttributes
-                                OPEN_EXISTING, 
+                                OPEN_EXISTING,
                                 FlagsAndAttributes,
                                 nullptr)); // hTemplateFile
         }
@@ -308,14 +313,14 @@ std::optional<std::vector<usbip::imported_device>> usbip::vhci::get_imported_dev
                 r->size = sizeof(*r);
 
                 if (DWORD BytesReturned{}; // must be set if the last arg is NULL
-                    DeviceIoControl(dev, ioctl::GET_IMPORTED_DEVICES, r, sizeof(r->size), 
+                    DeviceIoControl(dev, ioctl::GET_IMPORTED_DEVICES, r, sizeof(r->size),
                                     buf.data(), DWORD(buf.size()), &BytesReturned, nullptr)) {
 
                         if (BytesReturned < devices_offset) [[unlikely]] {
                                 SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
                                 return devices;
                         }
-                                
+
                         buf.resize(BytesReturned);
                         ok = true;
                         break;
@@ -385,7 +390,7 @@ int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_loc
                         return -1;
                 }
         }
-        
+
         constexpr auto outlen = ioctl::stop_attach_attempts::output_size();
 
         if (DWORD BytesReturned{}; // must be set if the last arg is NULL
@@ -402,11 +407,24 @@ int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_loc
 
 bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
 {
+        if (port != port_all_closeonly) {
+                cleanup_port_volumes(port);
+        }
+
         ioctl::plugout_hardware r { .port = port };
         r.size = sizeof(r);
 
         DWORD BytesReturned{}; // must be set if the last arg is NULL
         return DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
+}
+
+bool usbip::vhci::detach(_In_ int port)
+{
+        auto dev = open();
+        if (!dev) {
+                return false;
+        }
+        return detach(dev.get(), port);
 }
 
 bool usbip::vhci::cancel_io(_In_ HANDLE dev, _In_opt_ OVERLAPPED *overlapped) noexcept
@@ -419,6 +437,182 @@ bool usbip::vhci::cancel_io(_In_ HANDLE dev, _In_opt_ OVERLAPPED *overlapped) no
                 return true;
         }
         return false;
+}
+
+namespace
+{
+
+struct async_attach_context
+{
+        Handle owned_dev;
+        HANDLE dev{};
+        vhci::attach_args args;
+        HANDLE cancel_event{};
+        vhci::attach_callback callback;
+};
+
+struct async_detach_context
+{
+        Handle owned_dev;
+        HANDLE dev{};
+        int port{};
+        vhci::detach_callback callback;
+};
+
+} // namespace
+
+bool usbip::vhci::attach_async(
+        _In_opt_ HANDLE dev,
+        _In_ const attach_args &args,
+        _In_ attach_callback callback,
+        _In_opt_ HANDLE cancel_event)
+{
+        if (!callback) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return false;
+        }
+
+        if (check_cancelled(cancel_event)) {
+                return false;
+        }
+
+        auto ctx = std::make_unique<async_attach_context>(async_attach_context {
+                .dev = dev,
+                .args = args,
+                .cancel_event = cancel_event,
+                .callback = std::move(callback)
+        });
+
+        if (!ctx->dev || ctx->dev == INVALID_HANDLE_VALUE) {
+                ctx->owned_dev = open();
+                if (!ctx->owned_dev) {
+                        return false;
+                }
+                ctx->dev = ctx->owned_dev.get();
+        }
+
+        if (!TrySubmitThreadpoolCallback([](PTP_CALLBACK_INSTANCE, PVOID param) noexcept {
+                auto ctx = std::unique_ptr<async_attach_context>(
+                        static_cast<async_attach_context*>(param));
+
+                cancel_wait_guard cancel_guard(ctx->dev, ctx->cancel_event);
+                if (!cancel_guard) {
+                        auto err = GetLastError();
+                        try {
+                                ctx->callback(0, err);
+                        } catch (...) {
+                        }
+                        return;
+                }
+
+                auto port = attach(ctx->dev, ctx->args);
+                auto err = port > 0 ? ERROR_SUCCESS : GetLastError();
+
+                if (err == ERROR_SUCCESS && port > 0 && ctx->args.config.iso_mode != isolation::none) {
+                        isolate_port_volumes(port, 4000, ctx->cancel_event);
+                }
+
+                cancel_guard.reset();
+
+                if (is_signaled(ctx->cancel_event)) {
+                        if (err == ERROR_SUCCESS && port > 0) {
+                                detach(ctx->dev, port);
+                        }
+                        err = ERROR_CANCELLED;
+                        port = 0;
+                }
+
+                try {
+                        ctx->callback(port, err);
+                } catch (...) {
+                }
+        }, ctx.get(), get_threadpool_environ())) {
+                set_last_error last; // ~context can overwrite it
+                ctx.reset();
+                return false;
+        }
+
+        ctx.release(); // the ownership is transferred to the callback
+        return true;
+}
+
+bool usbip::vhci::attach_async(
+        _In_ const attach_args &args,
+        _In_ attach_callback callback,
+        _In_opt_ HANDLE cancel_event)
+{
+        return attach_async(nullptr, args, std::move(callback), cancel_event);
+}
+
+bool usbip::vhci::attach_async(
+        _In_ HANDLE dev,
+        _In_ const attach_args &args,
+        _In_ attach_callback callback,
+        _In_ std::stop_token stoken)
+{
+        auto stop_evt = std::make_shared<stop_event>(stoken);
+        if (!*stop_evt) {
+                return false;
+        }
+
+        auto wrapped_cb = [callback = std::move(callback), stop_evt](int port, DWORD err) {
+                callback(port, err);
+        };
+
+        return attach_async(dev, args, std::move(wrapped_cb), stop_evt->get());
+}
+
+bool usbip::vhci::attach_async(
+        _In_ const attach_args &args,
+        _In_ attach_callback callback,
+        _In_ std::stop_token stoken)
+{
+        return attach_async(nullptr, args, std::move(callback), stoken);
+}
+
+bool usbip::vhci::detach_async(
+        _In_ int port,
+        _In_ detach_callback callback,
+        _In_opt_ HANDLE dev)
+{
+        if (!callback) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return false;
+        }
+
+        auto ctx = std::make_unique<async_detach_context>(async_detach_context {
+                .dev = dev,
+                .port = port,
+                .callback = std::move(callback)
+        });
+
+        if (!ctx->dev || ctx->dev == INVALID_HANDLE_VALUE) {
+                ctx->owned_dev = open();
+                if (!ctx->owned_dev) {
+                        return false;
+                }
+                ctx->dev = ctx->owned_dev.get();
+        }
+
+        if (!TrySubmitThreadpoolCallback([](PTP_CALLBACK_INSTANCE, PVOID param) noexcept {
+                auto ctx = std::unique_ptr<async_detach_context>(
+                        static_cast<async_detach_context*>(param));
+
+                auto ok = detach(ctx->dev, ctx->port);
+                auto err = ok ? ERROR_SUCCESS : GetLastError();
+
+                try {
+                        ctx->callback(ok, err);
+                } catch (...) {
+                }
+        }, ctx.get(), get_threadpool_environ())) {
+                set_last_error last; // ~context can overwrite it
+                ctx.reset();
+                return false;
+        }
+
+        ctx.release(); // the ownership is transferred to the callback
+        return true;
 }
 
 DWORD usbip::vhci::get_device_state_size() noexcept
@@ -462,4 +656,292 @@ std::optional<usbip::device_state> usbip::vhci::read_device_state(_In_ HANDLE de
         }
 
         return state;
+}
+
+namespace
+{
+
+/*
+ * Shared by the threadpool worker and state_monitor_impl.
+ */
+class monitor_state
+{
+public:
+        monitor_state(HANDLE dev, vhci::state_callback callback, Handle owned_dev = {}) :
+                m_owned_dev(std::move(owned_dev)),
+                m_dev(m_owned_dev ? m_owned_dev.get() : dev),
+                m_callback(std::move(callback)) {}
+
+        void cancel() noexcept
+        {
+                if (!m_cancelled.exchange(true, std::memory_order_acq_rel)) {
+                        CancelIoEx(m_dev, nullptr); // it's OK to fail
+                }
+        }
+
+        bool is_cancelled() const noexcept
+        {
+                return m_cancelled.load(std::memory_order_acquire);
+        }
+
+        /*
+         * Cancels the monitoring and waits until run() returns.
+         * Does not wait if called on the worker thread (from the callback) to avoid a deadlock,
+         * run() returns as soon as the callback returns.
+         */
+        void cancel_and_wait() noexcept
+        {
+                cancel();
+
+                if (m_worker_tid.load(std::memory_order_acquire) == GetCurrentThreadId()) {
+                        return;
+                }
+
+                using namespace std::chrono_literals;
+
+                while (!m_done.try_acquire_for(100ms)) {
+                        CancelIoEx(m_dev, nullptr); // cancel() can precede ReadFile, retry
+                }
+        }
+
+        void run() noexcept
+        {
+                m_worker_tid.store(GetCurrentThreadId(), std::memory_order_release);
+
+                try {
+                        read_loop();
+                } catch (...) {
+                }
+
+                m_done.release();
+        }
+
+private:
+        Handle m_owned_dev;
+        HANDLE m_dev{};
+        vhci::state_callback m_callback;
+        std::atomic<bool> m_cancelled{false};
+        std::atomic<DWORD> m_worker_tid{};
+        std::binary_semaphore m_done{0};
+
+        void read_loop()
+        {
+                while (!is_cancelled()) {
+                        auto state = vhci::read_device_state(m_dev);
+                        if (!state) {
+                                auto err = GetLastError();
+                                if (is_cancelled() || err == ERROR_OPERATION_ABORTED) {
+                                        break;
+                                }
+                                try {
+                                        m_callback({}, err);
+                                } catch (...) {
+                                }
+                                break;
+                        }
+
+                        if (is_cancelled()) {
+                                break;
+                        }
+
+                        try {
+                                m_callback(*state, ERROR_SUCCESS);
+                        } catch (...) {
+                        }
+                }
+        }
+};
+
+/*
+ * The object returned to the caller. The worker holds monitor_state only,
+ * so releasing the last reference to this object cancels the monitoring.
+ */
+class state_monitor_impl final : public vhci::state_monitor
+{
+public:
+        explicit state_monitor_impl(std::shared_ptr<monitor_state> state) noexcept :
+                m_state(std::move(state)) {}
+
+        ~state_monitor_impl() override { m_state->cancel_and_wait(); }
+
+        void cancel() noexcept override { m_state->cancel(); }
+
+private:
+        std::shared_ptr<monitor_state> m_state;
+};
+
+/*
+ * @param dev driver device handle, can be caller-owned or owned_dev
+ * @return call GetLastError() if nullptr is returned
+ */
+vhci::state_monitor_ptr start_monitor(_In_ HANDLE dev, _In_ vhci::state_callback callback, Handle owned_dev = {})
+{
+        auto state = std::make_shared<monitor_state>(dev, std::move(callback), std::move(owned_dev));
+
+        using context = std::shared_ptr<monitor_state>;
+        auto ctx = std::make_unique<context>(state);
+
+        auto ok = TrySubmitThreadpoolCallback([](PTP_CALLBACK_INSTANCE, PVOID param) noexcept {
+                std::unique_ptr<context> ctx(static_cast<context*>(param));
+                (*ctx)->run();
+        }, ctx.get(), get_threadpool_environ());
+
+        if (!ok) {
+                return nullptr;
+        }
+
+        ctx.release(); // the ownership is transferred to the callback
+
+        try {
+                return std::make_shared<state_monitor_impl>(std::move(state));
+        } catch (...) {
+                state->cancel();
+                throw;
+        }
+}
+
+} // namespace
+
+vhci::state_monitor_ptr usbip::vhci::watch_device_states(
+        _In_ HANDLE dev,
+        _In_ state_callback callback)
+{
+        if (!dev || dev == INVALID_HANDLE_VALUE || !callback) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return nullptr;
+        }
+
+        return start_monitor(dev, std::move(callback));
+}
+
+vhci::state_monitor_ptr usbip::vhci::watch_device_states(_In_ state_callback callback)
+{
+        if (!callback) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return nullptr;
+        }
+
+        auto dev = open();
+        if (!dev) {
+                return nullptr;
+        }
+
+        auto raw_dev = dev.get();
+        return start_monitor(raw_dev, std::move(callback), std::move(dev));
+}
+
+std::optional<std::vector<usbip::imported_device>> usbip::vhci::get_imported_devices()
+{
+        auto dev = open();
+        if (!dev) {
+                return std::nullopt;
+        }
+        return get_imported_devices(dev.get());
+}
+
+int usbip::vhci::attach(_In_ const attach_args &args)
+{
+        auto dev = open();
+        if (!dev) {
+                return 0;
+        }
+        return attach(dev.get(), args);
+}
+
+int usbip::vhci::stop_attach_attempts(_In_opt_ const device_location *location)
+{
+        auto dev = open();
+        if (!dev) {
+                return -1;
+        }
+        return stop_attach_attempts(dev.get(), location);
+}
+
+usbip::vhci::client::client()
+        : m_dev(vhci::open())
+{
+}
+
+usbip::vhci::client::client(_In_ bool overlapped)
+        : m_dev(vhci::open(overlapped))
+{
+}
+
+usbip::vhci::client::client(_In_ Handle dev) noexcept
+        : m_dev(std::move(dev))
+{
+}
+
+usbip::vhci::client::operator bool() const noexcept
+{
+        return bool(m_dev);
+}
+
+bool usbip::vhci::client::operator!() const noexcept
+{
+        return !m_dev;
+}
+
+HANDLE usbip::vhci::client::handle() const noexcept
+{
+        return m_dev.get();
+}
+
+bool usbip::vhci::client::open(_In_ bool overlapped)
+{
+        m_dev = vhci::open(overlapped);
+        return bool(m_dev);
+}
+
+void usbip::vhci::client::close() noexcept
+{
+        m_dev.close();
+}
+
+std::optional<std::vector<usbip::imported_device>> usbip::vhci::client::get_imported_devices() const
+{
+        return m_dev ? vhci::get_imported_devices(m_dev.get()) : vhci::get_imported_devices();
+}
+
+std::optional<std::vector<usbip::device_config>> usbip::vhci::client::get_persistent() const
+{
+        return m_dev ? vhci::get_persistent(m_dev.get()) : vhci::get_persistent();
+}
+
+bool usbip::vhci::client::set_persistent(_In_ const std::vector<device_config> &devices)
+{
+        return m_dev ? vhci::set_persistent(m_dev.get(), devices) : vhci::set_persistent(devices);
+}
+
+int usbip::vhci::client::attach(_In_ const attach_args &args)
+{
+        return m_dev ? vhci::attach(m_dev.get(), args) : vhci::attach(args);
+}
+
+bool usbip::vhci::client::attach_async(
+        _In_ const attach_args &args,
+        _In_ attach_callback callback,
+        _In_opt_ HANDLE cancel_event)
+{
+        return vhci::attach_async(args, std::move(callback), cancel_event);
+}
+
+int usbip::vhci::client::stop_attach_attempts(_In_opt_ const device_location *location)
+{
+        return m_dev ? vhci::stop_attach_attempts(m_dev.get(), location) : vhci::stop_attach_attempts(location);
+}
+
+bool usbip::vhci::client::detach(_In_ int port)
+{
+        return m_dev ? vhci::detach(m_dev.get(), port) : vhci::detach(port);
+}
+
+bool usbip::vhci::client::detach_async(_In_ int port, _In_ detach_callback callback)
+{
+        return vhci::detach_async(port, std::move(callback), nullptr);
+}
+
+vhci::state_monitor_ptr usbip::vhci::client::watch_device_states(_In_ state_callback callback)
+{
+        return vhci::watch_device_states(std::move(callback));
 }

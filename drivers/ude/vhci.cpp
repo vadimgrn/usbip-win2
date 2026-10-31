@@ -126,8 +126,8 @@ PAGED auto query_usb_ports_cnt(_In_ int def_cnt)
 }
 
 /*
- * Ports number cannot be zero and total ports number cannot exceed 255.
- * @see userspace/usbip/usbip.cpp, MAX_HUB_PORTS
+ * Ports number cannot be zero and total ports number cannot exceed MAX_HUB_PORTS.
+ * @see include/usbip/consts.h, MAX_HUB_PORTS
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -135,7 +135,7 @@ PAGED void set_usb_ports_cnt(_Inout_ int &usb2_ports, _Inout_ int &usb3_ports)
 {
         PAGED_CODE();
 
-        enum { MIN_PORTS = 1, DEF_PORTS = 30, MAX_PORTS = 254, MAX_TOTAL_PORTS };
+        enum { MIN_PORTS = 1, DEF_PORTS = 30, MAX_PORTS = MAX_HUB_PORTS - 1, MAX_TOTAL_PORTS = MAX_HUB_PORTS };
         auto v = query_usb_ports_cnt(DEF_PORTS);
 
         for (int total = 0; auto &n: v.cnt) {

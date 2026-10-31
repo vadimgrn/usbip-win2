@@ -15,6 +15,17 @@
 namespace usbip
 {
 
+inline auto to_string_view(_In_ const char *s, size_t maxlen) noexcept
+{
+        return std::string_view(s, strnlen(s, maxlen));
+}
+
+template<size_t N>
+inline auto to_string_view(_In_ const char (&s)[N]) noexcept
+{
+        return to_string_view(s, N);
+}
+
 /**
  * Trims trailing characters (by default whitespace: space, tab, CR, LF).
  */

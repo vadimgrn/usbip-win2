@@ -4,12 +4,14 @@
 
 #include "../volume_isolation.h"
 #include "../win_handle.h"
-#include "../vhci.h"
 
 #include "sid.h"
 #include "output.h"
+#include "last_error.h"
 #include "setupapi.h"
-#include "strconv.h"
+#include "stop_event.h"
+#include "cancel_wait_guard.h"
+#include "threadpool.h"
 
 #include <resources/messages.h>
 
@@ -20,15 +22,20 @@
 #include <aclapi.h>
 
 #include <thread>
-#include <vector>
-#include <chrono>
 #include <algorithm>
-#include <memory>
 
 namespace
 {
 
 using namespace usbip;
+
+struct async_isolation_context
+{
+        int port{};
+        unsigned long timeout_ms{};
+        HANDLE cancel_event{};
+        isolate_port_volumes_callback callback;
+};
 
 /*
  * Creates a security descriptor with a protected DACL granting full access (GA)
@@ -74,9 +81,9 @@ auto harden_volume_dacl(_In_ const std::wstring &vol_path, _In_ wchar_t drive_le
                 return sd.error();
         }
 
-        ACL *dacl{};
-        BOOL dacl_present{};
-        BOOL dacl_defaulted{}; // ignored: SD was explicitly constructed, not inherited or defaulted.
+        ACL *dacl;
+        BOOL dacl_present;
+        BOOL dacl_defaulted; // ignored: SD was explicitly constructed, not inherited or defaulted
         if (!GetSecurityDescriptorDacl(sd->get(), &dacl_present, &dacl, &dacl_defaulted)) {
                 auto err = GetLastError();
                 libusbip::output("GetSecurityDescriptorDacl error {}", err);
@@ -96,7 +103,7 @@ auto harden_volume_dacl(_In_ const std::wstring &vol_path, _In_ wchar_t drive_le
                 return err;
         }
 
-        const SECURITY_INFORMATION sinfo = DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION;
+        constexpr SECURITY_INFORMATION sinfo = DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION;
         auto ret = SetSecurityInfo(vol.get(), SE_KERNEL_OBJECT, sinfo, nullptr, nullptr, dacl, nullptr);
 
         if (ret != ERROR_SUCCESS) {
@@ -234,11 +241,6 @@ bool sleep_or_cancel(_In_ unsigned long ms, _In_opt_ HANDLE cancel_event) noexce
         return true;
 }
 
-bool is_cancelled(_In_opt_ HANDLE cancel_event) noexcept
-{
-        return cancel_event && WaitForSingleObject(cancel_event, 0) == WAIT_OBJECT_0;
-}
-
 wchar_t wait_for_volume_drive_letter(
         _In_ std::wstring_view nt_device,
         _In_ std::chrono::steady_clock::time_point deadline,
@@ -248,7 +250,7 @@ wchar_t wait_for_volume_drive_letter(
                 deadline, std::chrono::steady_clock::now() + std::chrono::milliseconds(1000));
 
         while (true) {
-                if (is_cancelled(cancel_event)) {
+                if (is_signaled(cancel_event)) {
                         break;
                 }
 
@@ -541,7 +543,8 @@ std::expected<std::vector<DWORD>, DWORD> get_disks_for_port(_In_ DEVINST vhci_de
                         break;
                 }
 
-                if (get_disk_port_number(dd.DevInst, vhci_devinst) == port) {
+                auto dev_port = get_disk_port_number(dd.DevInst, vhci_devinst);
+                if (port <= 0 ? dev_port > 0 : dev_port == port) {
                         if (auto num = get_disk_number(di.get(), dd)) {
                                 disk_numbers.push_back(*num);
                         }
@@ -739,7 +742,7 @@ std::expected<std::vector<DWORD>, DWORD> wait_for_port_disks(
         }
 
         while (true) {
-                if (is_cancelled(cancel_event)) {
+                if (is_signaled(cancel_event)) {
                         return std::unexpected(static_cast<DWORD>(ERROR_CANCELLED));
                 }
 
@@ -778,7 +781,7 @@ std::expected<std::vector<volume_info>, DWORD> wait_for_disk_volumes(
         }
 
         while (true) {
-                if (is_cancelled(cancel_event)) {
+                if (is_signaled(cancel_event)) {
                         return std::unexpected(static_cast<DWORD>(ERROR_CANCELLED));
                 }
 
@@ -823,8 +826,7 @@ auto usbip::isolate_port_volumes(
         _In_opt_ HANDLE cancel_event) ->
         std::optional<std::vector<isolated_volume>>
 {
-        if (is_cancelled(cancel_event)) {
-                SetLastError(ERROR_CANCELLED);
+        if (check_cancelled(cancel_event)) {
                 return std::nullopt;
         }
 
@@ -840,14 +842,26 @@ auto usbip::isolate_port_volumes(
         volumes.reserve(vols->size());
 
         for (const auto &v: *vols) {
-                if (is_cancelled(cancel_event)) {
-                        SetLastError(ERROR_CANCELLED);
+                if (check_cancelled(cancel_event)) {
                         return std::nullopt;
                 }
                 volumes.push_back(isolate_volume(v, deadline, cancel_event));
         }
 
         return volumes;
+}
+
+std::optional<std::vector<usbip::isolated_volume>> usbip::isolate_port_volumes(
+        _In_ int port,
+        _In_ unsigned long timeout_ms,
+        _In_ std::stop_token stoken)
+{
+        stop_event cancel_evt(stoken);
+        if (!cancel_evt) {
+                return std::nullopt;
+        }
+
+        return isolate_port_volumes(port, timeout_ms, cancel_evt.get());
 }
 
 bool usbip::cleanup_port_volumes(_In_ int port)
@@ -884,20 +898,6 @@ bool usbip::cleanup_port_volumes(_In_ int port)
 }
 
 
-namespace
-{
-
-struct async_isolation_context
-{
-        int port{};
-        unsigned long timeout_ms{};
-        HANDLE cancel_event{};
-        isolate_port_volumes_callback callback;
-};
-
-} // namespace
-
-
 bool usbip::isolate_port_volumes_async(
         _In_ int port,
         _In_ isolate_port_volumes_callback callback,
@@ -909,8 +909,7 @@ bool usbip::isolate_port_volumes_async(
                 return false;
         }
 
-        if (is_cancelled(cancel_event)) {
-                SetLastError(ERROR_CANCELLED);
+        if (check_cancelled(cancel_event)) {
                 return false;
         }
 
@@ -921,7 +920,7 @@ bool usbip::isolate_port_volumes_async(
                 .callback = std::move(callback)
         });
 
-        auto ok = TrySubmitThreadpoolCallback([](PTP_CALLBACK_INSTANCE, PVOID param) noexcept {
+        if (!TrySubmitThreadpoolCallback([](PTP_CALLBACK_INSTANCE, PVOID param) noexcept {
                 auto ctx = std::unique_ptr<async_isolation_context>(
                         static_cast<async_isolation_context*>(param));
 
@@ -931,12 +930,31 @@ bool usbip::isolate_port_volumes_async(
                         ctx->callback(ctx->port, std::move(result));
                 } catch (...) {
                 }
-        }, ctx.get(), nullptr);
-
-        if (ok) {
-                ctx.release();
-                return true;
+        }, ctx.get(), get_threadpool_environ())) {
+                set_last_error last; // ~context can overwrite it
+                ctx.reset();
+                return false;
         }
 
-        return false;
+        ctx.release(); // the ownership is transferred to the callback
+        return true;
+}
+
+bool usbip::isolate_port_volumes_async(
+        _In_ int port,
+        _In_ isolate_port_volumes_callback callback,
+        _In_ unsigned long timeout_ms,
+        _In_ std::stop_token stoken)
+{
+        auto stop_evt = std::make_shared<stop_event>(stoken);
+        if (!*stop_evt) {
+                return false;
+        }
+
+        auto wrapped_cb = [callback = std::move(callback), stop_evt](
+                int port, std::optional<std::vector<isolated_volume>> res) {
+                callback(port, std::move(res));
+        };
+
+        return isolate_port_volumes_async(port, std::move(wrapped_cb), timeout_ms, stop_evt->get());
 }
