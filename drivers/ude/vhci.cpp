@@ -1099,16 +1099,14 @@ PAGED void usbip::vhci::complete_read(_In_ WDFREQUEST request, _In_ WDFMEMORY ev
 {
         PAGED_CODE();
 
-        device_state *dst{};
-        auto dst_sz = sizeof(*dst);
+        device_state *dst;
+        size_t dst_sz;
 
-        auto st = WdfRequestRetrieveOutputBuffer(request, dst_sz, reinterpret_cast<PVOID*>(&dst), nullptr);
-        
+        auto st = wdf::retrieve_output_buffer(request, dst, &dst_sz);
         if (NT_SUCCESS(st)) {
                 *dst = get_device_state(evt);
         } else {
-                Trace(TRACE_LEVEL_ERROR, "WdfRequestRetrieveOutputBuffer %!STATUS!", st);
-                dst_sz = 0;
+                Trace(TRACE_LEVEL_ERROR, "retrieve_output_buffer %!STATUS!", st);
         }
 
         TraceDbg("fobj %04x, req %04x, device_state %04x, %!STATUS!", ptr04x(WdfRequestGetFileObject(request)), 

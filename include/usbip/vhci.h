@@ -127,7 +127,7 @@ struct imported_device_hardware
 struct imported_device
 {
         int port; // OUT, >= 1 or zero if an error
-        ULONG location_hash; // OUT, hash(host,service,busid)
+        ULONG location_hash; // OUT, hash(host,service,busid), driver-internal (ignored in userspace)
 
         imported_device_config config;
         imported_device_hardware hw;
@@ -222,18 +222,26 @@ enum {
 struct plugin_hardware : base
 {
         int port; // OUT, >= 1 or zero if an error
-        ULONG location_hash; // OUT, hash(host,service,busid)
-
         imported_device_config config;
+
+        static constexpr auto output_size() noexcept
+        {
+                return offset_plus_size(plugin_hardware, port);
+        }
 };
-static_assert(offsetof_ex(plugin_hardware, port) == sizeof(base));
-static_assert(offsetof_ex(plugin_hardware, location_hash) == sizeof(base) + sizeof(plugin_hardware::port));
+static_assert(offsetof_ex(plugin_hardware, port) == sizeof(base)); // must be the first member
 
 struct stop_attach_attempts : base
 {
         int count; // OUT, number of canceled requests
         imported_device_location location;
+
+        static constexpr auto output_size() noexcept
+        {
+                return offset_plus_size(stop_attach_attempts, count);
+        }
 };
+static_assert(offsetof_ex(stop_attach_attempts, count) == sizeof(base)); // must be the first member
 
 enum { PORT_ALL_CLOSEONLY = -2, PORT_ALL };
 

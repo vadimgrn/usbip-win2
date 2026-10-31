@@ -352,7 +352,7 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
         }
 
         auto ctl = args.once ? ioctl::PLUGIN_HARDWARE_ONCE : ioctl::PLUGIN_HARDWARE;
-        constexpr auto outlen = offsetof_ex(ioctl::plugin_hardware, port) + sizeof(r.port);
+        constexpr auto outlen = ioctl::plugin_hardware::output_size();
 
         if (DWORD BytesReturned{}; // must be set if the last arg is NULL
             DeviceIoControl(dev, ctl, &r, sizeof(r), &r, outlen, &BytesReturned, nullptr)) {
@@ -386,10 +386,12 @@ int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_loc
                 }
         }
         
+        constexpr auto outlen = ioctl::stop_attach_attempts::output_size();
+
         if (DWORD BytesReturned{}; // must be set if the last arg is NULL
-            !DeviceIoControl(dev, ioctl::STOP_ATTACH_ATTEMPTS, &r, sizeof(r), &r, sizeof(r), &BytesReturned, nullptr)) {
+            !DeviceIoControl(dev, ioctl::STOP_ATTACH_ATTEMPTS, &r, sizeof(r), &r, outlen, &BytesReturned, nullptr)) {
                 return -1;
-        } else if (BytesReturned != sizeof(r)) [[unlikely]] {
+        } else if (BytesReturned != outlen) [[unlikely]] {
                 SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
                 return -1;
         } else {

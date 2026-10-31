@@ -392,7 +392,7 @@ PAGED bool create_outbuf(
         PAGED_CODE();
         NT_ASSERT(!result);
 
-        const auto len = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
+        const auto len = vhci::ioctl::plugin_hardware::output_size();
 
         auto st = WdfMemoryCreatePreallocated(&attr, req, len, &result);
         if (NT_ERROR(st)) {
