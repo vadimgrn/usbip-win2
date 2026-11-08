@@ -66,7 +66,8 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	NT_ASSERT(bool(setup_out) == (usb_endpoint_type(epd) == UsbdPipeTypeControl));
+	auto pipe_type = usb_endpoint_type(epd);
+	NT_ASSERT(bool(setup_out) == (pipe_type == UsbdPipeTypeControl));
 	auto dir_out = setup_out ? *setup_out : usb_endpoint_dir_out(epd);
 
 	TransferFlags = fix_transfer_flags(TransferFlags, dir_out);
@@ -78,7 +79,7 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 	hdr.ep = usb_endpoint_num(epd);
 
 	auto &r = hdr.cmd_submit;
-	r.transfer_flags = to_linux_flags(TransferFlags, !dir_out);
+	r.transfer_flags = to_linux_flags(TransferFlags, !dir_out, pipe_type);
 	r.transfer_buffer_length = TransferBufferLength;
 	r.start_frame = 0;
 	r.number_of_packets = number_of_packets_non_isoch;

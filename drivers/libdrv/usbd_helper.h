@@ -30,13 +30,19 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto to_windows_status_isoch(_In_ int usbip_status) { return to_windows_status_ex(usbip_status, true); }
 
+/**
+ * Converts Linux URB transfer flags to Windows USBD transfer flags.
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-ULONG to_windows_flags(_In_ UINT32 transfer_flags, _In_ bool dir_in);
+ULONG to_windows_flags(_In_ UINT32 transfer_flags, _In_ bool dir_in, _In_ USBD_PIPE_TYPE pipe_type);
 
+/**
+ * Converts Windows USBD transfer flags to Linux URB transfer flags.
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-UINT32 to_linux_flags(_In_ ULONG TransferFlags, _In_ bool dir_in);
+UINT32 to_linux_flags(_In_ ULONG TransferFlags, _In_ bool dir_in, _In_ USBD_PIPE_TYPE pipe_type);
 
 constexpr auto IsTransferDirectionIn(ULONG TransferFlags)
 {

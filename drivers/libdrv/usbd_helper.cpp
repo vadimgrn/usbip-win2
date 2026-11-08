@@ -172,7 +172,9 @@ enum {
 
  USBD_SHORT_TRANSFER_OK
  This flag should not be set unless USBD_TRANSFER_DIRECTION_IN is also set.
- 
+ Only bulk and interrupt endpoints require USBD_SHORT_TRANSFER_OK to permit short transfers;
+ control transfers inherently permit short data stages on Windows without this flag.
+
  USBD_START_ISO_TRANSFER_ASAP
  Causes the transfer to begin on the next frame, if no transfers have been submitted to the pipe 
  since the pipe was opened or last reset. Otherwise, the transfer begins on the first frame that 
@@ -182,12 +184,14 @@ enum {
  For control endpoints:
  1.Direction in endpoint address or transfer flags should be ignored
  2.Direction is determined by bits of bmRequestType in the Setup packet (D7 Data Phase Transfer Direction) 
+ 3.Short data stage is legal (USB 2.0 8.5.3.2) and accepted by Windows, so URB_SHORT_NOT_OK must not be set
  */
-ULONG libdrv::to_windows_flags(_In_ UINT32 transfer_flags, _In_ bool dir_in)
+ULONG libdrv::to_windows_flags(_In_ UINT32 transfer_flags, _In_ bool dir_in, _In_ USBD_PIPE_TYPE pipe_type)
 {
 	ULONG TransferFlags = dir_in ? USBD_TRANSFER_DIRECTION_IN : USBD_TRANSFER_DIRECTION_OUT;
 
-	if (dir_in && !(transfer_flags & URB_SHORT_NOT_OK)) {
+	if (dir_in && !(transfer_flags & URB_SHORT_NOT_OK) &&
+	    (pipe_type == UsbdPipeTypeBulk || pipe_type == UsbdPipeTypeInterrupt)) {
 		TransferFlags |= USBD_SHORT_TRANSFER_OK;
 	}
 
@@ -198,16 +202,25 @@ ULONG libdrv::to_windows_flags(_In_ UINT32 transfer_flags, _In_ bool dir_in)
 	return TransferFlags;
 }
 
-UINT32 libdrv::to_linux_flags(_In_ ULONG TransferFlags, _In_ bool dir_in)
+/*
+ * USB 2.0 8.5.3.2: Short data stage is legal on control pipes and accepted by
+ * Windows (e.g. HID feature/input reports), so URB_SHORT_NOT_OK must not be set
+ * to prevent Linux usbip-host from failing short reads with -EREMOTEIO.
+ * Also, Linux kernel rejects URB_SHORT_NOT_OK on isochronous endpoints (-EINVAL).
+ * Only bulk and interrupt IN endpoints treat short transfers as errors unless
+ * USBD_SHORT_TRANSFER_OK is explicitly set.
+ */
+UINT32 libdrv::to_linux_flags(_In_ ULONG TransferFlags, _In_ bool dir_in, _In_ USBD_PIPE_TYPE pipe_type)
 {
 	UINT32 flags = 0;
 
-	if (TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
-		flags |= URB_ISO_ASAP;
+	if (dir_in && !(TransferFlags & USBD_SHORT_TRANSFER_OK) &&
+	    (pipe_type == UsbdPipeTypeBulk || pipe_type == UsbdPipeTypeInterrupt)) {
+		flags |= URB_SHORT_NOT_OK;
 	}
 
-	if (dir_in && !(TransferFlags & USBD_SHORT_TRANSFER_OK)) {
-		flags |= URB_SHORT_NOT_OK;
+	if (TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
+		flags |= URB_ISO_ASAP;
 	}
 
 	return flags;
