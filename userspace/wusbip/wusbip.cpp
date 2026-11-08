@@ -27,6 +27,8 @@
 #include <wx/clipbrd.h>
 #include <wx/persist/dataview.h>
 #include <wx/wupdlock.h>
+#include <wx/iconbndl.h>
+#include <wx/bmpbndl.h>
 
 #include <format>
 #include <set>
@@ -505,6 +507,10 @@ void MainFrame::check_view_appearance(_In_ int appearance)
         }
 }
 
+/*
+ * Load all icon resolutions (16 to 256 px). wxIcon(name) defaults to the first
+ * resource entry (256x256), which breaks notification tray rendering on Win11.
+ */
 void MainFrame::init()
 {
         m_log->SetVerbose(true); // produce messages for wxLOG_Info
@@ -513,7 +519,7 @@ void MainFrame::init()
         auto app_name = wxGetApp().GetAppDisplayName();
         SetTitle(app_name);
 
-        SetIcon(wxIcon(L"USBip")); // see wxwidgets.rc
+        SetIcons(wxIconBundle(L"USBip", nullptr)); // see wusbip.rc
         
         if (auto cfg = wxConfig::Get()) {
                 cfg->SetStyle(wxCONFIG_USE_LOCAL_FILE);
@@ -613,6 +619,10 @@ void MainFrame::on_exit(wxCommandEvent&)
         Close(true);
 }
 
+/*
+ * Create bitmap bundle from all icon sizes so wxTaskBarIcon can pick/scale
+ * the appropriate small metric size (SM_CXSMICON) instead of 256x256.
+ */
 void MainFrame::iconize_to_tray()
 {
         auto &log = *m_log->GetFrame();
@@ -624,8 +634,13 @@ void MainFrame::iconize_to_tray()
                 wxASSERT(!log.IsShown());
                 return;
         }
-        
-        if (!m_taskbar_icon->SetIcon(GetIcon(), GetTitle())) {
+
+        auto bundle = wxBitmapBundle::FromIconBundle(GetIcons());
+        if (!bundle.IsOk()) {
+                bundle = wxBitmapBundle::FromIconBundle(wxIconBundle(L"USBip", nullptr));
+        }
+
+        if (!m_taskbar_icon->SetIcon(bundle, GetTitle())) {
                 wxLogError(_("Could not set taskbar icon"));
         } else {
                 log.Hide();
