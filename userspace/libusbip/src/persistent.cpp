@@ -8,7 +8,6 @@
 #include "sid.h"
 #include "output.h"
 
-#include <usbip/vhci.h>
 #include <ranges>
 
 namespace
@@ -16,29 +15,60 @@ namespace
 
 using namespace usbip;
 
-auto is_malformed(_In_ const device_location &d) noexcept
+auto is_malformed(_In_ std::string_view s, _In_ size_t max_len) noexcept
 {
-        return d.hostname.empty() || d.service.empty() || d.busid.empty();
+        using namespace std::string_view_literals;
+        return  s.empty() ||
+                s.size() >= max_len ||
+                s.find_first_of(";=\0"sv) != std::string_view::npos;
 }
 
-auto is_malformed_isolation(_In_ const device_config &d, _In_ bool check_user) noexcept
+auto is_malformed(_In_ const device_location &d) noexcept
+{
+        using loc = vhci::imported_device_location;
+        return  is_malformed(d.hostname, sizeof(loc::host)) ||
+                is_malformed(d.service, sizeof(loc::service)) ||
+                is_malformed(d.busid, sizeof(loc::busid));
+}
+
+constexpr auto is_malformed(_In_ receive_mode mode) noexcept
+{
+        switch (mode) {
+        case receive_mode::zero_copy:
+        case receive_mode::low_latency:
+                return false;
+        }
+
+        return true;
+}
+
+constexpr auto is_malformed_isolation(
+        _In_ const device_config &d, _In_ bool check_user) noexcept
 {
         switch (d.iso_mode) {
-        case isolation::session:
-                return true; // cannot be used for persistent device
+        case isolation::none:
+                return !d.user.empty();
         case isolation::user:
                 return check_user && d.user.empty();
-        case isolation::none:
+        case isolation::session: // cannot be used for persistent device
         default:
-                return !d.user.empty();
+                return true;
         }
+}
+
+constexpr auto is_malformed_serial(_In_ const std::string &serial) noexcept
+{
+        auto sz = std::ssize(serial);
+        auto ok = sz < SERIAL_BUFSZ && is_ascii_alnum(serial.data(), sz) == sz;
+        return !ok;
 }
 
 auto is_malformed(_In_ const device_config &d, _In_ bool check_user = true) noexcept
 {
         return  is_malformed(d.location) ||
-                is_malformed_isolation(d, check_user) || 
-                !validate_device_serial(d.serial);
+                is_malformed(d.recv_mode) ||
+                is_malformed_isolation(d, check_user) ||
+                is_malformed_serial(d.serial);
 }
 
 auto config_to_str(_In_ const device_config &dev, _In_ const std::optional<sid_blob> &user_sid)
@@ -62,52 +92,53 @@ auto config_to_str(_In_ const device_config &dev, _In_ const std::optional<sid_b
         return s;
 }
 
+std::expected<std::wstring, DWORD> to_wstring(_In_ const device_config &dev)
+{
+        if (is_malformed(dev, false)) { // empty dev.user is OK
+                auto &dl = dev.location;
+                libusbip::output("malformed device_config( hostname='{}', port='{}', "
+                                 "busid='{}', serial='{}', wsk_events={}, iso_mode={}, user='{}' )",
+                                 dl.hostname, dl.service, dl.busid, dev.serial,
+                                 dev.recv_mode == receive_mode::low_latency,
+                                 static_cast<int>(dev.iso_mode), dev.user);
+
+                return std::unexpected(ERROR_INVALID_PARAMETER);
+        }
+
+        std::optional<sid_blob> user_sid;
+
+        if (dev.iso_mode == isolation::user) {
+                auto res = !dev.user.empty() ? parse_sid(dev.user) : get_user_sid();
+                if (!res) {
+                        libusbip::output("invalid device_config.user='{}'", dev.user);
+                        return std::unexpected(res.error());
+                }
+                user_sid = *res;
+        }
+
+        auto s = config_to_str(dev, user_sid);
+
+        auto ws = utf8_to_wchar(s);
+        if (!ws) {
+                libusbip::output("utf8_to_wchar('{}') error {}", s, ws.error());
+        }
+        return ws;
+}
+
 std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<device_config> &devices)
 {
-        std::wstring multi_sz;
+        std::vector<std::wstring> v;
+        v.reserve(devices.size());
 
         for (auto &dev: devices) {
-
-                std::optional<sid_blob> user_sid;
-
-                if (dev.iso_mode == isolation::user) {
-                        auto res = !dev.user.empty() ? parse_sid(dev.user) : get_user_sid(); 
-                        if (!res) {
-                                libusbip::output("invalid device_config.user='{}'", dev.user);
-                                return std::unexpected(res.error());
-                        }
-                        user_sid = *res;
-                }
-
-                auto &dl = dev.location;
-                auto wsk_events = dev.recv_mode == receive_mode::low_latency;
-
-                if (is_malformed(dev, false)) { // empty dev.user is OK
-                        libusbip::output("malformed device_config( hostname='{}', port='{}', "
-                                         "busid='{}', serial='{}', wsk_events={}, iso_mode={}, user='{}' )",
-                                         dl.hostname, dl.service, dl.busid, dev.serial, wsk_events,
-                                         static_cast<int>(dev.iso_mode), dev.user);
-
-                        return std::unexpected(ERROR_INVALID_PARAMETER);
-                }
-
-                auto s = config_to_str(dev, user_sid);
-
-                if (auto ws = utf8_to_wchar(s)) {
-                        *ws += L'\0';
-                        multi_sz += *ws;
+                if (auto ws = to_wstring(dev)) {
+                        v.push_back(std::move(*ws));
                 } else {
-                        libusbip::output("utf8_to_wchar('{}') error {}", s, ws.error());
                         return std::unexpected(ws.error());
                 }
         }
 
-        multi_sz += L'\0';
-        if (devices.empty()) { // double null terminator if empty
-                multi_sz += L'\0';
-        }
-
-        return multi_sz;
+        return make_multi_sz(v);
 }
 
 auto parse_recv_mode(_Inout_ receive_mode &mode, _In_ std::wstring_view val) noexcept
@@ -232,7 +263,7 @@ std::expected<std::wstring, DWORD> get_persistent_devices(_In_ HANDLE dev)
                 auto bytes = std::span(val).size_bytes();
 
                 DWORD BytesReturned{}; // must be set if the last arg is NULL
-                auto ok = DeviceIoControl(dev, vhci::ioctl::GET_PERSISTENT, nullptr, 0, 
+                auto ok = DeviceIoControl(dev, vhci::ioctl::GET_PERSISTENT, nullptr, 0,
                                           val.data(), static_cast<DWORD>(bytes), &BytesReturned, nullptr);
 
                 auto cnt = BytesReturned/sizeof(val.front());

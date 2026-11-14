@@ -6,6 +6,7 @@
 
 #include "dllspec.h"
 #include "win_handle.h"
+
 #include <usbspec.h>
 
 #include <string>
@@ -21,7 +22,7 @@ namespace usbip::vhci
 
 /*
  * A virtual device isolation can be session/user based.
- */ 
+ */
 #ifndef USBIP_VHCI_ISOLATION_DEFINED
 #define USBIP_VHCI_ISOLATION_DEFINED
   enum class isolation : unsigned char { none, session, user };
@@ -85,7 +86,7 @@ struct imported_device
         int port{}; ///< hub port number, >= 1
 
         UINT32 devid{};
-        USB_DEVICE_SPEED speed = UsbLowSpeed;
+        USB_DEVICE_SPEED speed{}; // UsbLowSpeed
 
         UINT16 vendor{};
         UINT16 product{};
@@ -100,7 +101,7 @@ enum class state { unplugged, connecting, connected, plugged, disconnected, unpl
 struct device_state
 {
         imported_device device;
-        state state = state::unplugged;
+        state state{}; // state::unplugged
         ULONG source_id{};
 };
 
@@ -152,13 +153,14 @@ struct attach_args
  * @param dev handle of the driver device
  * @param args arguments
  * @return hub port number, >= 1. Call GetLastError() if zero is returned.
+ * @note Does not call isolate_port_volumes(). Attach only triggers virtual hardware
+ *       plug-in and returns immediately; storage volumes are enumerated asynchronously
+ *       by Windows PnP and MountMgr over several seconds. Callers attaching storage
+ *       devices with isolation enabled (args.config.iso_mode != isolation::none)
+ *       should call isolate_port_volumes() immediately after attach() succeeds.
+ * @see isolate_port_volumes
  */
 USBIP_API int attach(_In_ HANDLE dev, _In_ const attach_args &args);
-
-inline auto attach(_In_ HANDLE dev, _In_ const device_config &config)
-{
-        return attach(dev, attach_args{ config });
-}
 
 /**
  * @param dev handle of the driver device
@@ -170,12 +172,19 @@ USBIP_API int stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_locati
 enum { port_all_closeonly = -2, port_all };
 
 /**
+ * Detaches a port. Automatically cleans up any session-isolated volumes before detaching.
+ *
  * @param dev handle of the driver device
  * @param port hub port number starting from 1
  *        port_all - detach all ports
  *        port_all_closeonly - close tcp/ip connections for all ports,
  *              use to skip unnecessary steps on Windows reboot/shutdown
  * @return call GetLastError() if false is returned
+ * @note Unlike global drive letters, session DosDevices links are not removed automatically
+ *       by Windows PnP on device teardown. cleanup_port_volumes() must be called before
+ *       hardware plugout while the DevNode hierarchy is still intact to avoid orphan
+ *       drive letters in the user session.
+ * @see cleanup_port_volumes
  */
 USBIP_API bool detach(_In_ HANDLE dev, _In_ int port);
 

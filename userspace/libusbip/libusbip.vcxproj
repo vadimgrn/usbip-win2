@@ -178,6 +178,7 @@
     <ClCompile Include="src\usb_ids.cpp" />
     <ClCompile Include="src\vhci.cpp" />
     <ClCompile Include="src\volume_isolation.cpp" />
+    <ClCompile Include="src\stop_event.cpp" />
     <ClCompile Include="src\win_socket.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -199,6 +200,7 @@
     <ClInclude Include="src\strconv.h" />
     <ClInclude Include="src\usb_ids.h" />
     <ClInclude Include="src\setupapi.h" />
+    <ClInclude Include="src\stop_event.h" />
     <ClInclude Include="vhci.h" />
     <ClInclude Include="volume_isolation.h" />
     <ClInclude Include="win_handle.h" />

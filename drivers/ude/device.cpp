@@ -592,10 +592,10 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugout_and_delete(
         _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE device,
-        _In_ const device_attributes &attr, _In_ int port, _In_ bool force_delete, _In_ const vhci::device_owner &owner)
+        _In_ const device_attributes &attr, _In_ int port, _In_ bool force_delete)
 {
         PAGED_CODE();
-        device_state_changed(vhci, attr, port, vhci::state::unplugging, owner);
+        device_state_changed(vhci, attr, port, vhci::state::unplugging);
 
         auto st = UdecxUsbDevicePlugOutAndDelete(device);
         if (NT_ERROR(st)) {
@@ -605,7 +605,7 @@ PAGED void plugout_and_delete(
         // device and device_ctx may already be destroyed, do not use
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, done, force delete %d", ptr04x(device), force_delete);
-        device_state_changed(vhci, attr, port, vhci::state::unplugged, owner);
+        device_state_changed(vhci, attr, port, vhci::state::unplugged);
 
         if (force_delete) { // FIXME: may cause BSOD if something changes in future UDE releases
                 WdfObjectDelete(device);
@@ -669,9 +669,7 @@ void async_detach_and_delete(_In_ WDFDEVICE vhci, _In_ int port, _In_ bool reatt
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::device::create(
-        _Out_ UDECXUSBDEVICE &device, _In_ WDFDEVICE vhci, _In_ WDFMEMORY ctx_ext,
-        _In_ const vhci::device_owner &owner)
+PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVICE vhci, _In_ WDFMEMORY ctx_ext)
 {
         PAGED_CODE();
 
@@ -680,7 +678,7 @@ PAGED NTSTATUS usbip::device::create(
 
         device_init_ptr init(vhci);
 
-        if (auto err = init ? prepare_init(init.ptr, ext.hw().speed) : STATUS_INSUFFICIENT_RESOURCES) {
+        if (auto err = init ? prepare_init(init.ptr, ext.attr.hw.speed) : STATUS_INSUFFICIENT_RESOURCES) {
                 Trace(TRACE_LEVEL_ERROR, "UDECXUSBDEVICE_INIT %!STATUS!", err);
                 return err;
         }
@@ -704,7 +702,6 @@ PAGED NTSTATUS usbip::device::create(
         ext.ctx = &ctx;
 
         ctx.vhci = vhci;
-        ctx.owner = owner;
 
         st = init_device(device, ctx);
 
@@ -791,17 +788,15 @@ PAGED wdm::object_reference usbip::device::detach(
         wdf::ObjectRef ref(dev.ctx_ext); // prevent its destruction after UdecxUsbDevicePlugOutAndDelete
         auto &ext = get_device_ctx_ext(dev.ctx_ext);
 
-        auto owner = dev.owner; // capture before the device_ctx may be destroyed
-
         if (plugout_and_delete) {
                 auto force_delete = !dev.ep0_added;
-                ::plugout_and_delete(vhci, device, ext.attr, port, force_delete, owner);
+                ::plugout_and_delete(vhci, device, ext.attr, port, force_delete);
         }
 
         if (reattach) {
                 auto ctx = get_vhci_ctx(vhci);
                 auto delayed = plugout_and_delete;
-                start_attach_attempts(vhci, *ctx, ext.attr, owner, delayed); // keep the same owner across reattach
+                start_attach_attempts(vhci, *ctx, ext.attr, delayed); // keep the same owner across reattach
         }
 
         return thread;

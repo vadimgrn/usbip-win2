@@ -126,8 +126,8 @@ PAGED auto query_usb_ports_cnt(_In_ int def_cnt)
 }
 
 /*
- * Ports number cannot be zero and total ports number cannot exceed 255.
- * @see userspace/usbip/usbip.cpp, MAX_HUB_PORTS
+ * Ports number cannot be zero and total ports number cannot exceed MAX_HUB_PORTS.
+ * @see include/usbip/consts.h, MAX_HUB_PORTS
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -135,7 +135,7 @@ PAGED void set_usb_ports_cnt(_Inout_ int &usb2_ports, _Inout_ int &usb3_ports)
 {
         PAGED_CODE();
 
-        enum { MIN_PORTS = 1, DEF_PORTS = 30, MAX_PORTS = 254, MAX_TOTAL_PORTS };
+        enum { MIN_PORTS = 1, DEF_PORTS = 30, MAX_PORTS = MAX_HUB_PORTS - 1, MAX_TOTAL_PORTS = MAX_HUB_PORTS };
         auto v = query_usb_ports_cnt(DEF_PORTS);
 
         for (int total = 0; auto &n: v.cnt) {
@@ -1027,7 +1027,7 @@ bool usbip::vhci::has_device(_In_ WDFDEVICE vhci, _In_ ULONG location_hash)
 
                 if (auto hdev = ctx.devices[i]) {
                         auto dev = get_device_ctx(hdev);
-                        if (auto &ext = dev->ext(); ext.location_hash() == location_hash) {
+                        if (dev->attributes().location_hash == location_hash) {
                                 return true;
                         }
                 }
@@ -1152,8 +1152,7 @@ PAGED void usbip::vhci::replay_plugged_devices(_In_ WDFDEVICE vhci, _Inout_ file
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::vhci::device_state_changed(
-        _In_ WDFDEVICE vhci, _In_ const device_attributes &attr, _In_ int port, _In_ state state,
-        _In_ const device_owner &owner)
+        _In_ WDFDEVICE vhci, _In_ const device_attributes &attr, _In_ int port, _In_ state state)
 {
         PAGED_CODE();
         auto &ctx = *get_vhci_ctx(vhci);
@@ -1162,6 +1161,8 @@ PAGED void usbip::vhci::device_state_changed(
         if (!subscribers) {
                 return;
         }
+
+        auto &owner = attr.config.iso.owner;
 
         TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!vhci_state!, session %lu, subscribers %d",
                   &attr.node_name, &attr.service_name, &attr.busid, port, int(state), owner.session_id, subscribers);

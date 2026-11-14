@@ -15,6 +15,17 @@
 namespace usbip
 {
 
+inline auto to_string_view(_In_ const char *s, size_t maxlen) noexcept
+{
+        return std::string_view(s, strnlen(s, maxlen));
+}
+
+template<size_t N>
+inline auto to_string_view(_In_ const char (&s)[N]) noexcept
+{
+        return to_string_view(s, N);
+}
+
 /**
  * Trims trailing characters (by default whitespace: space, tab, CR, LF).
  */
@@ -40,7 +51,7 @@ USBIP_API bool equal_ordinal(_In_ std::wstring_view a, _In_ std::wstring_view b,
  * Empty strings or strings beginning with L'\0' will be skipped.
  * If string has L'\0', characters after it will not be included.
  * @return multi-sz string
- * Examples: 
+ * Examples:
  * {"aaa\0\zzz", "\0", "bbb", ""} -> "aaa\0\bbb\0\0"
  * {} -> "\0\0"
  */

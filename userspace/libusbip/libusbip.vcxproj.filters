@@ -40,6 +40,9 @@
     <ClCompile Include="src\sid.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\stop_event.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="format_message.h" />
@@ -73,6 +76,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\setupapi.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stop_event.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="persistent.h" />

@@ -81,12 +81,11 @@ PAGED void replay_plugged_devices(_In_ WDFDEVICE vhci, _Inout_ fileobject_ctx &f
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void device_state_changed(
-        _In_ WDFDEVICE vhci, _In_ const device_attributes &attr,
-        _In_ int port, _In_ state state, _In_ const device_owner &owner);
+        _In_ WDFDEVICE vhci, _In_ const device_attributes &attr, _In_ int port, _In_ state state);
 
 inline void device_state_changed(_In_ const device_ctx &dev, _In_ state state)
 {
-        device_state_changed(dev.vhci, dev.attributes(), dev.port, state, dev.owner);
+        device_state_changed(dev.vhci, dev.attributes(), dev.port, state);
 }
 
 } // namespace usbip::vhci

@@ -353,18 +353,26 @@ auto make_device_config(
                         tree.GetItemText(device, COL_RECEIVE_MODE));
 }
 
-auto get_persistent(_In_ const Handle &vhci = get_vhci())
+/*
+ * Opens separate handle to avoid blocking the GUI thread if an attach operation is in progress.
+ */
+std::set<device_config> get_persistent()
 {
-        std::set<device_config> result;
-
-        if (auto v = vhci::get_persistent(vhci.get())) {
-                result = as_set(*v);
-        } else {
+        auto dev = vhci::open();
+        if (!dev) {
                 auto err = GetLastError();
-                wxLogVerbose(_("Could not get persistent info\nError %lu\n%s"), err, get_last_error_msg(err));
+                wxLogVerbose(_("Could not open vhci device\nError %lu\n%s"), err, get_last_error_msg(err));
+                return {};
         }
 
-        return result;
+        auto v = vhci::get_persistent(dev.get());
+        if (!v) {
+                auto err = GetLastError();
+                wxLogVerbose(_("Could not get persistent info\nError %lu\n%s"), err, get_last_error_msg(err));
+                return {};
+        }
+
+        return as_set(std::move(*v));
 }
 
 auto get_saved()
@@ -438,6 +446,60 @@ auto get_servers(_In_ const std::vector<device_columns> &devices)
         return servers;
 }
 
+auto get_exportable_devices(
+        _In_ wxWindow *parent,
+        _In_ const wxString &host,
+        _In_ const wxString &port) -> std::optional<std::vector<usb_device>>
+{
+        auto u8_host = host.utf8_string();
+        auto u8_port = port.utf8_string();
+
+        std::optional<std::vector<usb_device>> devices;
+        DWORD err{};
+
+        auto f = [&devices, &err, host = u8_host, svc = u8_port] (std::stop_token stoken)
+        {
+                auto sock = connect(host, svc, stoken);
+                if (!sock) {
+                        err = GetLastError();
+                        return;
+                }
+
+                std::stop_callback stop_cb(stoken, [s = sock.get()] noexcept { cancel_io(s); });
+
+                devices = usbip::get_exportable_devices(sock.get());
+                if (!devices) {
+                        err = stoken.stop_requested() ? ERROR_CANCELLED : GetLastError();
+                }
+        };
+
+        auto msg = wxString::Format(L"%s:%s", host, port);
+        run_cancellable(parent, msg, _("Querying devices"), std::move(f));
+
+        switch (err) {
+        case ERROR_SUCCESS:
+                break;
+        case WSA_E_CANCELLED:
+        case ERROR_CANCELLED:
+                return {};
+        default:
+                wxLogError(_("Could not query devices from %s:%s\nError %lu\n%s"),
+                           host, port, err, get_last_error_msg(err));
+                return {};
+        }
+
+        return devices;
+}
+
+void update_server_history(_Inout_ wxComboBox &cb, _In_ const wxString &host)
+{
+        if (cb.FindString(host) != wxNOT_FOUND) {
+                // already exists
+        } else if (cb.Append(host); cb.GetCount() > 32) {
+                cb.Delete(0);
+        }
+}
+
 } // namespace
 
 
@@ -493,6 +555,7 @@ void MainFrame::break_and_join_read_loop()
 {
         if (m_read_thread.joinable()) {
                 m_read_thread.request_stop();
+                vhci::cancel_io(m_read.get());
                 m_read_thread.join();
         }
 }
@@ -652,35 +715,23 @@ void MainFrame::iconize_to_tray()
 void MainFrame::start_read_thread()
 {
         wxASSERT(!m_read_thread.joinable());
-        m_read_thread = std::jthread([this] (std::stop_token stoken) { read_loop(stoken); });
-}
 
-void MainFrame::read_loop(std::stop_token stoken)
-{
-        scope_guard guard([this] {
-                std::lock_guard<std::mutex> lock(m_read_close_mtx);
-                m_read.close();
-        });
-
-        std::stop_callback stop_cb(stoken, [this] {
-                std::lock_guard<std::mutex> lock(m_read_close_mtx);
-                if (m_read) {
-                        vhci::cancel_io(m_read.get());
+        auto f = [this] (std::stop_token stoken)
+        {
+                while (!stoken.stop_requested()) {
+                        auto state = vhci::read_device_state(m_read.get());
+                        if (!state || stoken.stop_requested()) {
+                                break;
+                        }
+                        QueueEvent(new DeviceStateEvent(std::move(*state)));
                 }
-        });
 
-        while (!stoken.stop_requested()) {
-                auto state = vhci::read_device_state(m_read.get());
-                if (!state || stoken.stop_requested()) {
-                        break;
+                if (auto err = GetLastError(); err != ERROR_OPERATION_ABORTED && !stoken.stop_requested()) {
+                        wxLogError(_("vhci::read_device_state error %lu\n%s"), err, get_last_error_msg(err));
                 }
-                auto evt = new DeviceStateEvent(std::move(*state));
-                QueueEvent(evt); // see on_device_state()
-        }
+        };
 
-        if (auto err = GetLastError(); err != ERROR_OPERATION_ABORTED && !stoken.stop_requested()) {
-                wxLogError(_("vhci::read_device_state error %lu\n%s"), err, get_last_error_msg(err));
-        }
+        m_read_thread = std::jthread(std::move(f));
 }
 
 /*
@@ -743,7 +794,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
 
         if (added) { // COL_SERIAL, COL_RECEIVE_MODE are actual
                 auto saved = as_set(get_saved());
-                auto persistent = get_persistent(vhci::open());
+                auto persistent = get_persistent();
                 constexpr auto cols = columns::saved_read_only | columns::saved_notes | columns::pers_persistent;
                 flags = update_from_registry(dc, flags, cols, saved, persistent);
         }
@@ -1030,7 +1081,8 @@ DWORD MainFrame::attach(
         { 
                 auto port = vhci::attach(vhci, args); 
                 err = port > 0 ? ERROR_SUCCESS : GetLastError();
-                if (port > 0 && args.config.iso_mode != isolation::none) {
+
+                if (!err && args.config.iso_mode != isolation::none) {
                         isolate_port_volumes(port, 4000, stoken);
                 }
         };
@@ -1109,16 +1161,20 @@ void MainFrame::on_attach_stop_all(wxCommandEvent&)
         }
 }
 
+/*
+ * Opens separate handle to avoid blocking the GUI thread if an attach operation is in progress.
+ */
 DWORD MainFrame::detach(_In_ int port)
 {
         wxLogVerbose(_("Detach port %d"), port);
         wxBusyCursor wait;
 
-        if (port > 0) {
-                cleanup_port_volumes(port);
+        auto dev = vhci::open();
+        if (!dev) {
+                return GetLastError();
         }
 
-        if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), port)) {
+        if (!vhci::detach(dev.get(), port)) {
                 return GetLastError();
         }
 
@@ -1253,34 +1309,6 @@ void MainFrame::on_help_about(wxCommandEvent&)
         wxAboutBox(d, this);
 }
 
-auto MainFrame::connect(
-        _In_ const wxString &hostname, _In_ const wxString &service, 
-        _In_ const std::string &hostname_u8, _In_ const std::string &service_u8)
-{
-        Socket sock;
-        DWORD err{};
-
-        auto f = [&sock, &err, host = hostname_u8, svc = service_u8] (std::stop_token st)
-        {
-                sock = usbip::connect(host.c_str(), svc.c_str(), st);
-                err = sock ? ERROR_SUCCESS : GetLastError();
-        };
-
-        auto msg = wxString::Format(L"%s:%s", hostname, service);
-        run_cancellable(this, msg, _("Connecting"), std::move(f));
-
-        switch (err) {
-        case ERROR_SUCCESS:
-        case WSA_E_CANCELLED:
-        case ERROR_CANCELLED:
-                break;
-        default:
-                wxLogError(_("Could not connect to %s:%s\nError %lu\n%s"), hostname, service, err, get_last_error_msg(err));
-        }
-
-        return sock;
-}
-
 void MainFrame::add_exported_devices(wxCommandEvent&)
 {
         auto &cb = *m_comboBoxServer;
@@ -1294,25 +1322,21 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         auto port = wxString::Format(L"%d", m_spinCtrlPort->GetValue());
         wxLogVerbose(L"%s, host='%s', port='%s'", wxString::FromAscii(__func__), host, port);
 
-        auto u8_host = host.utf8_string();
-        auto u8_port = port.utf8_string();
-
-        auto sock = connect(host, port, u8_host, u8_port);
-        if (!sock) {
-                return;
+        if (auto devices = get_exportable_devices(this, host, port)) {
+                add_devices(host.utf8_string(), port.utf8_string(), *devices);
+                update_server_history(cb, host);
         }
+}
 
+void MainFrame::add_devices(
+        _In_ const std::string &u8_host,
+        _In_ const std::string &u8_port,
+        _In_ const std::vector<usb_device> &devices)
+{
         auto persistent = get_persistent();
         auto saved = as_set(get_saved());
 
-        auto devices = get_exportable_devices(sock.get());
-        if (!devices) {
-                auto err = GetLastError();
-                wxLogError(_("get_exportable_devices error %lu\n%s"), err, get_last_error_msg(err));
-                return;
-        }
-
-        for (const auto &device: *devices) {
+        for (const auto &device: devices) {
 
                 device_state state {
                         .device = make_imported_device(u8_host, u8_port, device),
@@ -1336,12 +1360,6 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                 }
 
                 update_device(item, dc, flags);
-        }
-
-        if (cb.FindString(host) != wxNOT_FOUND) {
-                // already exists
-        } else if (cb.Append(host); cb.GetCount() > 32) {
-                cb.Delete(0);
         }
 }
 
@@ -1579,7 +1597,7 @@ void MainFrame::on_reload(wxCommandEvent &event)
                 return;
         }
 
-        auto persistent = get_persistent(vhci);
+        auto persistent = get_persistent();
         auto saved = as_set(get_saved());
 
         for (auto &dev: *devices) {

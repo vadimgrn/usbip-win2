@@ -15,14 +15,11 @@ namespace usbip
 namespace usbip::vhci
 {
         struct device_owner;
+        struct isolation_data;
 }
 
 namespace usbip::session
 {
-
-_IRQL_requires_same_
-_IRQL_requires_max_(APC_LEVEL)
-PAGED ULONG get_requestor_session_id(_In_ WDFREQUEST request);
 
 /*
  * Checks whether the requestor has administrative privileges (or is kernel mode).
@@ -33,11 +30,19 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED bool is_admin_request(_In_ WDFREQUEST request);
 
 /*
- * Retrieves the effective owner (session ID and User SID) of the requestor.
+ * Validates and initializes device isolation ownership from the attach request.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS get_requestor_owner(_In_ WDFREQUEST request, _Out_ vhci::device_owner &owner);
+PAGED NTSTATUS init_requestor_isolation(_In_ WDFREQUEST request, _Inout_ vhci::isolation_data &iso);
+
+/*
+ * Resolves caller ownership and privilege.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS get_caller_owner(
+        _In_ WDFREQUEST request, _Out_ bool &is_admin, _Out_ vhci::device_owner &owner);
 
 /*
  * Checks whether the owner owns the device under its active isolation mode.

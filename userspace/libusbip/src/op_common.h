@@ -27,7 +27,7 @@ constexpr auto op_status_str(_In_ op_status_t st)
 
 constexpr auto op_status_error(_In_ op_status_t st)
 {
-        constexpr USBIP_STATUS v[] = 
+        constexpr USBIP_STATUS v[] =
         {
                 USBIP_ERROR_SUCCESS, // ST_OK
                 USBIP_ERROR_ST_NA,

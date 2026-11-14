@@ -49,14 +49,17 @@ int main()
 
         // remote.h
         [[maybe_unused]] auto port = get_tcp_port();
+        auto cancel_evt = create_cancel_event();
+        [[maybe_unused]] auto cancel_evt_signaled = create_cancel_event(true);
         auto s1 = connect("", "1234");
-        auto s2 = connect("", "1234", HANDLE());
+        auto s2 = connect("", "1234", cancel_evt.get());
 #if __cplusplus >= 202002L
         std::stop_source ssrc;
         auto s3 = connect("", "1234", ssrc.get_token());
 #endif
         if (s1) {
                 [[maybe_unused]] auto devices = get_exportable_devices(s1.get());
+                [[maybe_unused]] auto cancelled = cancel_io(s1.get());
         }
 
         // vhci.h
@@ -81,7 +84,6 @@ int main()
         args.config.user = "S-1-5-21-test";
 
         [[maybe_unused]] auto attached_port = vhci::attach(dev.get(), args);
-        [[maybe_unused]] auto attached_config = vhci::attach(dev.get(), args.config);
         [[maybe_unused]] auto stopped_cnt = vhci::stop_attach_attempts(dev.get(), &args.config.location);
         [[maybe_unused]] auto stopped_all = vhci::stop_attach_attempts(dev.get(), nullptr);
         [[maybe_unused]] auto detached = vhci::detach(dev.get(), 1);
@@ -102,9 +104,12 @@ int main()
         if (auto vols = isolate_port_volumes(1, 100, nullptr); vols && !vols->empty()) {
                 [[maybe_unused]] auto &nt_dev = vols->front().nt_device;
         }
-        [[maybe_unused]] auto async_ok1 = isolate_port_volumes_async(1, [](int, auto) {});
-        [[maybe_unused]] auto async_ok2 = isolate_port_volumes_async(1, 100, [](int, auto) {});
-        [[maybe_unused]] auto async_ok3 = isolate_port_volumes_async(1, [](int, auto) {}, 100, nullptr);
+        [[maybe_unused]] auto cleaned = cleanup_port_volumes(1);
+#if __cplusplus >= 202002L
+        if (auto vols = isolate_port_volumes(1, 100, ssrc.get_token()); vols && !vols->empty()) {
+                [[maybe_unused]] auto &nt_dev = vols->front().nt_device;
+        }
+#endif
         [[maybe_unused]] auto clean_ok = cleanup_port_volumes(1);
 }
 

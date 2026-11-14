@@ -13,12 +13,12 @@ namespace win
 {
 
 /*
- * Call GetLastError if empty string is returned. 
+ * Call GetLastError if empty string is returned.
  */
 USBIP_API std::wstring get_module_filename();
 
 
-class USBIP_API FileVersion 
+class USBIP_API FileVersion
 {
 public:
         FileVersion(const std::wstring &filename = get_module_filename());
@@ -40,7 +40,7 @@ public:
 
         void SetTranslation(WORD lang_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL), UINT code_page = GetACP());
         void GetTranslation(WORD &lang_id, UINT &code_page) const;
-                                              
+
         std::wstring_view GetCompanyName() const;
         std::wstring_view GetComments() const;
         std::wstring_view GetFileDescription() const;
@@ -48,6 +48,7 @@ public:
         std::wstring_view GetInternalName() const;
         std::wstring_view GetLegalCopyright() const;
         std::wstring_view GetLegalTrademarks() const;
+        std::wstring_view GetOriginalFilename() const;
         std::wstring_view GetPrivateBuild() const;
         std::wstring_view GetProductName() const;
         std::wstring_view GetProductVersion() const;

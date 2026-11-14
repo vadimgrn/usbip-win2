@@ -8,29 +8,6 @@
 #include <format>
 #include <utility>
 
-namespace
-{
-
-constexpr auto &str_zero_copy = "zero-copy";
-constexpr auto &str_low_latency = "low-latency";
-
-} // namespace
-
-const char* usbip::to_string(receive_mode mode) noexcept
-{
-        return mode == receive_mode::low_latency ? str_low_latency : str_zero_copy;
-}
-
-const char* usbip::to_string(isolation iso) noexcept
-{
-        switch (iso) {
-        case isolation::none: return "none";
-        case isolation::session: return "session";
-        case isolation::user: return "user";
-        }
-        return "unknown";
-}
-
 const char* usbip::get_speed_str(USB_DEVICE_SPEED speed) noexcept
 {
         static constexpr const char *names[] {

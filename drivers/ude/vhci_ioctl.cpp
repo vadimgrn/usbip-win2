@@ -52,7 +52,6 @@ struct workitem_ctx
 
         ADDRINFOEXW *addrinfo; // list head
         irp_args args;
-        vhci::device_owner owner; // Terminal Server session and User SID that requested the attach
         bool one_attempt;
 
         workitem_ctx& operator=(const workitem_ctx&) = delete;
@@ -70,7 +69,6 @@ workitem_ctx& workitem_ctx::operator=(workitem_ctx &&src)
         if (this != &src) {
                 vhci = src.vhci;
                 args = src.args;
-                owner = src.owner;
                 one_attempt = src.one_attempt;
 
                 NT_ASSERT(!request);
@@ -128,13 +126,13 @@ PAGED auto send_req_import(_In_ device_ctx_ext &ext)
         } req;
 
         static_assert(sizeof(req) == sizeof(req.hdr) + sizeof(req.body)); // packed
-        auto busid = ext.busid();
+        auto &busid = ext.attr.busid;
 
         auto &dst = req.body.busid;
-        auto st = unicode_to_utf8(dst, sizeof(dst), *busid);
+        auto st = unicode_to_utf8(dst, sizeof(dst), busid);
 
         if (NT_ERROR(st)) {
-                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", busid, st);
+                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &busid, st);
                 return st;
         }
 
@@ -164,10 +162,10 @@ PAGED NTSTATUS recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_
         byteswap(reply);
 
         char busid[sizeof(reply.udev.busid)];
-        st = unicode_to_utf8(busid, sizeof(busid), *ext.busid());
+        st = unicode_to_utf8(busid, sizeof(busid), ext.attr.busid);
 
         if (!NT_SUCCESS(st)) {
-                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", ext.busid(), st);
+                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &ext.attr.busid, st);
                 return st;
         } else if (!equal_strings(reply.udev.busid, busid)) {
                 Trace(TRACE_LEVEL_ERROR, "Received busid '%s' != '%s'", reply.udev.busid, busid);
@@ -199,7 +197,7 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
         log(udev);
 
         {
-                auto &p = ext.hw();
+                auto &p = ext.attr.hw;
 
                 p.devid = make_devid(static_cast<UINT16>(udev.busnum), static_cast<UINT16>(udev.devnum));
                 p.speed = static_cast<usb_device_speed>(udev.speed);
@@ -327,7 +325,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_ device_ctx_ext &ext)
 {
         PAGED_CODE();
-        Trace(TRACE_LEVEL_INFORMATION, "%!USTR!:%!USTR!", ext.node_name(), ext.service_name());
+        Trace(TRACE_LEVEL_INFORMATION, "%!USTR!:%!USTR!", &ext.attr.node_name, &ext.attr.service_name);
 
         vhci::ioctl::plugin_hardware *out;
         auto st = retrieve_output_buffer(request, out, out->output_size());
@@ -336,7 +334,7 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
                 return st;
         }
 
-        device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::connected, ctx.owner);
+        device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::connected);
 
         st = import_remote_device(ext);
         if (!NT_SUCCESS(st)) {
@@ -344,7 +342,7 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
         }
 
         UDECXUSBDEVICE dev{};
-        st = device::create(dev, ctx.vhci, ctx.ctx_ext, ctx.owner);
+        st = device::create(dev, ctx.vhci, ctx.ctx_ext);
         if (!NT_SUCCESS(st)) {
                 return st;
         }
@@ -557,12 +555,14 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         WdfRequestComplete(request, st);
 
         if (!ctx.one_attempt) {
-                auto hash = ext.location_hash();
+                auto hash = ext.attr.location_hash;
+                auto &owner = ext.attr.config.iso.owner;
+
                 if (NT_SUCCESS(st)) {
-                        stop_attach_attempts(vhci, hash, &ctx.owner);
+                        stop_attach_attempts(vhci, hash, &owner);
                 } else if (can_reattach(ctx.vhci, hash, st)) {
-                        stop_attach_attempts(vhci, hash, &ctx.owner);
-                        start_attach_attempts(ctx.vhci, vhci, ext.attr, ctx.owner, true);
+                        stop_attach_attempts(vhci, hash, &owner);
+                        start_attach_attempts(ctx.vhci, vhci, ext.attr, true);
                 }
         }
 }
@@ -590,7 +590,7 @@ PAGED void workitem_cleanup(_In_ WDFOBJECT object)
                 auto &ext = get_device_ctx_ext(mem); // or ctx.ext()
 
                 close_socket(ext.sock);
-                device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::disconnected, ctx.owner);
+                device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::disconnected);
 
                 WdfObjectDelete(mem);
                 mem = WDF_NO_HANDLE;
@@ -636,7 +636,7 @@ PAGED void getaddrinfo(
         IoSetCompletionRoutine(irp, irp_complete, wi, true, true, true);
 
         NT_ASSERT(!ctx.addrinfo);
-        auto st = wsk::getaddrinfo(ctx.addrinfo, ext.node_name(), ext.service_name(), &hints, irp);
+        auto st = wsk::getaddrinfo(ctx.addrinfo, &ext.attr.node_name, &ext.attr.service_name, &hints, irp);
         TraceDbg("%!STATUS!", st);
 }
 
@@ -662,70 +662,6 @@ PAGED void getaddrinfo(
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto init_requestor_isolation(
-        _In_ WDFREQUEST request, _In_ vhci::isolation mode, _Out_ vhci::device_owner &owner)
-{
-        PAGED_CODE();
-        using vhci::isolation;
-
-        owner = {};
-
-        if (mode == isolation::none || WdfRequestGetRequestorMode(request) == KernelMode) {
-                return STATUS_SUCCESS;
-        }
-
-        if (mode == isolation::session) {
-                owner.session_id = get_requestor_session_id(request);
-                if (!owner.has_session()) {
-                        Trace(TRACE_LEVEL_ERROR, "get_requestor_session_id");
-                        return STATUS_ACCESS_DENIED;
-                }
-        } else if (mode == isolation::user) {
-                auto st = get_requestor_owner(request, owner);
-                if (!NT_SUCCESS(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "get_requestor_owner %!STATUS!", st);
-                        return STATUS_ACCESS_DENIED;
-                }
-        }
-
-        return STATUS_SUCCESS;
-}
-
-/*
- * A driver-initiated (re)attach reaches this handler through target_self, which erased the
- * original requestor's session/user. Recover the owning session/user from the pending attach request.
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto recover_attach_isolation(
-        _In_ WDFDEVICE vhci, _In_ ULONG location_hash, _In_ vhci::isolation mode,
-        _Inout_ vhci::device_owner &owner)
-{
-        PAGED_CODE();
-        using vhci::isolation;
-
-        auto &ctx = *get_vhci_ctx(vhci);
-
-        if (mode == isolation::session && !owner.has_session()) {
-
-                if (!(find_attach_device_owner(ctx, location_hash, owner) && owner.has_session())) {
-                        Trace(TRACE_LEVEL_ERROR, "failed to recover session for session-isolated device");
-                        return STATUS_ACCESS_DENIED;
-                }
-
-        } else if (mode == isolation::user && !owner.has_sid()) {
-
-                if (!(find_attach_device_owner(ctx, location_hash, owner) && owner.has_sid())) {
-                        Trace(TRACE_LEVEL_ERROR, "failed to recover owner SID for user-isolated device");
-                        return STATUS_ACCESS_DENIED;
-                }
-        }
-
-        return STATUS_SUCCESS;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto plugin_hardware(
         _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r, _In_ bool once)
 {
@@ -734,10 +670,10 @@ PAGED auto plugin_hardware(
 
         Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, serial '%s', once %d, wsk events %d, %!vhci_isolation!",
                                         cfg.location.host, cfg.location.service, cfg.location.busid,
-                                        cfg.serial, once, cfg.wsk_events, int(cfg.iso_mode));
+                                        cfg.serial, once, cfg.wsk_events, int(cfg.iso.mode));
 
-        if (!is_valid(cfg.iso_mode)) {
-                Trace(TRACE_LEVEL_ERROR, "invalid isolation mode %d", int(cfg.iso_mode));
+        if (!is_valid(cfg.iso.mode)) {
+                Trace(TRACE_LEVEL_ERROR, "invalid isolation mode %d", int(cfg.iso.mode));
                 return STATUS_INVALID_PARAMETER;
         }
 
@@ -756,24 +692,18 @@ PAGED auto plugin_hardware(
         ctx.request = request;
         ctx.one_attempt = once;
 
-        st = init_requestor_isolation(request, cfg.iso_mode, ctx.owner);
-        if (!NT_SUCCESS(st)) {
-                return st;
-        }
-
         st = create_device_ctx_ext(ctx.ctx_ext, vhci, r);
         if (!NT_SUCCESS(st)) {
                 return st;
         }
         auto &ext = ctx.ext();
 
-        st = recover_attach_isolation(vhci, ext.location_hash(), cfg.iso_mode, ctx.owner);
+        st = init_requestor_isolation(request, ext.attr.config.iso);
         if (!NT_SUCCESS(st)) {
                 return st;
         }
 
-        device_state_changed(vhci, ext.attr, 0, vhci::state::connecting, ctx.owner);
-
+        device_state_changed(vhci, ext.attr, 0, vhci::state::connecting);
         getaddrinfo(request, wi, ctx, ext); // completion handler will be called anyway
 
         del.release();
@@ -787,7 +717,7 @@ PAGED auto get_location_hash(_In_ const vhci::imported_device_location &loc, _Ou
         PAGED_CODE();
         hash = 0;
 
-        if (loc.empty()) {
+        if (!(*loc.host || *loc.service || *loc.busid)) {
                 return STATUS_SUCCESS;
         }
 
@@ -800,33 +730,6 @@ PAGED auto get_location_hash(_In_ const vhci::imported_device_location &loc, _Ou
                 free(attr);
         }
 
-        return st;
-}
-
-/*
- * Resolves caller ownership and privilege.
- * For administrators (including KernelMode callers), only the session ID is recorded;
- * extracting a User SID is unnecessary because administrators bypass user isolation
- * restrictions, and would fail with STATUS_NO_TOKEN for KernelMode threads lacking tokens.
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto get_caller_owner(
-        _In_ WDFREQUEST request, _Out_ bool &is_admin, _Out_ vhci::device_owner &owner)
-{
-        PAGED_CODE();
-        owner = {};
-
-        is_admin = is_admin_request(request);
-        if (is_admin) {
-                owner.session_id = get_requestor_session_id(request);
-                return STATUS_SUCCESS;
-        }
-
-        auto st = get_requestor_owner(request, owner);
-        if (!NT_SUCCESS(st)) {
-                Trace(TRACE_LEVEL_ERROR, "get_requestor_owner %!STATUS!", st);
-        }
         return st;
 }
 
@@ -1417,13 +1320,10 @@ auto get_port_isolation(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
 
         out->size = sizeof(*out);
         out->port = in->port;
-        out->data = {
-                .owner = dev.owner,
-                .mode = dev.iso_mode()
-        };
+        out->data = dev.attributes().config.iso;
 
         TraceDbg("dev %04x, port %d, session %lu, %!vhci_isolation!",
-                  ptr04x(device.get()), in->port, dev.owner.session_id, int(out->data.mode));
+                  ptr04x(device.get()), in->port, dev.owner().session_id, int(out->data.mode));
 
         WdfRequestSetInformation(request, sizeof(*out));
         return STATUS_SUCCESS;

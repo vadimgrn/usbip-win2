@@ -3,16 +3,22 @@
  */
 
 #include "../vhci.h"
+#include "../persistent.h"
+#include "../volume_isolation.h"
+
+#include "strconv.h"
+#include "output.h"
+#include "last_error.h"
+#include "device_speed.h"
 
 #include <usbip/offsetof_ex.h>
-#include "device_speed.h"
-#include "output.h"
-
 #include <resources/messages.h>
+
 #include <cfgmgr32.h>
 
 #include <initguid.h>
 #include <usbip/vhci.h>
+#include "sid.h"
 
 #include <span>
 #include <random>
@@ -71,8 +77,11 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
         };
 
         for (auto &i: v) {
-                if (auto err = strncpy_s(i.dst, i.len, i.src.data(), i.src.size())) {
-                        libusbip::output("strncpy_s('{}') error #{} {}", i.src, err, 
+                if (i.src.size() >= i.len) { // see strncpy_s, _TRUNCATE
+                        libusbip::output("string '{}' length {} >= max {}", i.src, i.src.size(), i.len);
+                        return ERROR_INVALID_PARAMETER;
+                } else if (auto err = strncpy_s(i.dst, i.len, i.src.data(), i.src.size())) {
+                        libusbip::output("strncpy_s('{}') error #{} {}", i.src, err,
                                           std::generic_category().message(err));
 
                         return ERROR_INVALID_PARAMETER;
@@ -82,10 +91,31 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
         return ERROR_SUCCESS;
 }
 
+DWORD assign(_Inout_ vhci::isolation_data &dst, _In_ const device_config &src)
+{
+        dst = { .mode = src.iso_mode };
+
+        if (src.user.empty()) {
+                return ERROR_SUCCESS;
+        } else if (src.iso_mode != vhci::isolation::user) {
+                libusbip::output("user '{}' specified without user isolation", src.user);
+                return ERROR_INVALID_PARAMETER;
+        } else if (auto sid = parse_sid(src.user)) {
+                dst.owner.sid = *sid;
+                return ERROR_SUCCESS;
+        } else {
+                libusbip::output("parse_sid('{}') error #{}", src.user, sid.error());
+                return sid.error();
+        }
+}
+
 DWORD assign(_Inout_ vhci::imported_device_config &dst, _In_ const device_config &src)
 {
         dst.wsk_events = src.recv_mode == receive_mode::low_latency;
-        dst.iso_mode = src.iso_mode;
+
+        if (auto err = assign(dst.iso, src)) {
+                return err;
+        }
 
         if (auto err = assign(dst.serial, src.serial)) {
                 return err;
@@ -94,22 +124,12 @@ DWORD assign(_Inout_ vhci::imported_device_config &dst, _In_ const device_config
         return assign(dst.location, src.location);
 }
 
-DWORD assign(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const vhci::attach_args &args)
-{
-        return assign(r.config, args.config);
-}
-
 auto make_device_location(_In_ const vhci::imported_device_location &src)
 {
-        auto str = [] (const char *str, size_t maxlen)
-        {
-                return std::string(str, strnlen(str, maxlen));
-        };
-
         return device_location {
-                .hostname = str(src.host, std::size(src.host)),
-                .service = str(src.service, std::size(src.service)),
-                .busid = str(src.busid, std::size(src.busid)),
+                .hostname{ to_string_view(src.host) },
+                .service{ to_string_view(src.service) },
+                .busid{ to_string_view(src.busid) }
         };
 }
 
@@ -117,9 +137,10 @@ auto make_device_config(_In_ const vhci::imported_device_config &c)
 {
         return device_config {
                 .location = make_device_location(c.location),
-                .serial{ c.serial, strnlen(c.serial, std::size(c.serial)) },
+                .serial{ to_string_view(c.serial) },
                 .recv_mode = c.wsk_events ? receive_mode::low_latency : receive_mode::zero_copy,
-                .iso_mode = c.iso_mode,
+                .iso_mode = c.iso.mode,
+                .user = c.iso.owner.has_sid() ? to_string(c.iso.owner.sid) : std::string{},
         };
 }
 
@@ -169,7 +190,7 @@ auto get_path()
                         auto code = CM_MapCrToWin32Err(err, ERROR_INVALID_PARAMETER);
                         SetLastError(code);
                         return path;
-                } 
+                }
 
                 multi_sz.resize(cch); // "path1\0path2\0pathn\0\0"
 
@@ -278,11 +299,11 @@ auto usbip::vhci::open(_In_ bool overlapped) -> Handle
         Handle h;
 
         if (auto path = get_path(); !path.empty()) {
-                h.reset(CreateFile(path.c_str(), 
-                                GENERIC_READ | GENERIC_WRITE, 
-                                FILE_SHARE_READ | FILE_SHARE_WRITE, 
+                h.reset(CreateFile(path.c_str(),
+                                GENERIC_READ | GENERIC_WRITE,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE,
                                 nullptr, // lpSecurityAttributes
-                                OPEN_EXISTING, 
+                                OPEN_EXISTING,
                                 FlagsAndAttributes,
                                 nullptr)); // hTemplateFile
         }
@@ -308,14 +329,14 @@ std::optional<std::vector<usbip::imported_device>> usbip::vhci::get_imported_dev
                 r->size = sizeof(*r);
 
                 if (DWORD BytesReturned{}; // must be set if the last arg is NULL
-                    DeviceIoControl(dev, ioctl::GET_IMPORTED_DEVICES, r, sizeof(r->size), 
+                    DeviceIoControl(dev, ioctl::GET_IMPORTED_DEVICES, r, sizeof(r->size),
                                     buf.data(), DWORD(buf.size()), &BytesReturned, nullptr)) {
 
                         if (BytesReturned < devices_offset) [[unlikely]] {
                                 SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
                                 return devices;
                         }
-                                
+
                         buf.resize(BytesReturned);
                         ok = true;
                         break;
@@ -341,12 +362,18 @@ std::optional<std::vector<usbip::imported_device>> usbip::vhci::get_imported_dev
         return devices;
 }
 
+/*
+ * Note: attach does not call isolate_port_volumes(). The IOCTL only initiates
+ * virtual hardware plug-in and returns immediately. Storage volumes are
+ * enumerated asynchronously by Windows PnP and MountMgr, requiring polling,
+ * timeouts, and cancellation tokens handled by the caller (e.g. CLI or GUI).
+ */
 int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
 {
         ioctl::plugin_hardware r{};
         r.size = sizeof(r);
 
-        if (auto err = assign(r, args)) {
+        if (auto err = assign(r.config, args.config)) {
                 SetLastError(err);
                 return 0;
         }
@@ -385,7 +412,7 @@ int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_loc
                         return -1;
                 }
         }
-        
+
         constexpr auto outlen = ioctl::stop_attach_attempts::output_size();
 
         if (DWORD BytesReturned{}; // must be set if the last arg is NULL
@@ -400,8 +427,38 @@ int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_loc
         }
 }
 
+namespace
+{
+
+void cleanup_isolated_volumes(_In_ HANDLE dev, _In_ int port)
+{
+        auto devices = vhci::get_imported_devices(dev);
+        if (!devices) {
+                return;
+        }
+
+        for (auto &d: *devices) {
+                if ((port == vhci::port_all || d.port == port) && d.config.iso_mode != isolation::none) {
+                        cleanup_port_volumes(d.port);
+                }
+        }
+}
+
+} // namespace
+
+/*
+ * Clean up session-isolated drive letters before hardware plugout.
+ * Unlike \GLOBAL??, session DosDevices links are not removed automatically
+ * by MountMgr/PnP when the PDO is removed. Furthermore, DevNode
+ * traversal requires the device tree to still be intact.
+ * The query is instantaneous (no waiting) as the devices already exist.
+ */
 bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
 {
+        if (port > 0 || port == port_all) {
+                cleanup_isolated_volumes(dev, port);
+        }
+
         ioctl::plugout_hardware r { .port = port };
         r.size = sizeof(r);
 

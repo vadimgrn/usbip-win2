@@ -4,12 +4,12 @@
 
 #include "../volume_isolation.h"
 #include "../win_handle.h"
-#include "../vhci.h"
 
 #include "sid.h"
 #include "output.h"
+#include "last_error.h"
 #include "setupapi.h"
-#include "strconv.h"
+#include "stop_event.h"
 
 #include <resources/messages.h>
 
@@ -20,10 +20,8 @@
 #include <aclapi.h>
 
 #include <thread>
-#include <vector>
-#include <chrono>
 #include <algorithm>
-#include <memory>
+#include <cassert>
 
 namespace
 {
@@ -58,35 +56,11 @@ std::expected<HLocal, DWORD> make_hardened_user_sd()
 }
 
 /*
- * Hardens the volume DACL to allow only SYSTEM and the caller's session/user.
- *
- * Secures both layers:
- * 1. Kernel device object (SE_KERNEL_OBJECT): vol_path (e.g. \\?\Volume{guid})
- *    is a raw DASD handle to \Device\HarddiskVolumeN; protects against raw sector
- *    access, dismount, and format.
- * 2. File system root directory (SE_FILE_OBJECT): drive_letter (e.g. X:\)
- *    is a Win32 file path; protects file system browsing and file access.
+ * Hardens the kernel device object (Layer 1): raw DASD handle to \Device\HarddiskVolumeN.
+ * Protects against raw sector access, dismount, and format.
  */
-auto harden_volume_dacl(_In_ const std::wstring &vol_path, _In_ wchar_t drive_letter)
+auto harden_device_object(_In_ const std::wstring &vol_path, _In_ ACL *dacl)
 {
-        auto sd = make_hardened_user_sd();
-        if (!sd) {
-                return sd.error();
-        }
-
-        ACL *dacl{};
-        BOOL dacl_present{};
-        BOOL dacl_defaulted{}; // ignored: SD was explicitly constructed, not inherited or defaulted.
-        if (!GetSecurityDescriptorDacl(sd->get(), &dacl_present, &dacl, &dacl_defaulted)) {
-                auto err = GetLastError();
-                libusbip::output("GetSecurityDescriptorDacl error {}", err);
-                return err;
-        }
-
-        if (!(dacl_present && dacl)) { // a NULL DACL grants unrestricted access to everyone
-                return static_cast<DWORD>(ERROR_INVALID_SECURITY_DESCR);
-        }
-
         Handle vol(CreateFile(vol_path.c_str(), READ_CONTROL | WRITE_DAC,
                               FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
 
@@ -96,31 +70,85 @@ auto harden_volume_dacl(_In_ const std::wstring &vol_path, _In_ wchar_t drive_le
                 return err;
         }
 
-        const SECURITY_INFORMATION sinfo = DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION;
-        auto ret = SetSecurityInfo(vol.get(), SE_KERNEL_OBJECT, sinfo, nullptr, nullptr, dacl, nullptr);
+        constexpr SECURITY_INFORMATION sinfo = DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION;
+        auto st = SetSecurityInfo(vol.get(), SE_KERNEL_OBJECT, sinfo, nullptr, nullptr, dacl, nullptr);
 
-        if (ret != ERROR_SUCCESS) {
-                libusbip::output(L"SetSecurityInfo('{}') error {}", vol_path, ret);
-        } else if (drive_letter) {
-                wchar_t root[] { drive_letter, L':', L'\\', L'\0' };
-                DWORD flags{};
-                if (GetVolumeInformationW(root, nullptr, 0, nullptr, nullptr, &flags, nullptr, 0) &&
-                    !(flags & FILE_PERSISTENT_ACLS)) {
-                        libusbip::output(L"Filesystem on '{}' does not support persistent ACLs, skipping root DACL", root);
-                } else {
-                        auto err = SetNamedSecurityInfo(root, SE_FILE_OBJECT, sinfo, nullptr, nullptr, dacl, nullptr);
-                        if (err != ERROR_SUCCESS) {
-                                if (err == ERROR_NOT_SUPPORTED || err == ERROR_INVALID_FUNCTION) {
-                                        libusbip::output(L"SetNamedSecurityInfo('{}') not supported on filesystem (error {})", root, err);
-                                } else {
-                                        libusbip::output(L"SetNamedSecurityInfo('{}') error {}", root, err);
-                                        ret = err;
-                                }
-                        }
-                }
+        if (st != ERROR_SUCCESS) {
+                libusbip::output(L"SetSecurityInfo('{}') error {}", vol_path, st);
         }
 
-        return ret;
+        return st;
+}
+
+/*
+ * Hardens the file system root directory (Layer 2): Win32 file path (e.g. X:\).
+ * Protects file system browsing and file access.
+ */
+DWORD harden_root_directory(_In_ wchar_t drive_letter, _In_ ACL *dacl)
+{
+        if (!drive_letter) {
+                return ERROR_SUCCESS;
+        }
+
+        wchar_t root[] { drive_letter, L':', L'\\', L'\0' };
+
+        if (DWORD flags;
+            GetVolumeInformation(root, nullptr, 0, nullptr, nullptr, &flags, nullptr, 0) &&
+            !(flags & FILE_PERSISTENT_ACLS)) {
+                libusbip::output(L"Filesystem on '{}' does not support persistent ACLs, skipping root DACL", root);
+                return ERROR_SUCCESS;
+        }
+
+        constexpr SECURITY_INFORMATION sinfo = DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION;
+        auto st = SetNamedSecurityInfo(root, SE_FILE_OBJECT, sinfo, nullptr, nullptr, dacl, nullptr);
+
+        if (st != ERROR_SUCCESS) {
+                if (st == ERROR_NOT_SUPPORTED || st == ERROR_INVALID_FUNCTION) {
+                        libusbip::output(L"SetNamedSecurityInfo('{}') not supported on filesystem (error {})", root, st);
+                        return ERROR_SUCCESS;
+                }
+                libusbip::output(L"SetNamedSecurityInfo('{}') error {}", root, st);
+        }
+
+        return st;
+}
+
+/*
+ * Hardens the volume DACL to allow only SYSTEM and the caller's session/user.
+ *
+ * Secures both layers:
+ * 1. Kernel device object (SE_KERNEL_OBJECT): vol_path (e.g. \\?\Volume{guid})
+ *    is a raw DASD handle to \Device\HarddiskVolumeN; protects against raw sector
+ *    access, dismount, and format.
+ * 2. File system root directory (SE_FILE_OBJECT): drive_letter (e.g. X:\)
+ *    is a Win32 file path; protects file system browsing and file access.
+ */
+DWORD harden_volume_dacl(_In_ const std::wstring &vol_path, _In_ wchar_t drive_letter)
+{
+        auto sd = make_hardened_user_sd();
+        if (!sd) {
+                return sd.error();
+        }
+
+        ACL *dacl;
+        BOOL dacl_present;
+        BOOL dacl_defaulted; // ignored: SD was explicitly constructed, not inherited or defaulted
+
+        if (!GetSecurityDescriptorDacl(sd->get(), &dacl_present, &dacl, &dacl_defaulted)) {
+                auto err = GetLastError();
+                libusbip::output("GetSecurityDescriptorDacl error {}", err);
+                return err;
+        }
+
+        if (!(dacl_present && dacl)) { // a NULL DACL grants unrestricted access to everyone
+                return ERROR_INVALID_SECURITY_DESCR;
+        }
+
+        if (auto err = harden_device_object(vol_path, dacl)) {
+                return err;
+        }
+
+        return harden_root_directory(drive_letter, dacl);
 }
 
 /*
@@ -131,7 +159,7 @@ auto harden_volume_dacl(_In_ const std::wstring &vol_path, _In_ wchar_t drive_le
  * - `\??\Volume{guid}`
  * - `Volume{guid}\`
  * - `Volume{guid}`
- * 
+ *
  * The purpose of the function is to convert all of these variations into the single
  * canonical representation expected QueryDosDevice (which rejects `\\?\`, `\\.\`, `\??\` and trailing `\`).
  *
@@ -158,6 +186,9 @@ auto to_dos_device_name(_In_ std::wstring_view path) noexcept
  * Returns std::nullopt on failure (logged to debug output); callers skip unresolvable
  * volumes as non-viable candidates during discovery without requiring error codes.
  *
+ * Volume{guid} resolves to a single NT target (\Device\HarddiskVolumeN, ~25 chars),
+ * so MAX_PATH easily fits the multi-string result.
+ *
  * @param vol_guid_path volume GUID path
  * @see to_dos_device_name
  */
@@ -177,6 +208,10 @@ std::optional<std::wstring> resolve_volume_device(_In_ std::wstring_view vol_gui
 /*
  * Finds the drive letter mapped to the specified NT device path (e.g. \Device\HarddiskVolumeN).
  * Unassigned or non-existent drive letters fail QueryDosDevice and are skipped.
+ *
+ * QueryDosDevice returns a multi-string of all active/shadowed targets;
+ * even if both session DosDevices and \GLOBAL?? map \Device\HarddiskVolumeN,
+ * their combined length (~52 chars) fits well within MAX_PATH.
  *
  * NOTE on string comparison:
  * 1. Why <filesystem> (std::filesystem::path) is NOT used:
@@ -203,6 +238,7 @@ auto find_volume_drive_letter(_In_ std::wstring_view nt_device)
         }
 
         for (auto ch = L'A'; ch <= L'Z'; ++ch) {
+
                 const wchar_t drive[] { ch, L':', L'\0' };
 
                 if (wchar_t target[MAX_PATH]; QueryDosDevice(drive, target, std::size(target))) {
@@ -234,11 +270,6 @@ bool sleep_or_cancel(_In_ unsigned long ms, _In_opt_ HANDLE cancel_event) noexce
         return true;
 }
 
-bool is_cancelled(_In_opt_ HANDLE cancel_event) noexcept
-{
-        return cancel_event && WaitForSingleObject(cancel_event, 0) == WAIT_OBJECT_0;
-}
-
 wchar_t wait_for_volume_drive_letter(
         _In_ std::wstring_view nt_device,
         _In_ std::chrono::steady_clock::time_point deadline,
@@ -248,7 +279,7 @@ wchar_t wait_for_volume_drive_letter(
                 deadline, std::chrono::steady_clock::now() + std::chrono::milliseconds(1000));
 
         while (true) {
-                if (is_cancelled(cancel_event)) {
+                if (is_signaled(cancel_event)) {
                         break;
                 }
 
@@ -307,16 +338,19 @@ int get_device_address(_In_ DEVINST devinst) noexcept
                 return 0;
         }
 
-        DEVPROPTYPE typ{};
-        ULONG port{};
+        DEVPROPTYPE typ;
+        ULONG port;
         ULONG len = sizeof(port);
 
         auto ret = CM_Get_DevNode_Property(devinst, &DEVPKEY_Device_Address, &typ,
                                             reinterpret_cast<BYTE*>(&port), &len, 0);
 
-        if (ret != CR_SUCCESS || typ != DEVPROP_TYPE_UINT32 || len != sizeof(port)) {
+        if (ret != CR_SUCCESS) {
                 return 0;
         }
+
+        assert(typ == DEVPROP_TYPE_UINT32);
+        assert(len == sizeof(port));
 
         return static_cast<int>(port);
 }
@@ -382,13 +416,16 @@ DEVINST get_port_usb_device(_In_ DEVINST vhci_devinst, _In_ int port) noexcept
 std::wstring get_devnode_string_property(_In_ DEVINST devinst, _In_ const DEVPROPKEY &key)
 {
         DEVPROPTYPE typ{};
-        ULONG len = 0;
-        if (CM_Get_DevNode_Property(devinst, &key, &typ, nullptr, &len, 0) != CR_BUFFER_SMALL || !len) {
+        ULONG cb{};
+
+        if (!(CM_Get_DevNode_Property(devinst, &key, &typ, nullptr, &cb, 0) == CR_BUFFER_SMALL && cb)) {
                 return {};
         }
+        assert(typ == DEVPROP_TYPE_STRING);
 
-        std::wstring val(len / sizeof(wchar_t), L'\0');
-        if (CM_Get_DevNode_Property(devinst, &key, &typ, reinterpret_cast<BYTE*>(val.data()), &len, 0) != CR_SUCCESS) {
+        std::wstring val(cb/sizeof(std::wstring::value_type), L'\0');
+
+        if (CM_Get_DevNode_Property(devinst, &key, &typ, reinterpret_cast<BYTE*>(val.data()), &cb, 0) != CR_SUCCESS) {
                 return {};
         }
 
@@ -409,7 +446,8 @@ bool is_non_storage_device(_In_ DEVINST devinst)
                 return false;
         }
 
-        constexpr std::wstring_view non_storage_classes[] = {
+        constexpr std::wstring_view non_storage_classes[]
+        {
                 L"HIDClass", L"Media", L"Net", L"Bluetooth", L"Ports",
                 L"SmartCardReader", L"Camera", L"Image", L"PrintQueue",
                 L"Printer", L"Keyboard", L"Mouse", L"Biometric"
@@ -422,7 +460,8 @@ bool is_non_storage_device(_In_ DEVINST devinst)
         }
 
         auto service = get_devnode_string_property(devinst, DEVPKEY_Device_Service);
-        constexpr std::wstring_view non_storage_services[] = {
+        constexpr std::wstring_view non_storage_services[]
+        {
                 L"HidUsb", L"usbaudio", L"usbvideo", L"BthUSB", L"usbprint",
                 L"kbdhid", L"mouhid"
         };
@@ -481,16 +520,18 @@ std::optional<DWORD> get_storage_device_number(_In_ const std::wstring &device_p
                 return std::nullopt;
         }
 
-        DWORD actual{};
-        STORAGE_DEVICE_NUMBER sdn{};
+        STORAGE_DEVICE_NUMBER sdn;
+        DWORD actual; // requires if lpOverlapped is nullptr
+
         if (!DeviceIoControl(disk.get(), IOCTL_STORAGE_GET_DEVICE_NUMBER,
-                             nullptr, 0, &sdn, sizeof(sdn), &actual, nullptr) ||
-            actual != sizeof(sdn)) {
+                             nullptr, 0, &sdn, sizeof(sdn), &actual, nullptr)) {
+
                 auto err = GetLastError();
                 libusbip::output("DeviceIoControl(IOCTL_STORAGE_GET_DEVICE_NUMBER) error {}", err);
                 return std::nullopt;
         }
 
+        assert(actual == sizeof(sdn));
         return sdn.DeviceNumber;
 }
 
@@ -518,6 +559,8 @@ std::optional<DWORD> get_disk_number(_In_ HDEVINFO di, _In_ SP_DEVINFO_DATA &dd)
 
 std::expected<std::vector<DWORD>, DWORD> get_disks_for_port(_In_ DEVINST vhci_devinst, _In_ int port)
 {
+        assert(port > 0);
+
         hdevinfo di(SetupDiGetClassDevs(&GUID_DEVINTERFACE_DISK, nullptr, nullptr,
                                         DIGCF_PRESENT | DIGCF_DEVICEINTERFACE));
 
@@ -558,7 +601,7 @@ std::expected<std::vector<DWORD>, DWORD> get_disks_for_port(_In_ DEVINST vhci_de
  */
 std::optional<std::vector<DISK_EXTENT>> get_volume_disk_extents(_In_ HANDLE vol)
 {
-        VOLUME_DISK_EXTENTS extents{};
+        VOLUME_DISK_EXTENTS extents;
 
         if (DWORD ret{}; DeviceIoControl(vol, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,
                                          nullptr, 0, &extents, sizeof(extents), &ret, nullptr)) {
@@ -622,7 +665,7 @@ std::optional<volume_info> get_volume_info(_In_ std::wstring path, _In_ const st
                 return std::ranges::contains(disk_numbers, extent.DiskNumber);
         };
 
-        auto it = std::ranges::find_if(*extents, pred);
+        auto it = std::ranges::find_if(*extents, std::move(pred));
         if (it == extents->end()) {
                 return std::nullopt;
         }
@@ -682,21 +725,22 @@ std::expected<std::vector<volume_info>, DWORD> get_volumes_for_disks(_In_ const 
 
 bool remove_drive_letter(_In_ wchar_t drive_letter, _In_ const std::wstring &nt_device)
 {
+        const DWORD flags = DDD_REMOVE_DEFINITION | DDD_EXACT_MATCH_ON_REMOVE | DDD_RAW_TARGET_PATH;
         const wchar_t drive[] { drive_letter, L':', L'\0' };
 
-        if (const DWORD flags = DDD_REMOVE_DEFINITION | DDD_EXACT_MATCH_ON_REMOVE | DDD_RAW_TARGET_PATH;
-            DefineDosDevice(flags, drive, nt_device.c_str())) {
-                return true;
+        if (!DefineDosDevice(flags, drive, nt_device.c_str())) {
+                auto err = GetLastError();
+                libusbip::output(L"DefineDosDevice(remove '{}' -> '{}') error {}", drive, nt_device, err);
+                return false;
         }
 
-        auto err = GetLastError();
-        libusbip::output(L"DefineDosDevice(remove '{}' -> '{}') error {}", drive, nt_device, err);
-        return false;
+        return true;
 }
 
 bool isolate_drive_letter(_In_ wchar_t drive_letter, _In_ const std::wstring &nt_device)
 {
         const wchar_t drive[] { drive_letter, L':', L'\0' };
+
         if (!remove_drive_letter(drive_letter, nt_device)) {
                 libusbip::output(L"Warning: could not remove global drive letter '{}' from \\GLOBAL??; "
                                  L"isolation from other sessions may be incomplete", drive);
@@ -711,12 +755,15 @@ bool isolate_drive_letter(_In_ wchar_t drive_letter, _In_ const std::wstring &nt
         return true;
 }
 
-auto isolate_volume(
+std::optional<isolated_volume> isolate_volume(
         _In_ const volume_info &v,
         _In_ std::chrono::steady_clock::time_point deadline,
         _In_opt_ HANDLE cancel_event = HANDLE{})
 {
         auto drive_letter = wait_for_volume_drive_letter(v.nt_device, deadline, cancel_event);
+        if (check_cancelled(cancel_event)) {
+                return std::nullopt;
+        }
 
         if (drive_letter && !isolate_drive_letter(drive_letter, v.nt_device)) {
                 drive_letter = L'\0';
@@ -739,7 +786,7 @@ std::expected<std::vector<DWORD>, DWORD> wait_for_port_disks(
         }
 
         while (true) {
-                if (is_cancelled(cancel_event)) {
+                if (is_signaled(cancel_event)) {
                         return std::unexpected(static_cast<DWORD>(ERROR_CANCELLED));
                 }
 
@@ -778,7 +825,7 @@ std::expected<std::vector<volume_info>, DWORD> wait_for_disk_volumes(
         }
 
         while (true) {
-                if (is_cancelled(cancel_event)) {
+                if (is_signaled(cancel_event)) {
                         return std::unexpected(static_cast<DWORD>(ERROR_CANCELLED));
                 }
 
@@ -817,14 +864,27 @@ std::expected<std::vector<volume_info>, DWORD> wait_for_port_volumes(
 } // namespace
 
 
+/*
+ * Discovers and isolates storage volumes associated with a USB port.
+ *
+ * Should be called by the client application immediately after vhci::attach()
+ * returns a valid port (> 0), provided that isolation mode is enabled
+ * (config.iso_mode != isolation::none). If the attached device is non-storage
+ * or isolation is not requested, this function should not be called.
+ * Full volume protection (unmapping from \GLOBAL?? and DACL hardening)
+ * requires administrative elevation.
+ */
 auto usbip::isolate_port_volumes(
         _In_ int port,
         _In_ unsigned long timeout_ms,
-        _In_opt_ HANDLE cancel_event) ->
-        std::optional<std::vector<isolated_volume>>
+        _In_opt_ HANDLE cancel_event) -> std::optional<std::vector<isolated_volume>>
 {
-        if (is_cancelled(cancel_event)) {
-                SetLastError(ERROR_CANCELLED);
+        if (port <= 0) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return std::nullopt;
+        }
+
+        if (check_cancelled(cancel_event)) {
                 return std::nullopt;
         }
 
@@ -840,18 +900,33 @@ auto usbip::isolate_port_volumes(
         volumes.reserve(vols->size());
 
         for (const auto &v: *vols) {
-                if (is_cancelled(cancel_event)) {
-                        SetLastError(ERROR_CANCELLED);
+                if (auto vol = isolate_volume(v, deadline, cancel_event)) {
+                        volumes.push_back(std::move(*vol));
+                } else {
                         return std::nullopt;
                 }
-                volumes.push_back(isolate_volume(v, deadline, cancel_event));
         }
 
         return volumes;
 }
 
+std::optional<std::vector<usbip::isolated_volume>> usbip::isolate_port_volumes(
+        _In_ int port, _In_ unsigned long timeout_ms, _In_ std::stop_token stoken)
+{
+        if (auto evt = stop_event(stoken)) {
+                return isolate_port_volumes(port, timeout_ms, evt.get());
+        }
+
+        return std::nullopt;
+}
+
 bool usbip::cleanup_port_volumes(_In_ int port)
 {
+        if (port <= 0) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return false;
+        }
+
         auto vhci_devinst = get_vhci_devinst();
         if (!vhci_devinst) {
                 SetLastError(vhci_devinst.error());
@@ -881,62 +956,4 @@ bool usbip::cleanup_port_volumes(_In_ int port)
         }
 
         return true;
-}
-
-
-namespace
-{
-
-struct async_isolation_context
-{
-        int port{};
-        unsigned long timeout_ms{};
-        HANDLE cancel_event{};
-        isolate_port_volumes_callback callback;
-};
-
-} // namespace
-
-
-bool usbip::isolate_port_volumes_async(
-        _In_ int port,
-        _In_ isolate_port_volumes_callback callback,
-        _In_ unsigned long timeout_ms,
-        _In_opt_ HANDLE cancel_event)
-{
-        if (!callback || port <= 0) {
-                SetLastError(ERROR_INVALID_PARAMETER);
-                return false;
-        }
-
-        if (is_cancelled(cancel_event)) {
-                SetLastError(ERROR_CANCELLED);
-                return false;
-        }
-
-        auto ctx = std::make_unique<async_isolation_context>(async_isolation_context {
-                .port = port,
-                .timeout_ms = timeout_ms,
-                .cancel_event = cancel_event,
-                .callback = std::move(callback)
-        });
-
-        auto ok = TrySubmitThreadpoolCallback([](PTP_CALLBACK_INSTANCE, PVOID param) noexcept {
-                auto ctx = std::unique_ptr<async_isolation_context>(
-                        static_cast<async_isolation_context*>(param));
-
-                auto result = isolate_port_volumes(ctx->port, ctx->timeout_ms, ctx->cancel_event);
-
-                try {
-                        ctx->callback(ctx->port, std::move(result));
-                } catch (...) {
-                }
-        }, ctx.get(), nullptr);
-
-        if (ok) {
-                ctx.release();
-                return true;
-        }
-
-        return false;
 }

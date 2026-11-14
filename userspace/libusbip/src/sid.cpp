@@ -72,6 +72,10 @@ std::expected<sid_blob, DWORD> lookup_account_name(_In_ const std::wstring &acco
                 return std::unexpected(ERROR_INVALID_SID);
         }
 
+        if (!(use == SidTypeUser || use == SidTypeWellKnownGroup)) {
+                return std::unexpected(ERROR_NONE_MAPPED);
+        }
+
         return sid;
 }
 
@@ -148,23 +152,24 @@ std::expected<sid_blob, DWORD> get_user_sid(_In_ HANDLE token) noexcept
         return to_sid_blob(tu->User.Sid);
 }
 
-std::optional<std::vector<char>> get_token_info(
+std::expected<std::vector<char>, DWORD> get_token_info(
         _In_ HANDLE token, _In_ TOKEN_INFORMATION_CLASS cls) noexcept
 {
-        DWORD actual;
-        [[maybe_unused]] auto ok = GetTokenInformation(token, cls, nullptr, 0, &actual);
+        DWORD req_sz{};
+        [[maybe_unused]] auto ok = GetTokenInformation(token, cls, nullptr, 0, &req_sz);
         assert(!ok);
 
-        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-                return std::nullopt;
+        if (auto err = GetLastError(); err != ERROR_INSUFFICIENT_BUFFER) {
+                return std::unexpected(err);
         }
 
-        if (std::vector<char> v(actual);
-            GetTokenInformation(token, cls, v.data(), actual, &actual)) {
-                return v;
+        std::vector<char> v(req_sz);
+
+        if (!GetTokenInformation(token, cls, v.data(), req_sz, &req_sz)) {
+                return std::unexpected(GetLastError());
         }
 
-        return std::nullopt;
+        return v;
 }
 
 PSID find_group(_In_ const TOKEN_GROUPS &g, _In_ DWORD flags) noexcept
@@ -268,22 +273,31 @@ std::expected<std::wstring, DWORD> usbip::make_caller_aces(_In_ std::wstring_vie
 {
         auto token = GetCurrentProcessToken();
 
-        auto usr = ::get_user_sid(token);
-        if (!usr) {
-                return std::unexpected(usr.error());
+        auto user_sid = ::get_user_sid(token);
+        if (!user_sid) {
+                return std::unexpected(user_sid.error());
         }
 
         auto buf = get_token_info(token, TokenGroups);
         if (!buf) {
-                return std::unexpected(GetLastError());
+                return std::unexpected(buf.error());
         }
         auto &groups = *reinterpret_cast<TOKEN_GROUPS*>(buf->data());
 
+        auto user_str = to_wstring(*user_sid);
+        if (user_str.empty()) {
+                return std::unexpected(GetLastError());
+        }
+
         constexpr auto &fmt = L"(A;{};GA;;;{})";
-        auto aces = std::format(fmt, ace_flags, to_wstring(*usr));
+        auto aces = std::format(fmt, ace_flags, user_str);
 
         if (auto sid = find_group(groups, SE_GROUP_LOGON_ID)) {
-                aces += std::format(fmt, ace_flags, ::to_wstring(sid));
+                auto logon_str = ::to_wstring(sid);
+                if (logon_str.empty()) {
+                        return std::unexpected(GetLastError());
+                }
+                aces += std::format(fmt, ace_flags, logon_str);
         }
 
         return aces;

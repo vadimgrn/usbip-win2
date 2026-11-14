@@ -28,10 +28,10 @@ bool attach_persistent_devices(_In_ HANDLE dev)
 
         auto ok = true;
 
-        for (const auto &args: *v) {
-                std::println("{}", args);
+        for (const auto &dc: *v) {
+                std::println("{}", dc);
 
-                if (!vhci::attach(dev, args)) {
+                if (!vhci::attach(dev, {dc})) {
                         log::error(get_last_error_msg());
                         ok = false;
                 }
@@ -52,6 +52,63 @@ bool stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *loc)
         }
 
         return ok;
+}
+
+void isolate_and_print_volumes(_In_ int port)
+{
+        auto vols = isolate_port_volumes(port);
+        if (!vols) {
+                return;
+        }
+
+        for (const auto &v: *vols) {
+                if (!v.drive_letter) {
+                        continue;
+                }
+
+                if (!v.dacl_error) {
+                        std::println("storage volume {}: isolated to current session (DACL restricted)",
+                                     static_cast<char>(v.drive_letter));
+                } else {
+                        std::println("storage volume {}: isolated to current session (DACL error: {})",
+                                     static_cast<char>(v.drive_letter), get_last_error_msg(v.dacl_error));
+                }
+        }
+}
+
+bool attach_device(_In_ HANDLE dev, const attach_args &args)
+{
+        vhci::attach_args cmd_args {
+                .config = {
+                        .location = {
+                                .hostname = args.remote,
+                                .service = global_args.tcp_port,
+                                .busid = args.busid,
+                        },
+                        .serial = args.serial,
+                        .recv_mode = args.recv_mode,
+                        .iso_mode = args.iso_mode,
+                },
+                .once = args.once,
+        };
+
+        auto port = vhci::attach(dev, cmd_args);
+        if (!port) {
+                log::error(get_last_error_msg());
+                return false;
+        }
+
+        if (args.terse) {
+                std::println("{}", port);
+        } else {
+                std::println("successfully attached to port {}", port);
+        }
+
+        if (args.iso_mode != isolation::none) {
+                isolate_and_print_volumes(port);
+        }
+
+        return true;
 }
 
 } // namespace
@@ -75,53 +132,14 @@ bool usbip::cmd_attach(const attach_args &args)
                 return stop_attach_attempts(dev.get(), nullptr);
         }
 
-        device_location loc {
-                .hostname = args.remote,
-                .service = global_args.tcp_port,
-                .busid = args.busid,
-        };
-
         if (args.stop) {
+                device_location loc {
+                        .hostname = args.remote,
+                        .service = global_args.tcp_port,
+                        .busid = args.busid,
+                };
                 return stop_attach_attempts(dev.get(), &loc);
         }
 
-        vhci::attach_args cmd_args {
-                .config = {
-                        .location = std::move(loc),
-                        .serial = args.serial,
-                        .recv_mode = args.recv_mode,
-                        .iso_mode = args.iso_mode,
-                },
-                .once = args.once,
-        };
-
-        auto port = vhci::attach(dev.get(), cmd_args);
-        if (!port) {
-                log::error(get_last_error_msg());
-                return false;
-        }
-
-        if (args.terse) {
-                std::println("{}", port);
-        } else {
-                std::println("successfully attached to port {}", port);
-        }
-
-        if (args.iso_mode == isolation::session || args.iso_mode == isolation::user) {
-                if (auto vols = isolate_port_volumes(port); vols && !vols->empty()) {
-                        for (const auto &v: *vols) {
-                                if (v.drive_letter) {
-                                        if (!v.dacl_error) {
-                                                std::println("storage volume {}: isolated to current session (DACL restricted)",
-                                                             static_cast<char>(v.drive_letter));
-                                        } else {
-                                                std::println("storage volume {}: isolated to current session (DACL error: {})",
-                                                             static_cast<char>(v.drive_letter), get_last_error_msg(v.dacl_error));
-                                        }
-                                }
-                        }
-                }
-        }
-
-        return true;
+        return attach_device(dev.get(), args);
 }

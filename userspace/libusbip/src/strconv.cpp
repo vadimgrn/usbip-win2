@@ -15,9 +15,10 @@ std::expected<std::wstring, DWORD> usbip::utf8_to_wchar(_In_ std::string_view s)
                 return std::wstring{};
         }
 
-        auto f = [] (const auto &s, auto buf, auto cch) { 
-                return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, 
-                                           s.data(), static_cast<int>(s.size()), buf, cch); 
+        auto f = [] (const auto &s, auto buf, auto cch) noexcept
+        {
+                return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                           s.data(), static_cast<int>(s.size()), buf, cch);
         };
 
         auto cch = f(s, nullptr, 0);
@@ -33,18 +34,19 @@ std::expected<std::wstring, DWORD> usbip::utf8_to_wchar(_In_ std::string_view s)
                 ws.resize(n);
         }
 
-	return ws;
+        return ws;
 }
- 
+
 std::expected<std::string, DWORD> usbip::wchar_to_utf8(_In_ std::wstring_view ws)
 {
         if (ws.empty()) {
                 return std::string{};
         }
 
-        auto f = [] (const auto &ws, auto buf, auto cb) {
-                return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ws.data(), static_cast<int>(ws.size()), 
-                                           buf, cb, nullptr, nullptr);
+        auto f = [] (const auto &ws, auto buf, auto cb) noexcept
+        {
+                return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ws.data(),
+                                static_cast<int>(ws.size()), buf, cb, nullptr, nullptr);
         };
 
         auto cb = f(ws, nullptr, 0);

@@ -85,7 +85,6 @@ struct device_attributes
         ULONG location_hash; // hash(node_name,service_name,busid)
         //
         vhci::imported_device_hardware hw;
-        vhci::sid_blob sid; // owner for isolation::user
         vhci::imported_device_config config; // for ioctl::get_imported_devices
 };
 
@@ -105,16 +104,7 @@ struct device_ctx_ext
 {
         device_ctx *ctx;
         wsk::SOCKET *sock;
-
         device_attributes attr;
-
-        auto* node_name(this auto&& self) { return &self.attr.node_name; }
-        auto* service_name(this auto&& self) { return &self.attr.service_name; }
-        auto* busid(this auto&& self) { return &self.attr.busid; }
-
-        auto location_hash() const { return attr.location_hash; }
-        auto&& config(this auto&& self) { return self.attr.config; }
-        auto&& hw(this auto&& self) { return self.attr.hw; }
 };
 
 /*
@@ -138,11 +128,10 @@ struct device_ctx
         auto sock() const { return ext().sock; }
         auto& attributes() const { return ext().attr; }
 
-        auto speed() const { return ext().hw().speed; }
-        auto devid() const { return ext().hw().devid; }
-        auto wsk_events() const { return ext().config().wsk_events; }
+        auto speed() const { return attributes().hw.speed; }
+        auto wsk_events() const { return attributes().config.wsk_events; }
+        auto&& owner(this auto&& self) { return self.attributes().config.iso.owner; }
 
-        auto iso_mode() const { return ext().config().iso_mode; }
         bool is_session_isolated() const;
         bool is_user_isolated() const;
 
@@ -168,7 +157,6 @@ struct device_ctx
         };
 
         int port; // vhci_ctx.devices[port - 1]
-        vhci::device_owner owner; // Terminal Server session and user SID that attached this device
         seqnum_t seqnum; // @see next_seqnum
 
         SLIST_HEADER pending_sends;

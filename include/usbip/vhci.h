@@ -33,9 +33,9 @@ namespace usbip
  * @return < 0 if parameters/characters are invalid,
  *         otherwise the same as strnlen(s, maxlen)
  */
-constexpr SSIZE_T is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen);
+constexpr SSIZE_T is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen) noexcept;
 
-constexpr auto is_ascii(unsigned char ch) { return ch < 0x80; }
+constexpr auto is_ascii(unsigned char ch) noexcept { return ch < 0x80; }
 
 } // namespace usbip
 
@@ -98,16 +98,14 @@ struct imported_device_location
         char busid[BUS_ID_SIZE];
         char service[32]; // NI_MAXSERV
         char host[1025];  // NI_MAXHOST in ws2def.h
-
-        constexpr auto empty() const noexcept { return !(*host || *service || *busid); }
 };
 
 struct imported_device_config
 {
         imported_device_location location;
-        char serial[SERIAL_BUFSZ];
         bool wsk_events;
-        isolation iso_mode;
+        char serial[SERIAL_BUFSZ];
+        isolation_data iso;
 };
 
 struct imported_device_hardware
@@ -148,7 +146,7 @@ struct device_state : base
         imported_device device;
 };
 
-constexpr auto is_valid(isolation mode)
+constexpr auto is_valid(isolation mode) noexcept
 {
         switch (mode) {
         case isolation::none:
@@ -160,7 +158,7 @@ constexpr auto is_valid(isolation mode)
         return false;
 }
 
-constexpr auto pack_attach_flags(bool once, bool wsk_events, isolation iso = isolation::none)
+constexpr auto pack_attach_flags(bool once, bool wsk_events, isolation iso = isolation::none) noexcept
 {
         return  (static_cast<ULONG>(iso)  << 2) |
                 (static_cast<ULONG>(once) << 1) |
@@ -171,14 +169,14 @@ constexpr auto pack_attach_flags(bool once, bool wsk_events, isolation iso = iso
  * Unknown flags are ignored.
  */
 constexpr void unpack_attach_flags(
-        _Inout_ bool &once, _Inout_ bool &wsk_events, _Inout_ isolation &iso, ULONG flags)
+        _Inout_ bool &once, _Inout_ bool &wsk_events, _Inout_ isolation &iso, ULONG flags) noexcept
 {
         wsk_events = flags & 1;
         once = flags & 2;
         iso = static_cast<isolation>((flags >> 2) & 0x3);
 }
 
-constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, ULONG flags)
+constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, ULONG flags) noexcept
 {
         isolation iso;
         unpack_attach_flags(once, wsk_events, iso, flags);
@@ -257,7 +255,7 @@ struct get_imported_devices : base
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto get_imported_devices_size(_In_ ULONG n)
+inline auto get_imported_devices_size(_In_ ULONG n) noexcept
 {
         return offsetof_ex(get_imported_devices, devices) + n*sizeof(*get_imported_devices::devices);
 }
@@ -275,7 +273,7 @@ struct get_port_isolation : base
  * UTF-8 is designed so that all ASCII characters (0–127)
  * are represented by a single byte with the high bit set to 0.
  */
-constexpr SSIZE_T usbip::is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen)
+constexpr SSIZE_T usbip::is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen) noexcept
 {
         if (!(s && maxlen >= 0)) {
                 return -1;

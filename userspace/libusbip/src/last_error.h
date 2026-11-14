@@ -11,7 +11,7 @@ namespace usbip
 {
 
 /*
- * libusbip uses SetLastError() regardless of error origin.  
+ * libusbip uses SetLastError() regardless of error origin.
  */
 struct [[nodiscard]] set_last_error
 {
@@ -23,10 +23,10 @@ struct [[nodiscard]] set_last_error
         set_last_error(const set_last_error&) = delete;
         set_last_error& operator=(const set_last_error&) = delete;
 
-        set_last_error(set_last_error&& other) noexcept 
-                : error(other.error), m_active(other.m_active) 
-        { 
-                other.m_active = false; 
+        set_last_error(set_last_error&& other) noexcept
+                : error(other.error), m_active(other.m_active)
+        {
+                other.m_active = false;
         }
 
         set_last_error& operator=(set_last_error&& other) noexcept {

@@ -63,7 +63,8 @@ void destroy_device_ctx_ext(_In_ WDFOBJECT object)
         auto mem = static_cast<WDFMEMORY>(object);
         auto &ext = get_device_ctx_ext(mem);
 
-        Trace(TRACE_LEVEL_INFORMATION, "%!USTR!:%!USTR!/%!USTR!", ext.node_name(), ext.service_name(), ext.busid());
+        Trace(TRACE_LEVEL_INFORMATION, "%!USTR!:%!USTR!/%!USTR!",
+                                        &ext.attr.node_name, &ext.attr.service_name, &ext.attr.busid);
 
         free(ext.sock);
         free(ext.attr);
@@ -140,9 +141,9 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
                 return st;
         }
 
-        auto &config = ext.config();
+        auto &config = ext.attr.config;
         config.wsk_events = r.config.wsk_events;
-        config.iso_mode = r.config.iso_mode;
+        config.iso = r.config.iso;
 
         st = RtlStringCbCopyNA(config.serial, sizeof(config.serial), r.config.serial, sizeof(r.config.serial));
         if (!NT_SUCCESS(st)) {
@@ -211,10 +212,12 @@ void usbip::free(_Inout_ device_attributes &r)
 
 bool usbip::device_ctx::is_session_isolated() const
 {
-        return owner.has_session() && iso_mode() == vhci::isolation::session;
+        auto &iso = attributes().config.iso;
+        return iso.mode == vhci::isolation::session && iso.owner.has_session();
 }
 
 bool usbip::device_ctx::is_user_isolated() const
 {
-        return owner.has_sid() && iso_mode() == vhci::isolation::user;
+        auto &iso = attributes().config.iso;
+        return iso.mode == vhci::isolation::user && iso.owner.has_sid();
 }

@@ -204,12 +204,13 @@ PAGED auto validate(_In_ const device_attributes &r)
                 return st;
         }
 
-        if (r.config.iso_mode == vhci::isolation::user) {
-                if (!is_valid(r.sid)) {
+        auto &iso = r.config.iso;
+        if (iso.mode == vhci::isolation::user) {
+                if (!is_valid(iso.owner.sid)) {
                         Trace(TRACE_LEVEL_ERROR, "SID is required for user isolation");
                         return STATUS_INVALID_PARAMETER;
                 }
-        } else if (r.sid.length) {
+        } else if (iso.owner.has_sid()) {
                 Trace(TRACE_LEVEL_ERROR, "SID specified without user isolation");
                 return STATUS_INVALID_PARAMETER;
         }
@@ -321,9 +322,9 @@ PAGED auto parse_token(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &
         } else if (equal(key, L"recv_mode", true)) {
                 return parse_recv_mode(r.config.wsk_events, val);
         } else if (equal(key, L"isolate", true)) {
-                return parse_isolation_mode(r.config.iso_mode, val);
+                return parse_isolation_mode(r.config.iso.mode, val);
         } else if (equal(key, L"user_sid", true)) {
-                return parse_sid(r.sid, val);
+                return parse_sid(r.config.iso.owner.sid, val);
         }
 
         return STATUS_SUCCESS; // unknown keys are ignored for forward compatibility
@@ -556,9 +557,7 @@ PAGED void cleanup_attach_request(_In_ WDFOBJECT obj)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_attach_request(
-        _In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ const device_attributes &dev,
-        _In_ const vhci::device_owner &owner)
+PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ const device_attributes &dev)
 {
         PAGED_CODE();
 
@@ -571,6 +570,8 @@ PAGED auto create_attach_request(
         if (!req) {
                 return req;
         }
+
+        auto &owner = dev.config.iso.owner;
 
         Trace(TRACE_LEVEL_INFORMATION, "%04x, %!USTR!:%!USTR!/%!USTR!, hash %lx, session %lu",
                                         ptr04x(req.get()), &dev.node_name, &dev.service_name,
@@ -742,8 +743,7 @@ PAGED auto validate_trailing_nulls(_In_ const wchar_t *p, _In_ const wchar_t *en
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::start_attach_attempts(
-        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ const device_attributes &attr,
-        _In_ const vhci::device_owner &owner, _In_ bool delayed)
+        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ const device_attributes &attr, _In_ bool delayed)
 {
         PAGED_CODE();
 
@@ -751,7 +751,7 @@ PAGED void usbip::start_attach_attempts(
                 TraceDbg("vhci is being removing");
         } else if (auto cnt = reattach_req_count(ctx); cnt >= 4*static_cast<ULONG>(ctx.devices_cnt)) {
                 Trace(TRACE_LEVEL_WARNING, "too many active attach requests, %lu", cnt);
-        } else if (auto req = create_attach_request(vhci, ctx, attr, owner); !req) {
+        } else if (auto req = create_attach_request(vhci, ctx, attr); !req) {
                 //
         } else if (auto &r = *get_attach_ctx(req.get()); !delayed) {
                 send_plugin_hardware(ctx.target_self, r.inbuf, r.outbuf, req);
@@ -797,39 +797,6 @@ int usbip::stop_attach_attempts(
         return cnt;
 }
 
-/*
- * A device (re)attach travels to the driver through an IOCTL to target_self, which erases the
- * original requestor's session/user. The owning session/user is preserved in the pending attach request's
- * context, so the inbound attach handler can recover them by location_hash.
- * @see start_attach_attempts, plugin_hardware
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-bool usbip::find_attach_device_owner(
-        _Inout_ vhci_ctx &vhci, _In_ ULONG location_hash, _Out_ vhci::device_owner &owner)
-{
-        owner = {};
-
-        if (!location_hash) {
-                return false;
-        }
-
-        auto col = vhci.reattach_req;
-        wdf::spinlock lck(vhci.reattach_req_lock);
-
-        for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
-
-                auto req = WdfCollectionGetItem(col, i);
-
-                if (auto &r = *get_attach_ctx(req); r.location_hash == location_hash) {
-                        owner = r.owner;
-                        return true;
-                }
-        }
-
-        return false;
-}
-
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
@@ -853,8 +820,7 @@ PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
                 if (!NT_SUCCESS(st)) {
                         Trace(TRACE_LEVEL_ERROR, "parse_device_str(%!USTR!) %!STATUS!", &device_str, st);
                 } else {
-                        vhci::device_owner owner{ .sid = attr.sid };
-                        start_attach_attempts(vhci, ctx, attr, owner);
+                        start_attach_attempts(vhci, ctx, attr);
                 }
         }
 }

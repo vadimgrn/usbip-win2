@@ -48,6 +48,7 @@ DWORD parse_transl(const std::wstring &s)
 class win::FileVersion::Impl
 {
 public:
+        Impl() = default;
         Impl(std::wstring_view filename);
 
         explicit operator bool () const { return !m_info.empty(); }
@@ -75,7 +76,7 @@ public:
         auto GetSpecialBuild() const { return VerQueryValue(L"SpecialBuild"); }
 
 private:
-        std::vector<wchar_t> m_info;
+        std::vector<char> m_info;
         std::wstring m_def_transl;
 
         static DWORD PackTransl(WORD lang_id, UINT code_page);
@@ -106,12 +107,13 @@ DWORD win::FileVersion::Impl::SetFile(std::wstring_view path)
                 return GetLastError();
         }
 
-        m_info.resize(sz);
+        std::vector<char> info(sz);
 
-        if (!GetFileVersionInfo(null_term_path.c_str(), 0, sz, m_info.data())) {
+        if (!GetFileVersionInfo(null_term_path.c_str(), 0, sz, info.data())) {
                 return GetLastError();
-        } 
+        }
 
+        m_info = std::move(info);
         SetDefTranslation();
         return ERROR_SUCCESS;
 }
@@ -130,14 +132,19 @@ const void *win::FileVersion::Impl::VerQueryValue(const std::wstring &val, UINT 
         if (!m_info.empty()) {
                 ::VerQueryValue(m_info.data(), val.c_str(), &buf, &buf_sz);
         }
-        
+
         return buf;
 }
 
 std::wstring_view win::FileVersion::Impl::VerQueryValue(const wchar_t *value) const
 {
         std::wstring_view res;
-        auto key = L"\\StringFileInfo\\" + GetTranslation() + L'\\' + value;
+        auto transl = GetTranslation();
+        if (transl.empty()) {
+                return res;
+        }
+
+        auto key = L"\\StringFileInfo\\" + transl + L'\\' + value;
 
         UINT cch{};
         auto ws = static_cast<const wchar_t*>(VerQueryValue(key, cch));
@@ -154,13 +161,16 @@ std::wstring_view win::FileVersion::Impl::VerQueryValue(const wchar_t *value) co
 
 std::wstring win::FileVersion::Impl::VerLanguageName() const
 {
+        if (m_def_transl.empty()) {
+                return {};
+        }
+
         auto wLang = HIWORD(parse_transl(m_def_transl));
 
-        auto cnt = ::VerLanguageName(wLang, nullptr, 0);
-        std::vector<wchar_t> v(cnt);
+        wchar_t buf[256];
+        auto cch = ::VerLanguageName(wLang, buf, std::size(buf));
 
-        cnt = ::VerLanguageName(wLang, v.data(), cnt);
-        return std::wstring(v.data(), cnt);
+        return std::wstring(buf, std::min<size_t>(cch, std::size(buf) - 1));
 }
 
 std::wstring win::FileVersion::Impl::MakeTransl(DWORD transl)
@@ -168,31 +178,24 @@ std::wstring win::FileVersion::Impl::MakeTransl(DWORD transl)
         return std::format(L"{:04x}{:04x}", LOWORD(transl), HIWORD(transl));
 }
 
+/*
+ * IsValidLocale and IsValidCodePage are intentionally not used:
+ * - IsValidLocale rejects LANG_NEUTRAL (0x0000, the default in SetTranslation)
+ *   as well as language IDs present in a file's version resource that are not
+ *   installed on the current system.
+ * - IsValidCodePage always returns FALSE for Unicode code pages such as 1200
+ *   (0x04b0, UTF-16LE), which is the standard code page in Win32 version resources.
+ */
 DWORD win::FileVersion::Impl::PackTransl(WORD lang_id, UINT code_page)
 {
-        auto locale_id = MAKELCID(lang_id, SORT_DEFAULT); // FIXME: deprecated
-
-        if (!IsValidLocale(locale_id, LCID_INSTALLED)) { // LCID_SUPPORTED
-                auto s = std::format("FileVersion::PackTransl: locale {:#x} is not installed", locale_id);
-                throw std::runtime_error(s);
-        }
-
-        if (!IsValidCodePage(code_page)) {
-                auto s = std::format("FileVersion::PackTransl: code page {} is not installed", code_page);
-                throw std::runtime_error(s);
-        }
-
         constexpr auto offs = static_cast<int>(sizeof(WORD))*CHAR_BIT; // number of bits in WORD
 
         if (code_page >> offs) {
-                auto s = std::format("FileVersion::PackTransl: UINT({:#x}) trancating", code_page);
+                auto s = std::format("FileVersion::PackTransl: UINT({:#x}) truncating", code_page);
                 throw std::overflow_error(s);
         }
 
-        DWORD res = code_page;
-        res <<= offs;
-
-        return res | lang_id;
+        return MAKELONG(lang_id, static_cast<WORD>(code_page));
 }
 
 /*
@@ -221,7 +224,7 @@ std::wstring win::FileVersion::Impl::GetTranslation(bool original) const
 
 void win::FileVersion::Impl::GetTranslation(WORD &lang_id, UINT &code_page) const
 {
-        auto dw = parse_transl(m_def_transl);
+        auto dw = m_def_transl.empty() ? 0 : parse_transl(m_def_transl);
         lang_id   = HIWORD(dw);
         code_page = LOWORD(dw);
 }
@@ -242,21 +245,49 @@ auto win::FileVersion::operator =(FileVersion&& obj) noexcept -> FileVersion&
 win::FileVersion::operator bool () const { return m_impl && static_cast<bool>(*m_impl); }
 bool win::FileVersion::operator !() const { return !bool(*this); }
 
-DWORD win::FileVersion::SetFile(std::wstring_view path) { return m_impl->SetFile(path); }
-std::wstring win::FileVersion::VerLanguageName() const { return m_impl->VerLanguageName(); }
+DWORD win::FileVersion::SetFile(std::wstring_view path)
+{
+        if (!m_impl) {
+                m_impl = new Impl;
+        }
+        return m_impl->SetFile(path);
+}
 
-void win::FileVersion::SetDefTranslation() { m_impl->SetDefTranslation(); }
-void win::FileVersion::SetTranslation(WORD lang_id, UINT code_page) { m_impl->SetTranslation(lang_id, code_page); }
-void win::FileVersion::GetTranslation(WORD &lang_id, UINT &code_page) const { m_impl->GetTranslation(lang_id, code_page); }
+std::wstring win::FileVersion::VerLanguageName() const { return m_impl ? m_impl->VerLanguageName() : std::wstring{}; }
 
-std::wstring_view win::FileVersion::GetCompanyName() const { return m_impl->GetCompanyName(); }
-std::wstring_view win::FileVersion::GetComments() const { return m_impl->GetComments(); }
-std::wstring_view win::FileVersion::GetFileDescription() const { return m_impl->GetFileDescription(); }
-std::wstring_view win::FileVersion::GetFileVersion() const { return m_impl->GetFileVersion(); }
-std::wstring_view win::FileVersion::GetInternalName() const { return m_impl->GetInternalName(); }
-std::wstring_view win::FileVersion::GetLegalCopyright() const { return m_impl->GetLegalCopyright(); }
-std::wstring_view win::FileVersion::GetLegalTrademarks() const { return m_impl->GetLegalTrademarks(); }
-std::wstring_view win::FileVersion::GetPrivateBuild() const { return m_impl->GetPrivateBuild(); }
-std::wstring_view win::FileVersion::GetProductName() const { return m_impl->GetProductName(); }
-std::wstring_view win::FileVersion::GetProductVersion() const { return m_impl->GetProductVersion(); }
-std::wstring_view win::FileVersion::GetSpecialBuild() const { return m_impl->GetSpecialBuild(); }
+void win::FileVersion::SetDefTranslation()
+{
+        if (m_impl) {
+                m_impl->SetDefTranslation();
+        }
+}
+
+void win::FileVersion::SetTranslation(WORD lang_id, UINT code_page)
+{
+        if (m_impl) {
+                m_impl->SetTranslation(lang_id, code_page);
+        }
+}
+
+void win::FileVersion::GetTranslation(WORD &lang_id, UINT &code_page) const
+{
+        if (m_impl) {
+                m_impl->GetTranslation(lang_id, code_page);
+        } else {
+                lang_id = 0;
+                code_page = 0;
+        }
+}
+
+std::wstring_view win::FileVersion::GetCompanyName() const { return m_impl ? m_impl->GetCompanyName() : std::wstring_view{}; }
+std::wstring_view win::FileVersion::GetComments() const { return m_impl ? m_impl->GetComments() : std::wstring_view{}; }
+std::wstring_view win::FileVersion::GetFileDescription() const { return m_impl ? m_impl->GetFileDescription() : std::wstring_view{}; }
+std::wstring_view win::FileVersion::GetFileVersion() const { return m_impl ? m_impl->GetFileVersion() : std::wstring_view{}; }
+std::wstring_view win::FileVersion::GetInternalName() const { return m_impl ? m_impl->GetInternalName() : std::wstring_view{}; }
+std::wstring_view win::FileVersion::GetLegalCopyright() const { return m_impl ? m_impl->GetLegalCopyright() : std::wstring_view{}; }
+std::wstring_view win::FileVersion::GetLegalTrademarks() const { return m_impl ? m_impl->GetLegalTrademarks() : std::wstring_view{}; }
+std::wstring_view win::FileVersion::GetOriginalFilename() const { return m_impl ? m_impl->GetOriginalFilename() : std::wstring_view{}; }
+std::wstring_view win::FileVersion::GetPrivateBuild() const { return m_impl ? m_impl->GetPrivateBuild() : std::wstring_view{}; }
+std::wstring_view win::FileVersion::GetProductName() const { return m_impl ? m_impl->GetProductName() : std::wstring_view{}; }
+std::wstring_view win::FileVersion::GetProductVersion() const { return m_impl ? m_impl->GetProductVersion() : std::wstring_view{}; }
+std::wstring_view win::FileVersion::GetSpecialBuild() const { return m_impl ? m_impl->GetSpecialBuild() : std::wstring_view{}; }

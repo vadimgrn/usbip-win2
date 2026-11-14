@@ -25,12 +25,19 @@ enum op_status_t // op_common.status
  * SERIAL_BUFSZ
  *      buffer length for USB_DEVICE_DESCRIPTOR.iSerialNumber
  *      string in characters, including the terminating '\0'.
+ *
+ * MAX_HUB_PORTS
+ *      Hard limit for USB root hub ports (USB 2.0 / USB 3.x Hub Descriptor
+ *      bNbrPorts is 1 byte, UINT8). UdeCx (UdecxWdfDeviceAddUsbDeviceEmulation)
+ *      enforces NumberOfUsb20Ports + NumberOfUsb30Ports <= 255 and returns
+ *      STATUS_INVALID_PARAMETER if exceeded.
  */
-enum { 
+enum {
         USBIP_VERSION = 0x111, // protocol
-        DEV_PATH_MAX = 256, 
+        DEV_PATH_MAX = 256,
         BUS_ID_SIZE = 32,
         SERIAL_BUFSZ = 16,
+        MAX_HUB_PORTS = 255,
 };
 
 namespace session

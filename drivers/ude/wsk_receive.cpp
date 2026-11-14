@@ -366,11 +366,11 @@ void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_T
 		    dsc_len >= sizeof(d) && d.bLength == sizeof(d)) {
                         NT_ASSERT(is_valid(d));
                         log(d);
-                        if (*dev.ext().config().serial) {
+                        if (*dev.attributes().config.serial) {
                                 if (!d.iSerialNumber) {
                                         d.iSerialNumber = MAXUCHAR; // max possible
                                 }
-                                dev.ext().hw().iserial = d.iSerialNumber;
+                                dev.attributes().hw.iserial = d.iSerialNumber;
                         }
                 }
                 break;

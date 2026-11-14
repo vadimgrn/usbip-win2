@@ -31,12 +31,6 @@ using namespace usbip;
 
 const auto MAX_HUB_PORTS = 255; // @see drivers/usbip_ude/vhci.cpp, set_usb_ports_cnt
 
-constexpr auto &str_zero_copy = "zero-copy";
-constexpr auto &str_low_latency = "low-latency";
-constexpr auto &str_isolation_none = "none";
-constexpr auto &str_isolation_session = "session";
-constexpr auto &str_isolation_user = "user";
-
 auto get_ids_data()
 {
         win::Resource r(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDR_USB_IDS), RT_RCDATA);
@@ -73,6 +67,43 @@ auto serial_validator(const std::string &serial)
         return s;
 }
 
+auto add_receive_mode_option(CLI::App &app, receive_mode &mode)
+{
+        constexpr auto zero_copy = to_string(receive_mode::zero_copy);
+        constexpr auto low_latency = to_string(receive_mode::low_latency);
+
+        auto receive = [&mode, low_latency] (const auto &choice) noexcept
+        {
+                mode = choice == low_latency ? receive_mode::low_latency : receive_mode::zero_copy;
+        };
+
+        return app.add_option_function<std::string>("--receive-mode", receive, "How to receive data from the network")
+                ->check(CLI::IsMember({zero_copy, low_latency}))
+                ->default_str(zero_copy);
+}
+
+auto add_isolate_option(CLI::App &app, isolation &mode)
+{
+        constexpr auto iso_none = to_string(isolation::none);
+        constexpr auto iso_session = to_string(isolation::session);
+        constexpr auto iso_user = to_string(isolation::user);
+
+        auto isolate = [&mode, iso_session, iso_user] (const auto &choice) noexcept
+        {
+                if (choice == iso_session) {
+                        mode = isolation::session;
+                } else if (choice == iso_user) {
+                        mode = isolation::user;
+                } else {
+                        mode = isolation::none;
+                }
+        };
+
+        return app.add_option_function<std::string>("-i,--isolate", isolate, "Device isolation mode")
+                ->check(CLI::IsMember({iso_none, iso_session, iso_user}))
+                ->default_str(iso_none);
+}
+
 void add_cmd_attach(CLI::App &app)
 {
         auto r = std::make_shared<attach_args>();
@@ -95,31 +126,8 @@ void add_cmd_attach(CLI::App &app)
         auto stop = rem->add_flag("-x,--stop", r->stop, "Stop attach attempts to this device");
         rem->add_flag("--once", r->once, "Do not start automatic attach attempts if cannot connect")->excludes(stop);
 
-        auto receive = [&mode = r->recv_mode, low_lat = str_low_latency] (const auto &choice)
-        {
-                mode = choice == low_lat ? receive_mode::low_latency : receive_mode::zero_copy;
-        };
-
-        rem->add_option_function<std::string>("--receive-mode", receive, "How to receive data from the network")
-                ->check(CLI::IsMember({str_zero_copy, str_low_latency}))
-                ->default_str(str_zero_copy)
-                ->excludes(stop);
-
-        auto isolate = [&mode = r->iso_mode] (const auto &choice)
-        {
-                if (choice == str_isolation_session) {
-                        mode = isolation::session;
-                } else if (choice == str_isolation_user) {
-                        mode = isolation::user;
-                } else {
-                        mode = isolation::none;
-                }
-        };
-
-        rem->add_option_function<std::string>("-i,--isolate", isolate, "Device isolation mode (none, session, user)")
-                ->check(CLI::IsMember({str_isolation_none, str_isolation_session, str_isolation_user}))
-                ->default_str(str_isolation_none)
-                ->excludes(stop);
+        add_receive_mode_option(*rem, r->recv_mode)->excludes(stop);
+        add_isolate_option(*rem, r->iso_mode)->excludes(stop);
 
         auto stop_all = cmd->add_option_group("Stop")
                 ->add_flag("-X,--stop-all", r->stop_all, "Stop all active attach attempts");
