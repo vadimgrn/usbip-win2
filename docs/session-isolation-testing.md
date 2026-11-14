@@ -415,7 +415,7 @@ query user
 **Goal:** Verify that USB mass storage devices have their drive letters redirected to the owner's session and that foreign sessions (including Administrators) are denied data read/write access.
 
 > [!NOTE]
-> **Elevation Requirement:** Volume isolation (unlinking `\GLOBAL??\X:` and modifying the volume DACL via `WRITE_DAC`) operates on Windows Storage subsystem objects owned by `SYSTEM` and `Administrators`. Run step 1 in an **elevated (Run as Administrator)** command prompt. When run without elevation, the drive letter is mapped into the session, but global unmapping and DACL modification will report access denied.
+> **No Elevation Required:** Standard (non-admin) users can run step 1 directly. `usbip2_ude.sys` handles `\GLOBAL??\X:` unlinking and `\Device\HarddiskVolumeN` + filesystem root DACL hardening in kernel mode (both automatically upon `GUID_DEVINTERFACE_VOLUME` PnP arrival and via the owner-gated `ISOLATE_PORT_VOLUME` IOCTL after verifying disk extent ownership), while `libusbip` creates the session-local `X:` mapping inside `\Sessions\<Id>\DosDevices\<LogonId>\`.
 >
 > **Filesystem Types:** On NTFS, both the volume device object and directory tree DACL (`OICI`) are hardened. On FAT32/exFAT, filesystem-level ACLs are skipped (as they lack `FILE_PERSISTENT_ACLS`), while the kernel volume device object (`\Device\HarddiskVolumeN`) remains fully secured against raw sector access.
 
@@ -450,7 +450,7 @@ query user
 ### Test Case 12: User-Based Device Isolation (`-i user`) Across Accounts & Reconnects
 **Goal:** Verify that a device attached with `-i user` is bound strictly to the owner's Windows User SID (`TokenUser`). Verify that another user account cannot access or detach the device, and that ownership persists across RDP disconnect/reconnect cycles where `SessionId` may change.
 
-1. **User A (Alice)** attaches a USB device with `-i user` (elevated for storage volume DACL isolation):
+1. **User A (Alice)** attaches a USB device with `-i user` (standard user, no elevation required):
    ```cmd
    usbip attach -r <server_ip> -b 1-1 -i user
    ```

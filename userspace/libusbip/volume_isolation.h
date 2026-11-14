@@ -45,10 +45,11 @@ struct isolated_volume
  *         devices quickly bail out once their PnP class is determined, but calling is unnecessary.
  *       - In GUI or interactive applications, run on a background worker thread with a cancel
  *         event or stop_token so the UI remains responsive during asynchronous PnP enumeration.
- *       - Full isolation (removing the global mount point from \GLOBAL?? and hardening the volume
- *         DACL) requires administrative elevation; without elevation, the drive letter is still
- *         mapped locally in the session DosDevices, but global unmapping and DACL restrictions
- *         will report ERROR_ACCESS_DENIED.
+ *       - Privileged isolation (removing the global mount point from \GLOBAL?? and hardening
+ *         the volume and root directory DACLs) is performed in kernel mode by the VHCI
+ *         driver (alongside automatic volume arrival DACL hardening via PnP notifications).
+ *         Standard non-admin users therefore obtain full isolation without elevation, while
+ *         this function maps the session-local drive letter in the caller's interactive session.
  *
  * @see create_cancel_event
  * @see vhci::attach

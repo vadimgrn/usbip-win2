@@ -37,9 +37,18 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void FreeUnicodeString(_Inout_ UNICODE_STRING &s, _In_ ULONG pooltag);
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto empty(_In_ const UNICODE_STRING &s)
 {
         return !(s.Length && s.Buffer && *s.Buffer);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto length_cch(_In_ const UNICODE_STRING &s)
+{
+        return static_cast<USHORT>(s.Length/sizeof(*s.Buffer));
 }
 
 /**

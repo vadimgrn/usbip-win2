@@ -698,7 +698,7 @@ PAGED auto plugin_hardware(
         }
         auto &ext = ctx.ext();
 
-        st = init_requestor_isolation(request, ext.attr.config.iso);
+        st = init_requestor_isolation(request, ext.attr);
         if (!NT_SUCCESS(st)) {
                 return st;
         }
@@ -1083,6 +1083,10 @@ PAGED auto get_persistent(
         return st;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS isolate_port_volume(_In_ WDFREQUEST request);
+
 /*
  * IRP_MJ_DEVICE_CONTROL
  * 
@@ -1125,6 +1129,9 @@ PAGED void device_control(
                 [[fallthrough]];
         case vhci::ioctl::PLUGOUT_HARDWARE:
                 st = plugout_hardware(Request, reattach);
+                break;
+        case vhci::ioctl::ISOLATE_PORT_VOLUME:
+                st = isolate_port_volume(Request);
                 break;
         case IOCTL_USB_USER_REQUEST:
                 NT_ASSERT(!has_urb(Request));
@@ -1288,9 +1295,71 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
 }
 
 _IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto get_port_isolation(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS isolate_port_volume(_In_ WDFREQUEST request)
 {
+        PAGED_CODE();
+        WdfRequestSetInformation(request, 0);
+
+        size_t in_sz{};
+        const vhci::ioctl::isolate_port_volume *in{};
+
+        auto st = retrieve_input_buffer(request, in, &in_sz);
+        if (!NT_SUCCESS(st)) {
+                return st;
+        } else if (in_sz != sizeof(*in)) {
+                return STATUS_INVALID_BUFFER_SIZE;
+        } else if (in->size != in_sz) {
+                Trace(TRACE_LEVEL_ERROR, "isolate_port_volume.size %lu != sizeof %Iu", in->size, in_sz);
+                return USBIP_ERROR_ABI;
+        } else if (in->port <= 0) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        size_t cb{};
+        st = RtlStringCbLengthW(in->nt_device, sizeof(in->nt_device), &cb);
+        if (!NT_SUCCESS(st) || !cb) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        UNICODE_STRING nt_device;
+        st = RtlUnicodeStringInit(&nt_device, in->nt_device);
+        if (!NT_SUCCESS(st)) {
+                return st;
+        }
+
+        bool is_admin{};
+        vhci::device_owner owner{};
+        st = get_caller_owner(request, is_admin, owner);
+        if (!NT_SUCCESS(st)) {
+                return st;
+        }
+
+        auto vhci = get_vhci(request);
+        wdf::ObjectRef device;
+        st = vhci::get_device(vhci, in->port, device);
+        if (!NT_SUCCESS(st)) {
+                return st;
+        }
+
+        auto &d = *get_device_ctx(device.get());
+        if (!(d.is_session_isolated() || d.is_user_isolated())) {
+                return STATUS_INVALID_DEVICE_REQUEST;
+        }
+
+        if (!is_admin && is_access_denied(d, owner)) {
+                return STATUS_ACCESS_DENIED;
+        }
+
+        return session::isolate_device_volume(request, d, nt_device, in->drive_letter);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+PAGED auto get_port_isolation(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
+{
+        PAGED_CODE();
+
         const vhci::ioctl::get_port_isolation *in;
         auto st = retrieve_input_buffer(request, in);
         if (!NT_SUCCESS(st)) {
@@ -1301,6 +1370,8 @@ auto get_port_isolation(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
                 Trace(TRACE_LEVEL_ERROR, "iso.size %lu != sizeof(iso) %Iu", in->size, sizeof(*in));
                 return as_ntstatus(USBIP_ERROR_ABI);
         }
+
+        auto pdo = static_cast<DEVICE_OBJECT*>(in->pdo);
 
         vhci::ioctl::get_port_isolation *out;
         st = retrieve_output_buffer(request, out);
@@ -1317,9 +1388,11 @@ auto get_port_isolation(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
         }
 
         auto &dev = *get_device_ctx(device.get());
+        save_pdo_properties(dev.attributes(), pdo);
 
         out->size = sizeof(*out);
         out->port = in->port;
+        out->pdo = nullptr;
         out->data = dev.attributes().config.iso;
 
         TraceDbg("dev %04x, port %d, session %lu, %!vhci_isolation!",

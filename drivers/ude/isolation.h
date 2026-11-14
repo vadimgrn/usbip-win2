@@ -6,8 +6,15 @@
 
 #include <libdrv/wdf_cpp.h>
 
+struct _DEVICE_OBJECT;
+using DEVICE_OBJECT = struct _DEVICE_OBJECT;
+
+struct _UNICODE_STRING;
+using UNICODE_STRING = struct _UNICODE_STRING;
+
 namespace usbip
 {
+        struct device_attributes;
         struct device_ctx;
         struct fileobject_ctx;
 }
@@ -35,6 +42,41 @@ PAGED bool is_admin_request(_In_ WDFREQUEST request);
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS init_requestor_isolation(_In_ WDFREQUEST request, _Inout_ vhci::isolation_data &iso);
+
+/*
+ * Validates and initializes device isolation ownership and captures caller user/logon SIDs
+ * for volume DACL hardening.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS init_requestor_isolation(_In_ WDFREQUEST request, _Inout_ device_attributes &attr);
+
+/*
+ * Captures the USB PDO instance ID and container ID for later disk/volume ownership checks.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void save_pdo_properties(_Inout_ device_attributes &attr, _In_ DEVICE_OBJECT *pdo);
+
+/*
+ * Removes \GLOBAL??\<drive_letter>: and hardens the volume and root directory DACLs in kernel mode
+ * after verifying the volume belongs to the device.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS isolate_device_volume(
+        _In_ WDFREQUEST request,
+        _In_ const device_ctx &dev,
+        _In_ const UNICODE_STRING &nt_device,
+        _In_ wchar_t drive_letter);
+
+/*
+ * Registers PnP volume interface arrival notification to harden isolated volume DACLs
+ * as soon as volumes arrive.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS register_volume_notification(_In_ WDFDEVICE vhci);
 
 /*
  * Resolves caller ownership and privilege.

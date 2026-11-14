@@ -78,7 +78,7 @@ PAGED NTSTATUS do_add_device(
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS query_port_isolation(
-        _Inout_ filter_ext &hub, _In_ int port, _Out_ vhci::isolation_data &data);
+        _Inout_ filter_ext &hub, _In_ int port, _In_ DEVICE_OBJECT *pdo, _Out_ vhci::isolation_data &data);
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_

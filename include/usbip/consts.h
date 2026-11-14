@@ -40,6 +40,11 @@ enum {
         MAX_HUB_PORTS = 255,
 };
 
+enum {
+        max_device_id_len = 200, // MAX_DEVICE_ID_LEN (cfgmgr32.h)
+        se_group_logon_id = 0xC0000000UL, // SE_GROUP_LOGON_ID (winnt.h)
+};
+
 namespace session
 {
         constexpr auto system = 0UL;

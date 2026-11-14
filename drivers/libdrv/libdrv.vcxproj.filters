@@ -15,9 +15,11 @@
     <ClCompile Include="lists.cpp" />
     <ClCompile Include="urb_ptr.cpp" />
     <ClCompile Include="security.cpp" />
+    <ClCompile Include="handle.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="security.h" />
+    <ClInclude Include="handle.h" />
     <ClInclude Include="ch11.h" />
     <ClInclude Include="dbgcommon.h" />
     <ClInclude Include="mdl_cpp.h" />

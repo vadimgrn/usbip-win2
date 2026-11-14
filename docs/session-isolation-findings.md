@@ -301,3 +301,11 @@ In Windows architecture, "Terminal Services" (Terminal Server) is the OS subsyst
 - **Third-party VDI** solutions (Citrix Virtual Apps/Desktops, VMware Horizon) build directly on the Windows Terminal Services session infrastructure.
 
 Because the driver inspects the caller's session via the core kernel API `IoGetRequestorSessionId`, session isolation operates natively and identically across all of these environments.
+
+### 7. Kernel-Assisted Storage Volume Isolation & PnP Arrival Hardening
+Purely userspace volume isolation suffered from two constraints: standard (non-elevated) users received `ERROR_ACCESS_DENIED` when removing `\GLOBAL??\X:` or modifying DACLs on `\Device\HarddiskVolumeN`, and waiting for userspace `MountMgr` discovery left a brief arrival race window (or zero volume hardening if a caller skipped `isolate_port_volumes`).
+
+Moving privileged volume operations into `usbip2_ude.sys` closes both gaps without requiring a separate Windows service or administrative elevation:
+- During `INTERNAL_GET_PORT_ISOLATION`, `usbip2_filter.sys` forwards `fltr.pdo` so `usbip2_ude.sys` records the child USB PDO's `DEVPKEY_Device_InstanceId` and `DEVPKEY_Device_ContainerId`, alongside the attaching caller's User SID and Logon SID (`SE_GROUP_LOGON_ID`).
+- `usbip2_ude.sys` registers `IoRegisterPlugPlayNotification` (`GUID_DEVINTERFACE_VOLUME`) and verifies each arriving volume's extents (`IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS`) against `GUID_DEVINTERFACE_DISK` PDO parent/container properties, hardening `\Device\HarddiskVolumeN` DACLs immediately upon PnP arrival on isolated ports.
+- `vhci::ioctl::ISOLATE_PORT_VOLUME` verifies port ownership and volume-to-port correspondence, verifies the `\GLOBAL??\X:` target, deletes `\GLOBAL??\X:` via `IoDeleteSymbolicLink`, and hardens both `\Device\HarddiskVolumeN` and `\Device\HarddiskVolumeN\` DACLs via `ZwSetSecurityObject`, allowing standard users in `libusbip` to finish with session-local `DefineDosDeviceW`.

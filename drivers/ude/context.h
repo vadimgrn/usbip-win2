@@ -57,6 +57,9 @@ struct vhci_ctx
         WDFCOLLECTION reattach_req; // WDFREQUEST
         WDFSPINLOCK reattach_req_lock;
 
+        void *volume_notification; // IoRegisterPlugPlayNotification(GUID_DEVINTERFACE_VOLUME)
+        EX_RUNDOWN_REF volume_rundown;
+
         LONG removing; // use set_flag/get_flag
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_ctx, get_vhci_ctx)
@@ -76,6 +79,16 @@ bool is_valid_port(_In_ const vhci_ctx &ctx, _In_ int port);
 struct device_ctx;
 struct ring_buffer_data;
 
+/*
+ * SIDs for volume DACL hardening (libdrv::set_volume_dacl):
+ * - caller_user_sid: User Account SID (TokenUser, S-1-5-21-...).
+ *   In isolation::user mode this equals config.iso.owner.sid.
+ *   In isolation::session mode config.iso.owner.sid must remain empty
+ *   (owner.has_sid() == false), so the attaching caller's User SID is stored here.
+ * - caller_logon_sid: Logon Session SID (TokenGroups SE_GROUP_LOGON_ID, S-1-5-5-X-Y)
+ *   of the attaching user-mode caller (in isolation::user, set only when the
+ *   caller matches caller_user_sid).
+ */
 struct device_attributes
 {
         // from ioctl::plugin_hardware, .Buffer-s are allocated in PagedPool
@@ -86,6 +99,12 @@ struct device_attributes
         //
         vhci::imported_device_hardware hw;
         vhci::imported_device_config config; // for ioctl::get_imported_devices
+
+        sid_blob caller_user_sid;
+        sid_blob caller_logon_sid;
+
+        wchar_t pdo_instance_id[max_device_id_len]; // DEVPKEY_Device_InstanceId of USB PDO
+        GUID container_id; // DEVPKEY_Device_ContainerId of USB PDO
 };
 
 /*

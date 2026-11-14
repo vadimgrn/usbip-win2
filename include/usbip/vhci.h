@@ -37,6 +37,15 @@ constexpr SSIZE_T is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen) noexcep
 
 constexpr auto is_ascii(unsigned char ch) noexcept { return ch < 0x80; }
 
+/*
+ * @see ntifs.h, struct SID
+ */
+struct sid_blob
+{
+        ULONG length; // data[length]
+        UCHAR data[68]; // SECURITY_MAX_SID_SIZE, ntifs.h
+};
+
 } // namespace usbip
 
 
@@ -51,15 +60,6 @@ DEFINE_GUID(GUID_DEVINTERFACE_USBIP_VHCI,
   enum class isolation : unsigned char { none, session, user }; // see libusbip/vhci.h
 #endif
 
-/*
- * @see ntifs.h, struct SID
- */
-struct sid_blob
-{
-        ULONG length; // data[length]
-        UCHAR data[68]; // SECURITY_MAX_SID_SIZE, ntifs.h
-};
-
 static_assert(sizeof(session::system) == sizeof(ULONG)); // session id type
 
 /*
@@ -68,6 +68,14 @@ static_assert(sizeof(session::system) == sizeof(ULONG)); // session id type
  * When evaluating ownership or access permissions, User SID (has_sid()) takes
  * precedence over Session ID (has_session()) because user identity is persistent
  * across logon sessions. Session ID serves as a fallback for session-only isolation.
+ *
+ * sid - User Account SID (TokenUser, S-1-5-21-...) of the device owner or caller.
+ * In isolation_data::owner, this is populated only for isolation::user
+ * (either the attaching caller's User SID or an explicit target user's SID).
+ * It must remain empty (has_sid() == false) for isolation::session and
+ * isolation::none, because access checks, persistent config matching, and
+ * GET_IMPORTED_DEVICES rely on has_sid() to distinguish isolation::user from
+ * isolation::session.
  */
 struct device_owner
 {
@@ -198,6 +206,7 @@ enum class function { // 12 bit
         plugin_hardware_once,
         plugout_hardware_and_reattach,
         internal_get_port_isolation,
+        isolate_port_volume,
 };
 
 constexpr auto make(function id, ULONG access = FILE_READ_DATA | FILE_WRITE_DATA)
@@ -215,6 +224,7 @@ enum {
         PLUGIN_HARDWARE_ONCE = make(function::plugin_hardware_once),
         PLUGOUT_HARDWARE_AND_REATTACH = make(function::plugout_hardware_and_reattach), // for internal use only
         INTERNAL_GET_PORT_ISOLATION = make(function::internal_get_port_isolation, FILE_ANY_ACCESS),
+        ISOLATE_PORT_VOLUME = make(function::isolate_port_volume),
 };
 
 struct plugin_hardware : base
@@ -263,7 +273,15 @@ inline auto get_imported_devices_size(_In_ ULONG n) noexcept
 struct get_port_isolation : base
 {
         int port; // IN/OUT, >= 1 or zero if an error
+        void *pdo; // IN, DEVICE_OBJECT* of the USB PDO on port
         isolation_data data; // OUT
+};
+
+struct isolate_port_volume : base
+{
+        int port; // IN, >= 1
+        wchar_t drive_letter; // IN, L'A'-L'Z' or L'\0'
+        wchar_t nt_device[MAX_PATH]; // IN, e.g. \Device\HarddiskVolumeN
 };
 
 } // namespace usbip::vhci::ioctl

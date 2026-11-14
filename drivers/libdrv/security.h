@@ -12,7 +12,9 @@ using IRP = struct _IRP;
 struct _UNICODE_STRING;
 using UNICODE_STRING = struct _UNICODE_STRING;
 
-namespace usbip::vhci
+using HANDLE = void*;
+
+namespace usbip
 {
 
 struct sid_blob;
@@ -24,14 +26,14 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 bool operator==(_In_ const sid_blob &a, _In_ const sid_blob &b);
 
-} // namespace usbip::vhci
+} // namespace usbip
 
 
 namespace libdrv
 {
 
-using usbip::vhci::sid_blob;
-using usbip::vhci::operator==;
+using usbip::sid_blob;
+using usbip::operator==;
 
 /*
  * Retrieves the effective User SID of the caller who issued the IRP.
@@ -45,6 +47,18 @@ using usbip::vhci::operator==;
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS get_requestor_sid(_In_ IRP *irp, _Out_ sid_blob &result);
+
+/*
+ * Retrieves the logon session SID (SE_GROUP_LOGON_ID) of the caller who issued the IRP.
+ *
+ * @param irp caller request
+ * @param result out buffer for SID bytes and length
+ * @return STATUS_SUCCESS on success, STATUS_NOT_FOUND if the token has no logon SID,
+ *         STATUS_NO_TOKEN if no token is available, or another NTSTATUS failure code.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS get_requestor_logon_sid(_In_ IRP *irp, _Out_ sid_blob &result);
 
 /*
  * The Terminal Server session that issued the request, or session::invalid if it cannot be
@@ -118,5 +132,23 @@ bool is_system_sid(_In_ const sid_blob &sid);
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS sid_from_hex(_Out_ sid_blob &sid, _In_ const UNICODE_STRING &hex);
+
+/*
+ * Sets a protected DACL on a kernel object or directory handle granting GENERIC_ALL
+ * with inheritance (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE) to SYSTEM, user_sid,
+ * and (if valid) logon_sid. Administrators (BA) is omitted to deny foreign admins.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS set_volume_dacl(
+        _In_ HANDLE handle, _In_ const sid_blob &user_sid, _In_ const sid_blob &logon_sid);
+
+/*
+ * Removes \GLOBAL??\<drive_letter>: if and only if its target matches expected_nt_device.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS remove_global_drive_letter(
+        _In_ wchar_t drive_letter, _In_ const UNICODE_STRING &expected_nt_device);
 
 } // namespace libdrv

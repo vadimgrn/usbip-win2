@@ -44,6 +44,11 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
 
         set_flag(ctx.removing); // used to set earlier
 
+        if (auto h = InterlockedExchangePointer(&ctx.volume_notification, nullptr)) {
+                IoUnregisterPlugPlayNotificationEx(h);
+                ExWaitForRundownProtectionRelease(&ctx.volume_rundown);
+        }
+
         if (auto t = ctx.target_self) {
                 WdfIoTargetClose(t);
         }
@@ -743,7 +748,8 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *init)
         }
 
         init_func_t* const functions[] { init_context, configure, create_interfaces, 
-                                         add_usbdevice_emulation, vhci::create_queues };
+                                         add_usbdevice_emulation, vhci::create_queues,
+                                         session::register_volume_notification };
 
         for (auto f: functions) {
                 st = f(vhci);

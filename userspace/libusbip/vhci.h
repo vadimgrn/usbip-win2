@@ -155,9 +155,11 @@ struct attach_args
  * @return hub port number, >= 1. Call GetLastError() if zero is returned.
  * @note Does not call isolate_port_volumes(). Attach only triggers virtual hardware
  *       plug-in and returns immediately; storage volumes are enumerated asynchronously
- *       by Windows PnP and MountMgr over several seconds. Callers attaching storage
- *       devices with isolation enabled (args.config.iso_mode != isolation::none)
- *       should call isolate_port_volumes() immediately after attach() succeeds.
+ *       by Windows PnP and MountMgr over several seconds (the VHCI driver automatically
+ *       hardens arriving volume DACLs in kernel mode). Callers attaching storage devices
+ *       with isolation enabled (args.config.iso_mode != isolation::none) should call
+ *       isolate_port_volumes() immediately after attach() succeeds to migrate any global
+ *       drive letter into their session DosDevices namespace and finish root ACL setup.
  * @see isolate_port_volumes
  */
 USBIP_API int attach(_In_ HANDLE dev, _In_ const attach_args &args);

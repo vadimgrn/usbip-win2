@@ -10,6 +10,7 @@
 
 #include "driver.h"
 
+#include <libdrv/handle.h>
 #include <libdrv/timeout.h>
 #include <libdrv/strconv.h>
 #include <libdrv/dbgcommon.h>
@@ -22,25 +23,6 @@ using namespace libdrv;
 
 namespace
 {
-
-struct device_interfaces_traits
-{
-        static PZZWSTR invalid() { return nullptr; }
-};
-
-/*
- * IoGetDeviceInterfaces allocates a multi-string buffer from PagedPool.
- * It must be freed using ExFreePool at IRQL <= APC_LEVEL (PASSIVE_LEVEL).
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED inline void close_handle(_In_ PZZWSTR ptr, _In_ device_interfaces_traits)
-{
-        PAGED_CODE();
-        ExFreePool(ptr);
-}
-
-using device_interfaces_handle = generic_handle<device_interfaces_traits>;
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
@@ -144,15 +126,14 @@ PAGED auto get_vhci_device(_Inout_ filter_ext &fltr, _Out_ DEVICE_OBJECT* &vhci)
 
         vhci = nullptr;
 
-        PZZWSTR list{};
-        auto st = IoGetDeviceInterfaces(&vhci::GUID_DEVINTERFACE_USBIP_VHCI, nullptr, 0, &list);
+        device_interfaces_handle list;
+        auto st = get_device_interfaces(list, vhci::GUID_DEVINTERFACE_USBIP_VHCI);
         if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "IoGetDeviceInterfaces %!STATUS!", st);
                 return st;
         }
-        device_interfaces_handle del(list);
 
-        for (auto p = list; *p; ) {
+        for (auto p = list.get(); *p; ) {
                 UNICODE_STRING link;
                 RtlInitUnicodeString(&link, p);
 
@@ -169,7 +150,7 @@ PAGED auto get_vhci_device(_Inout_ filter_ext &fltr, _Out_ DEVICE_OBJECT* &vhci)
                 }
 
                 Trace(TRACE_LEVEL_WARNING, "IoGetDeviceObjectPointer('%!USTR!') %!STATUS!", &link, st);
-                p += link.Length/sizeof(*link.Buffer) + 1;
+                p += length_cch(link) + 1;
         }
 
         return STATUS_NOT_FOUND;
@@ -279,7 +260,7 @@ PAGED void usbip::destroy(_Inout_ filter_ext &f)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::query_port_isolation(
-        _Inout_ filter_ext &hub, _In_ int port, _Out_ vhci::isolation_data &data)
+        _Inout_ filter_ext &hub, _In_ int port, _In_ DEVICE_OBJECT *pdo, _Out_ vhci::isolation_data &data)
 {
         PAGED_CODE();
 
@@ -292,7 +273,7 @@ PAGED NTSTATUS usbip::query_port_isolation(
                 return st;
         }
 
-        vhci::ioctl::get_port_isolation req { .port = port };
+        vhci::ioctl::get_port_isolation req { .port = port, .pdo = pdo };
         req.size = sizeof(req);
 
         KEVENT event;

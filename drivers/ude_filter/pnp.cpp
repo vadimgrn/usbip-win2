@@ -291,7 +291,7 @@ PAGED auto apply_isolation(_Inout_ filter_ext &fltr)
                 return st;
         }
 
-        st = query_port_isolation(*dev.hub, static_cast<int>(port), dev.iso);
+        st = query_port_isolation(*dev.hub, static_cast<int>(port), fltr.pdo, dev.iso);
         if (!NT_SUCCESS(st)) {
                 Trace(TRACE_LEVEL_ERROR, "query_port_isolation(port=%lu) %!STATUS!", port, st);
                 return st;

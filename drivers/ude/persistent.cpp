@@ -286,7 +286,7 @@ PAGED auto parse_isolation_mode(_Inout_ vhci::isolation &mode, _In_ const UNICOD
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto parse_sid(_Out_ vhci::sid_blob &sid, _In_ const UNICODE_STRING &val)
+PAGED auto parse_sid(_Out_ sid_blob &sid, _In_ const UNICODE_STRING &val)
 {
         PAGED_CODE();
 

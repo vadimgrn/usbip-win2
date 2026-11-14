@@ -3,6 +3,7 @@
  */
 
 #include "../volume_isolation.h"
+#include "../vhci.h"
 #include "../win_handle.h"
 
 #include "sid.h"
@@ -12,6 +13,7 @@
 #include "stop_event.h"
 
 #include <resources/messages.h>
+#include <usbip/vhci.h>
 
 #include <cfgmgr32.h>
 #include <initguid.h>
@@ -27,6 +29,7 @@ namespace
 {
 
 using namespace usbip;
+static_assert(max_device_id_len == MAX_DEVICE_ID_LEN);
 
 /*
  * Creates a security descriptor with a protected DACL granting full access (GA)
@@ -737,14 +740,46 @@ bool remove_drive_letter(_In_ wchar_t drive_letter, _In_ const std::wstring &nt_
         return true;
 }
 
-bool isolate_drive_letter(_In_ wchar_t drive_letter, _In_ const std::wstring &nt_device)
+DWORD isolate_volume_kernel(
+        _In_opt_ HANDLE vhci_dev,
+        _In_ int port,
+        _In_ const std::wstring &nt_device,
+        _In_ wchar_t drive_letter) noexcept
+{
+        if (!vhci_dev || vhci_dev == INVALID_HANDLE_VALUE) {
+                return ERROR_INVALID_HANDLE;
+        }
+
+        vhci::ioctl::isolate_port_volume req {
+                .port = port,
+                .drive_letter = drive_letter,
+        };
+        req.size = sizeof(req);
+
+        static_assert(std::size(req.nt_device) == MAX_PATH);
+        if (nt_device.size() >= std::size(req.nt_device)) {
+                return ERROR_INVALID_PARAMETER;
+        }
+
+        if (auto err = wcsncpy_s(req.nt_device, nt_device.c_str(), nt_device.size())) {
+                libusbip::output("wcsncpy_s error #{}", err);
+                return ERROR_INVALID_PARAMETER;
+        }
+
+        DWORD bytes_returned{};
+        if (DeviceIoControl(vhci_dev, vhci::ioctl::ISOLATE_PORT_VOLUME,
+                            &req, sizeof(req), nullptr, 0, &bytes_returned, nullptr)) {
+                return ERROR_SUCCESS;
+        }
+
+        auto err = GetLastError();
+        libusbip::output(L"DeviceIoControl(ISOLATE_PORT_VOLUME, port={}, '{}') error {}", port, nt_device, err);
+        return err;
+}
+
+bool define_session_drive_letter(_In_ wchar_t drive_letter, _In_ const std::wstring &nt_device)
 {
         const wchar_t drive[] { drive_letter, L':', L'\0' };
-
-        if (!remove_drive_letter(drive_letter, nt_device)) {
-                libusbip::output(L"Warning: could not remove global drive letter '{}' from \\GLOBAL??; "
-                                 L"isolation from other sessions may be incomplete", drive);
-        }
 
         if (!DefineDosDevice(DDD_RAW_TARGET_PATH, drive, nt_device.c_str())) {
                 auto err = GetLastError();
@@ -755,7 +790,19 @@ bool isolate_drive_letter(_In_ wchar_t drive_letter, _In_ const std::wstring &nt
         return true;
 }
 
+bool isolate_drive_letter(_In_ wchar_t drive_letter, _In_ const std::wstring &nt_device)
+{
+        if (!remove_drive_letter(drive_letter, nt_device)) {
+                libusbip::output(L"Warning: could not remove global drive letter '{}:' from \\GLOBAL??; "
+                                 L"isolation from other sessions may be incomplete", drive_letter);
+        }
+
+        return define_session_drive_letter(drive_letter, nt_device);
+}
+
 std::optional<isolated_volume> isolate_volume(
+        _In_opt_ HANDLE vhci_dev,
+        _In_ int port,
         _In_ const volume_info &v,
         _In_ std::chrono::steady_clock::time_point deadline,
         _In_opt_ HANDLE cancel_event = HANDLE{})
@@ -763,6 +810,18 @@ std::optional<isolated_volume> isolate_volume(
         auto drive_letter = wait_for_volume_drive_letter(v.nt_device, deadline, cancel_event);
         if (check_cancelled(cancel_event)) {
                 return std::nullopt;
+        }
+
+        if (isolate_volume_kernel(vhci_dev, port, v.nt_device, drive_letter) == ERROR_SUCCESS) {
+                if (drive_letter && !define_session_drive_letter(drive_letter, v.nt_device)) {
+                        drive_letter = L'\0';
+                }
+
+                return isolated_volume {
+                        .nt_device = v.nt_device,
+                        .drive_letter = drive_letter,
+                        .dacl_error = ERROR_SUCCESS
+                };
         }
 
         if (drive_letter && !isolate_drive_letter(drive_letter, v.nt_device)) {
@@ -871,8 +930,12 @@ std::expected<std::vector<volume_info>, DWORD> wait_for_port_volumes(
  * returns a valid port (> 0), provided that isolation mode is enabled
  * (config.iso_mode != isolation::none). If the attached device is non-storage
  * or isolation is not requested, this function should not be called.
- * Full volume protection (unmapping from \GLOBAL?? and DACL hardening)
- * requires administrative elevation.
+ *
+ * Privileged volume isolation (\GLOBAL?? drive letter removal and volume/root DACL
+ * hardening) is performed in kernel mode by the VHCI driver via ISOLATE_PORT_VOLUME
+ * (in addition to automatic kernel PnP volume arrival DACL hardening), so standard
+ * non-admin users receive full isolation while this function creates the session-local
+ * DosDevices drive letter in the caller's interactive session.
  */
 auto usbip::isolate_port_volumes(
         _In_ int port,
@@ -896,11 +959,13 @@ auto usbip::isolate_port_volumes(
                 return std::nullopt;
         }
 
+        auto vhci_dev = vhci::open();
+
         std::vector<isolated_volume> volumes;
         volumes.reserve(vols->size());
 
         for (const auto &v: *vols) {
-                if (auto vol = isolate_volume(v, deadline, cancel_event)) {
+                if (auto vol = isolate_volume(vhci_dev.get(), port, v, deadline, cancel_event)) {
                         volumes.push_back(std::move(*vol));
                 } else {
                         return std::nullopt;

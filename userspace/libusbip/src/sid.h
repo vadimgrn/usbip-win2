@@ -13,8 +13,6 @@
 namespace usbip
 {
 
-using vhci::sid_blob;
-
 std::expected<sid_blob, DWORD> get_user_sid() noexcept;
 
 /**

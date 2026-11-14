@@ -286,6 +286,7 @@ const char* libdrv::device_control_name(_In_ ULONG ioctl_code)
         case vhci::ioctl::PLUGIN_HARDWARE_ONCE: return "vhci_plugin_hardware_once";
         case vhci::ioctl::PLUGOUT_HARDWARE_AND_REATTACH: return "vhci_plugout_hardware_and_reattach";
         case vhci::ioctl::INTERNAL_GET_PORT_ISOLATION: return "vhci_get_port_isolation";
+        case vhci::ioctl::ISOLATE_PORT_VOLUME: return "vhci_isolate_port_volume";
 
 	case IOCTL_USB_DIAG_IGNORE_HUBS_ON: return "USB_DIAG_IGNORE_HUBS_ON";
 	case IOCTL_USB_DIAG_IGNORE_HUBS_OFF: return "USB_DIAG_IGNORE_HUBS_OFF";

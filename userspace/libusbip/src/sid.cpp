@@ -292,6 +292,7 @@ std::expected<std::wstring, DWORD> usbip::make_caller_aces(_In_ std::wstring_vie
         constexpr auto &fmt = L"(A;{};GA;;;{})";
         auto aces = std::format(fmt, ace_flags, user_str);
 
+        static_assert(se_group_logon_id == SE_GROUP_LOGON_ID);
         if (auto sid = find_group(groups, SE_GROUP_LOGON_ID)) {
                 auto logon_str = ::to_wstring(sid);
                 if (logon_str.empty()) {
