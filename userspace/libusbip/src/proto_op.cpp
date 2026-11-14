@@ -3,7 +3,12 @@
  */
 
 #include <usbip/proto_op.h>
-#include <intrin.h>
+
+extern "C" {
+unsigned short __cdecl _byteswap_ushort(unsigned short);
+unsigned long __cdecl _byteswap_ulong(unsigned long);
+}
+#pragma intrinsic(_byteswap_ushort, _byteswap_ulong)
 
 namespace
 {
